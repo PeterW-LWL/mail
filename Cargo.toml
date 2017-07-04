@@ -1,0 +1,26 @@
+[package]
+authors = ["Philipp korber <p.korber@1aim.com>"]
+categories = []
+description = "TODO"
+keywords = ["mail", "codec", "mime", "smtp"]
+license = "MIT OR Apache-2.0"
+name = "mail-codec"
+readme = "./README.md"
+repository = "https://github.com/dathinab/mail-codec"
+version = "0.1.0"
+
+build = "./build.rs"
+
+[badges]
+
+[badges.travis-ci]
+branch = "master"
+repository = "dathinab/mail-codec"
+
+[dependencies]
+ascii = "0.8.4"
+chrono = "0.4.0"
+error-chain = "0.10.0"
+mime = "0.3.2"
+owning_ref = "0.3.3"
+quoted_printable = "0.3.0"
