@@ -62,3 +62,40 @@ impl  Deref for Token {
         &*self.0
     }
 }
+
+
+#[cfg(test)]
+mod test {
+    use super::TransferEncoding;
+    use codec::test_utils::*;
+
+    ec_test! {_7bit, {
+        TransferEncoding::_7Bit
+    } => ascii => [
+        LinePart( "7bit" )
+    ]}
+
+    ec_test! {_8bit, {
+        TransferEncoding::_8Bit
+    } => ascii => [
+        LinePart( "8bit" )
+    ]}
+
+    ec_test!{binary, {
+        TransferEncoding::Binary
+    } => ascii => [
+        LinePart( "binary" )
+    ]}
+
+    ec_test!{base64, {
+        TransferEncoding::Base64
+    } => ascii => [
+        LinePart( "base64" )
+    ]}
+
+    ec_test!{quoted_printable, {
+        TransferEncoding::QuotedPrintable
+    } => ascii => [
+        LinePart( "quoted-printable" )
+    ]}
+}

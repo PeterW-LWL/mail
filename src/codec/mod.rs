@@ -12,6 +12,7 @@ pub mod transfer_encoding;
 pub mod utf8_to_ascii;
 
 #[cfg(test)]
+#[macro_use]
 pub mod test_utils;
 
 use self::utf8_to_ascii::q_encode_for_encoded_word;
@@ -35,7 +36,7 @@ pub trait MailEncoder {
     /// an Ascii Mail, which is incorrect but has to be safe wrt. rust's safety.
     fn write_str_unchecked( &mut self, str: &str);
 
-    
+
     fn current_line_byte_length(&self ) -> usize;
 
     //could also be called write_data_unchecked

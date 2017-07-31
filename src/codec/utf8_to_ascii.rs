@@ -1,3 +1,5 @@
+//use std::ascii::AsciiExt;
+
 use ascii::{ AsciiString, AsAsciiStr };
 use codec::MailEncoder;
 use quoted_printable::encode;
@@ -18,6 +20,19 @@ pub fn q_encode_for_encoded_word<E>( encoder: &mut E, _ctx: EncodedWordContext, 
 pub fn puny_code_domain<E>( input: &str, encoder: &mut E )
     where E: MailEncoder
 {
+//    let mut out = String::new();
+//    for ch in input.chars() {
+//        if ch.is_ascii() {
+//            out.push( ch )
+//        } else {
+//            //makar that there was non asci and which non asci
+//        }
+//    }
+//
+//    if has_non_ascii {
+//        out.push( "-" );
+//
+//    }
     if let Ok( val ) = input.as_ascii_str() {
         encoder.write_str( val )
     } else {

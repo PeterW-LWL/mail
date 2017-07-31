@@ -1,10 +1,11 @@
 use std::ops::Deref;
 
-use ascii::{ AsciiString, AsciiStr, AsciiChar };
+use ascii::{ AsciiString, AsciiStr };
 
 use error::*;
 use codec::{ MailEncodable, MailEncoder };
 
+#[derive(Debug, Eq, Hash, PartialEq, Clone)]
 pub struct HeaderName( AsciiString );
 
 impl HeaderName {
@@ -33,7 +34,6 @@ impl MailEncodable for HeaderName {
         where E: MailEncoder
     {
         encoder.write_str( &*self.0 );
-        encoder.write_char( AsciiChar::Colon );
         Ok( () )
     }
 }
@@ -43,4 +43,34 @@ impl Deref for HeaderName {
     fn deref( &self ) -> &AsciiStr {
         &*self.0
     }
+}
+
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use codec::test_utils::LinePart;
+
+    #[test]
+    fn new_valid() {
+        let name = "Content-Randomization-Factor";
+        let valid = HeaderName::new( name.into() ).unwrap();
+        assert_eq!(
+            HeaderName( AsciiString::from_ascii( name ).unwrap() ),
+            valid
+        )
+    }
+
+    #[test]
+    fn new_invalid() {
+        let name = "X@3";
+        let res = HeaderName::new( name.into() );
+        assert_eq!( false, res.is_ok() );
+    }
+
+    ec_test!{ encode_header_name, {
+        HeaderName::new( "X-Random".into() ).unwrap()
+    } => ascii => [
+        LinePart( "X-Random" )
+    ]}
 }

@@ -13,3 +13,15 @@ impl MailEncodable for DateTime {
         Ok( () )
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use codec::test_utils::*;
+
+    ec_test!{ simple, {
+        DateTime::test_time( 45 )
+    } => ascii => [
+        LinePart( "Tue,  6 Aug 2013 04:11:45 +0000" )
+    ]}
+}

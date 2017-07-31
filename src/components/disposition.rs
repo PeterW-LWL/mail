@@ -147,3 +147,44 @@ fn encode_file_name<E>(file_name: &AsciiStr, encoder: &mut E) -> Result<()>
 
 
 deref0!{+mut DispositionParameters => FileMeta }
+
+#[cfg(test)]
+mod test {
+    use ascii::IntoAsciiString;
+
+    use super::*;
+    use codec::test_utils::*;
+    use components::DateTime;
+
+    ec_test!{ no_params_inline, {
+        Disposition::inline()
+    } => ascii => [
+        LinePart("inline")
+    ]}
+
+    ec_test!{ no_params_attachment, {
+        Disposition::attachment()
+    } => ascii => [
+        LinePart("attachment")
+    ]}
+
+    ec_test!{ attachment_all_params, {
+        Disposition::new( DispositionKind::Attachment, FileMeta {
+            file_name: Some( "random.png".into_ascii_string().unwrap() ),
+            creation_date: Some( DateTime::test_time( 1 ) ),
+            modification_date: Some( DateTime::test_time( 2 ) ),
+            read_date: Some( DateTime::test_time( 3 ) ),
+            size: Some( 4096 )
+        })
+    } => ascii => [
+        LinePart( concat!( "attachment",
+            ";filename=random.png",
+            ";creation-date=\"Tue,  6 Aug 2013 04:11:01 +0000\"",
+            ";modification-date=\"Tue,  6 Aug 2013 04:11:02 +0000\"",
+            ";read-date=\"Tue,  6 Aug 2013 04:11:03 +0000\"",
+            ";size=4096" ) )
+    ]}
+
+    //TODO: (1 allow FWS or so in parameters) (2 utf8 file names)
+
+}

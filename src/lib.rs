@@ -23,12 +23,13 @@ extern crate error_chain;
 
 #[macro_use]
 mod macros;
+#[cfg_attr(test, macro_use)]
+pub mod codec;
 
 pub mod error;
 pub mod mail;
 pub mod mail_composition;
 
-pub mod codec;
 pub mod headers;
 pub mod components;
 pub mod char_validators;

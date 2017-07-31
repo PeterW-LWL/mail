@@ -19,7 +19,8 @@ use codec::{ MailEncoder, MailEncodable };
 //    pub trailing: Vec<WS>
 //}
 
-pub type FWS = ();
+#[derive(Debug, Hash, Clone, Eq, PartialEq, Serialize)]
+pub struct FWS;
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize)]
 pub enum CFWS {
@@ -39,6 +40,21 @@ impl MailEncodable for CFWS {
             }
         }
         Ok( () )
+    }
+
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use codec::{ test_utils as t };
+
+    ec_test!{ simple_encode,
+        {
+            CFWS::SingleFws( FWS )
+        } => utf8 => [
+            t::FWS
+        ]
     }
 
 }

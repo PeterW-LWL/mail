@@ -1,6 +1,7 @@
 use serde;
 use std::rc::Rc;
 use std::ops::{ Deref };
+use std::cmp::PartialEq;
 use std::result::{ Result as StdResult };
 
 use owning_ref::OwningRef;
@@ -13,7 +14,7 @@ use ascii::{ AsciiString, AsciiStr, FromAsciiError };
 /// context's with different restrictions, but different to an Item it
 /// might contain characters which require encoding (e.g. encoded words)
 /// to represent them
-#[derive(Debug, Clone, Hash, Eq, PartialEq)]
+#[derive(Debug, Clone, Hash, Eq )]
 pub enum Input {
     Owned(String),
     Shared(OwningRef<Rc<String>, str>)
@@ -36,6 +37,14 @@ pub enum SimpleItem {
 }
 
 impl Input {
+
+    pub fn into_shared( self ) -> Self {
+        use self::Input::*;
+        match self {
+            Owned( value ) => Shared( OwningRef::new( Rc::new( value ) ).map( |rced| &**rced ) ),
+            v @ Shared( .. ) => v
+        }
+    }
 
     pub fn into_simple_item( self ) -> SimpleItem {
         match self {
@@ -82,6 +91,20 @@ impl Input {
         }
     }
 }
+
+impl PartialEq for Input {
+    fn eq(&self, other: &Input) -> bool {
+        let me: &str = &*self;
+        let other: &str = &*other;
+        me == other
+    }
+}
+
+impl<'a> From<&'a str> for Input {
+    fn from( s: &'a str ) -> Self {
+        Input::Owned( s.into() )
+    }
+}
 impl From<String> for Input {
     fn from( s: String ) -> Self {
         Input::Owned( s )
@@ -107,7 +130,7 @@ macro_rules! inner_impl {
         /// a InnerItem is something potential appearing in Mail, e.g. an encoded word, an
         /// atom or a email address, but not some content which has to be represented
         /// as an encoded word, as such String is a suite representation,
-        #[derive(Debug, Clone, Hash, Eq, PartialEq)]
+        #[derive(Debug, Clone, Hash, Eq)]
         pub enum $name {
             Owned($owned_form),
             Shared(OwningRef<Rc<$owned_form>, $borrowed_form>)
@@ -146,9 +169,91 @@ macro_rules! inner_impl {
             }
         }
 
+        impl PartialEq for $name {
+            fn eq(&self, other: &$name) -> bool {
+                let me: &$borrowed_form = &*self;
+                let other: &$borrowed_form = &*other;
+                me == other
+            }
+        }
+
     )
 }
 
 inner_impl!{ InnerAsciiItem, AsciiString, AsciiStr }
 inner_impl!{ InnerUtf8Item, String, str }
 //inner_impl!{ InnerOtherItem, OtherString, OtherStr }
+
+
+#[cfg(test)]
+mod test {
+    use std::str::FromStr;
+    use super::*;
+
+    #[test]
+    fn input_eq() {
+        let a = Input::Owned( "same".into() );
+        let b = Input::Shared(
+            OwningRef::new(
+                Rc::new( String::from( "same" ) ) )
+            .map(|v| &**v)
+        );
+        assert_eq!( a, b );
+    }
+
+    #[test]
+    fn input_neq() {
+        let a = Input::Owned( "not same".into() );
+        let b = Input::Shared(
+            OwningRef::new(
+                Rc::new( String::from( "not at all same" ) ) )
+                .map(|v| &**v)
+        );
+        assert_ne!( a, b );
+    }
+
+    #[test]
+    fn inner_ascii_item_eq() {
+        let a = InnerAsciiItem::Owned( AsciiString::from_str( "same" ).unwrap() );
+        let b = InnerAsciiItem::Shared(
+            OwningRef::new(
+                Rc::new( AsciiString::from_str( "same" ).unwrap() ) )
+                .map(|v| &**v)
+        );
+        assert_eq!( a, b );
+    }
+
+    #[test]
+    fn inner_ascii_item_neq() {
+        let a = InnerAsciiItem::Owned( AsciiString::from_str( "same" ).unwrap() );
+        let b = InnerAsciiItem::Shared(
+            OwningRef::new(
+                Rc::new( AsciiString::from_str( "not same" ).unwrap() ) )
+                .map(|v| &**v)
+        );
+        assert_ne!( a, b );
+    }
+
+    #[test]
+    fn inner_utf8_item_eq() {
+        let a = InnerUtf8Item::Owned( String::from( "same" ) );
+        let b = InnerUtf8Item::Shared(
+            OwningRef::new(
+                Rc::new( String::from( "same" ) ) )
+                .map(|v| &**v)
+        );
+        assert_eq!( a, b );
+    }
+
+    #[test]
+    fn inner_utf8_item_neq() {
+        let a = InnerUtf8Item::Owned( String::from( "same" ) );
+        let b = InnerUtf8Item::Shared(
+            OwningRef::new(
+                Rc::new( String::from( "not same" ) ) )
+                .map(|v| &**v)
+        );
+        assert_ne!( a, b );
+    }
+
+}

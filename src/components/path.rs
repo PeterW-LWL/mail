@@ -24,3 +24,33 @@ impl MailEncodable for Path {
     }
 }
 //NOTE for parsing we have to make sure to _require_ '<>' around the email
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use codec::test_utils::*;
+
+    ec_test!{empty_path, {
+        Path( None )
+    } => ascii => [
+        OptFWS,
+        LinePart( "<>" ),
+        OptFWS
+    ]}
+
+    ec_test!{simple_path, {
+        Path( Some( Email::from_input( "abc@de.fg".into() ).unwrap() ) )
+    } => ascii => [
+        OptFWS,
+        LinePart( "<" ),
+        OptFWS,
+        LinePart("abc"),
+        OptFWS,
+        LinePart("@"),
+        OptFWS,
+        LinePart("de.fg"),
+        OptFWS,
+        LinePart(">"),
+        OptFWS
+    ]}
+}

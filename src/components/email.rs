@@ -26,6 +26,31 @@ pub struct LocalPart( SimpleItem );
 pub struct Domain( SimpleItem );
 
 
+impl Email {
+
+    pub fn from_input( email: Input ) -> Result<Self> {
+        let email = email.into_shared();
+        match email {
+            Input::Owned( .. ) => unreachable!(),
+            Input::Shared( shared ) => {
+                //1. ownify Input
+                //2. get 2 sub shares split befor/after @
+                let index = shared.find( "@" )
+                    .ok_or_else( ||-> Error { "invalide email".into() } )?; //bail!( "" )
+
+                let left = shared.clone().map( |all| &all[..index] );
+                let local_part = LocalPart::from_input( Input::Shared( left ) )?;
+                //index+1 is ok as '@'.utf8_len() == 1
+                let right = shared.map( |all| &all[index+1..] );
+                let domain = Domain::from_input( Input::Shared( right ) );
+                Ok( Email { local_part, domain } )
+            }
+        }
+
+
+
+    }
+}
 
 impl MailEncodable for Email {
 
@@ -47,7 +72,7 @@ impl LocalPart {
         let mut mail_type = MailType::Ascii;
         for char in input.chars() {
             if !is_atext( char, mail_type ) {
-                if char.len_utf8() > 0 {
+                if char.len_utf8() > 1 {
                     mail_type = MailType::Internationalized;
                     if is_atext( char, mail_type ) {
                         continue;
@@ -78,6 +103,7 @@ impl MailEncodable for LocalPart {
         where E: MailEncoder
     {
         use super::utils::item::SimpleItem::*;
+        encoder.note_optional_fws();
         match self.0 {
             Ascii( ref ascii ) => {
                 encoder.write_str( ascii );
@@ -86,6 +112,7 @@ impl MailEncodable for LocalPart {
                 encoder.try_write_utf8( utf8 )?;
             }
         }
+        encoder.note_optional_fws();
         Ok( () )
     }
 }
@@ -108,6 +135,7 @@ impl MailEncodable for Domain {
     fn encode<E>( &self, encoder: &mut E ) -> Result<()>
         where E: MailEncoder
     {
+        encoder.note_optional_fws();
         match self.0 {
             SimpleItem::Ascii( ref ascii ) => {
                 encoder.write_str( ascii )
@@ -118,6 +146,7 @@ impl MailEncodable for Domain {
                 }
             }
         }
+        encoder.note_optional_fws();
         Ok( () )
     }
 }
@@ -125,6 +154,7 @@ impl MailEncodable for Domain {
 
 fn quote( input: &str ) -> Result<String> {
     let mut out = String::new();
+    out.push( '"' );
     for char in input.chars() {
         if is_qtext( char, MailType::Internationalized ) {
            out.push( char )
@@ -142,5 +172,119 @@ fn quote( input: &str ) -> Result<String> {
             }
         }
     }
+    out.push( '"' );
     Ok( out )
+}
+
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use codec::test_utils::*;
+
+    #[test]
+    fn quote_simple() {
+        assert_eq!( String::from( "\"tralala\""), quote("tralala").unwrap() );
+    }
+
+    #[test]
+    fn quote_some_chars() {
+        assert_eq!( String::from( "\"tr@al\\ al\\\"a\""), quote("tr@al al\"a").unwrap() );
+    }
+
+    #[test]
+    fn quote_ctl() {
+        let res = quote("\x01");
+        assert_eq!( false, res.is_ok() );
+    }
+
+
+    #[test]
+    fn email_from_input() {
+        let email = Email::from_input( "abc@de.fg".into() ).unwrap();
+        assert_eq!(
+            Email {
+                local_part: LocalPart::from_input( "abc".into() ).unwrap(),
+                domain: Domain::from_input( "de.fg".into() )
+            },
+            email
+        )
+    }
+
+
+
+    ec_test!{ local_part_simple, {
+        LocalPart::from_input(  "hans".into() ).unwrap()
+    } => ascii => [
+        OptFWS,
+        LinePart("hans"),
+        OptFWS
+    ]}
+
+    //fails tries to write utf8
+    ec_test!{ local_part_quoted, {
+        LocalPart::from_input(  "ha ns".into() ).unwrap()
+    } => ascii => [
+        OptFWS,
+        LinePart("\"ha\\ ns\""),
+        OptFWS
+    ]}
+
+
+    ec_test!{ local_part_utf8, {
+        LocalPart::from_input( "Jörn".into() ).unwrap()
+    } => utf8 => [
+        OptFWS,
+        LinePart( "Jörn" ),
+        OptFWS
+    ]}
+
+    #[test]
+    fn local_part_utf8_on_ascii() {
+        let mut ec = TestMailEncoder::new( MailType::Ascii );
+        let local = LocalPart::from_input( "Jörn".into() ).unwrap();
+        let res = local.encode( &mut ec );
+        assert_eq!( false, res.is_ok() );
+    }
+
+    ec_test!{ domain, {
+        Domain::from_input( "bad.at.domain".into() )
+    } => ascii => [
+        OptFWS,
+        LinePart( "bad.at.domain" ),
+        OptFWS
+    ]}
+
+    ec_test!{ domain_international, {
+        Domain::from_input( "dömain".into() )
+    } => utf8 => [
+        OptFWS,
+        LinePart( "dömain" ),
+        OptFWS
+    ]}
+
+//TODO implement punnycode
+//    ec_test!{ domain_encoded, {
+//
+//    } => ascii => [
+//
+//    ]}
+//
+
+
+    ec_test!{ email_simple, {
+        Email {
+            local_part: LocalPart::from_input( "simple".into() ).unwrap(),
+            domain: Domain::from_input( "and.ascii".into() )
+        }
+    } => ascii => [
+        OptFWS,
+        LinePart( "simple" ),
+        OptFWS,
+        LinePart( "@" ),
+        OptFWS,
+        LinePart( "and.ascii" ),
+        OptFWS
+    ]}
+
 }

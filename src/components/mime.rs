@@ -39,3 +39,21 @@ impl Error for MimeFromStrError {
         "parsing mime from str failed"
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use codec::test_utils::*;
+
+    ec_test!{simple,{
+        let mime: Mime = "text/wtf;charset=utf8;random=alot".parse().unwrap();
+        mime
+    } => ascii => [
+        LinePart("text/wtf;charset=utf8;random=alot")
+    ]}
+
+    //TODO test international extension:
+    // 0. check if relevant for mime (it's relevant for some other part based on the _same grammar_)
+    // 1. splitting parameters over multiple lines
+    // 2. non ascii parameters encoded with charset and language information
+}

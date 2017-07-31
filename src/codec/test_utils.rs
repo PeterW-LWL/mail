@@ -10,6 +10,32 @@ use char_validators::{ is_atext, MailType };
 use char_validators::encoded_word::EncodedWordContext;
 use super::MailEncoder;
 
+
+#[macro_export]
+macro_rules! ec_test {
+    ( $name:ident, $inp:block => $mt:tt => [ $($state:expr),* ] ) => (
+        #[test]
+        fn $name() {
+            use codec::MailEncodable;
+            use codec::test_utils::TestMailEncoder;
+
+            let mt_str = stringify!($mt).to_uppercase();
+            let mt = match mt_str.as_str() {
+                "UTF8" => $crate::char_validators::MailType::Internationalized,
+                "ASCII" =>  $crate::char_validators::MailType::Ascii,
+                other => panic!( "invalide string for mail type: {}", other)
+            };
+            let mut ec = TestMailEncoder::new(mt);
+            let to_encode = $inp;
+            to_encode.encode( &mut ec ).unwrap();
+            assert_eq!( vec![
+                $($state),*
+            ], ec.into_state_seq() );
+        }
+    );
+}
+
+
 #[derive(Debug, Hash, Eq, PartialEq, Clone)]
 pub enum State {
     Line(String),
@@ -106,7 +132,7 @@ impl MailEncoder for TestMailEncoder {
             self.current_line += data;
             Ok( () )
         } else {
-            bail!( "no write utf8" )
+            bail!( "[test] trying to write utf8 on ascii encoder: {:?}", data )
         }
     }
 
