@@ -11,6 +11,9 @@ use utils::insert_bytes;
 pub mod transfer_encoding;
 pub mod utf8_to_ascii;
 
+#[cfg(test)]
+pub mod test_utils;
+
 use self::utf8_to_ascii::q_encode_for_encoded_word;
 
 pub trait MailEncoder {
@@ -32,8 +35,7 @@ pub trait MailEncoder {
     /// an Ascii Mail, which is incorrect but has to be safe wrt. rust's safety.
     fn write_str_unchecked( &mut self, str: &str);
 
-
-    fn break_line_on_last_cfws( &mut self );
+    
     fn current_line_byte_length(&self ) -> usize;
 
     //could also be called write_data_unchecked
@@ -87,6 +89,21 @@ impl MailEncoderImpl {
     pub fn buffer_ref( &self ) -> &[u8] {
         &*self.inner
     }
+
+    pub fn break_line_on_last_cfws( &mut self )  {
+        //FIXME forbid the creation of "ws-only lines in broken headers"
+        if let Some( cfws_pos ) = self.last_cfws_pos {
+            self.last_cfws_pos = None;
+
+            if self.inner[cfws_pos] == b' ' {
+                insert_bytes(&mut self.inner, cfws_pos, b"\r\n" );
+            } else {
+                insert_bytes(&mut self.inner, cfws_pos, b"\r\n " );
+            }
+
+            self.current_line_byte_length = self.inner.len() - (cfws_pos + 2)
+        }
+    }
 }
 
 impl MailEncoder for MailEncoderImpl {
@@ -118,20 +135,7 @@ impl MailEncoder for MailEncoderImpl {
         };
     }
 
-    fn break_line_on_last_cfws( &mut self )  {
-        //FIXME forbid the creation of "ws-only lines in broken headers"
-        if let Some( cfws_pos ) = self.last_cfws_pos {
-            self.last_cfws_pos = None;
 
-            if self.inner[cfws_pos] == b' ' {
-                insert_bytes(&mut self.inner, cfws_pos, b"\r\n" );
-            } else {
-                insert_bytes(&mut self.inner, cfws_pos, b"\r\n " );
-            }
-
-            self.current_line_byte_length = self.inner.len() - (cfws_pos + 2)
-        }
-    }
 
     fn current_line_byte_length(&self ) -> usize {
         self.current_line_byte_length

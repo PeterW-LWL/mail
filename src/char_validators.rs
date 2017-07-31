@@ -101,13 +101,7 @@ pub fn is_tspecial( ch: char ) -> bool {
 /// atext as defined by RFC 5322
 #[inline(always)]
 pub fn is_atext( ch: char, tp: MailType  ) -> bool {
-    use self::MailType::*;
-    ( ! is_special( ch ) ) || {
-        match tp {
-            Ascii => false,
-            Internationalized => ch.len_utf8() > 1
-        }
-    }
+    is_vchar( ch, tp) && !is_special( ch )
 }
 
 ///dtext as defined by RFC 5322
