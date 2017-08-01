@@ -1,22 +1,21 @@
-use error:*;
+use error::*;
 use char_validators::{ is_vchar, is_ws, MailType };
 
 #[derive(Copy, Clone)]
 pub enum Partition<'a> {
     //from -> to the start of the next block
-    SPACE(&str),
-    VCHAR(&str)
+    SPACE(&'a str),
+    VCHAR(&'a str)
 }
 
-#[derive(Copy)]
-#[repr(bool)]
+#[derive(Clone, Copy, PartialEq)]
 enum Type { SPACE, VCHAR }
 
 pub fn partition<'a>( text: &'a str ) -> Result< Vec< Partition<'a> > > {
     use self::Type::*;
 
     if text.len() == 0 {
-        return Vec::new()
+        return Ok( Vec::new() );
     }
 
     // unwrap is ok, as we return earlier if len == 0
@@ -38,7 +37,7 @@ pub fn partition<'a>( text: &'a str ) -> Result< Vec< Partition<'a> > > {
             }
         } else if is_ws( char ) || char == '\r' || char == '\n' {
             if current_type == VCHAR {
-                partitions.push( Partition::VCHAR( &test[start_of_current..idx] ) );
+                partitions.push( Partition::VCHAR( &text[start_of_current..idx] ) );
                 start_of_current = idx;
                 current_type = SPACE
             }
@@ -49,9 +48,9 @@ pub fn partition<'a>( text: &'a str ) -> Result< Vec< Partition<'a> > > {
 
 
     partitions.push( match current_type {
-        SPACE => Partition::SPACE( &test[start_of_current..] ),
-        VCHAR => Partition::VCHAR( &test[start_of_current..] )
+        SPACE => Partition::SPACE( &text[start_of_current..] ),
+        VCHAR => Partition::VCHAR( &text[start_of_current..] )
     } );
 
-    partitions
+    Ok( partitions )
 }

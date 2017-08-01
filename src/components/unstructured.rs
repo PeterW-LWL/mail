@@ -1,7 +1,10 @@
+use ascii::AsciiChar;
+
 use error::*;
 use codec::{ MailEncoder, MailEncodable };
-use char_validators::{ is_vchar, is_ws, MailType };
+use char_validators::is_vchar;
 use char_validators::encoded_word::EncodedWordContext;
+
 use super::utils::text_partition::{partition, Partition};
 use super::utils::item::Input;
 
@@ -37,12 +40,9 @@ impl MailEncodable for Unstructured {
 
         let blocks = partition( text )?;
 
-        let mut biter = blocks.into_iter();
-
         //UNWRAP_SAFETY: is safe because we pushed at last one (current_block)
-        let this_block = biter.next().unwrap();
-        for next_block in biter {
-            match this_block {
+        for block in blocks.into_iter() {
+            match block {
                 Partition::VCHAR( data ) => {
                     let needs_encoding = data
                         .chars()
@@ -67,10 +67,12 @@ impl MailEncodable for Unstructured {
                         if char == '\r' || char == '\n' {
                             continue;
                         } else if had_fws {
-                            encoder.write_char( char );
+                            //OPTIMIZE: from_unchecked as char is always a char in this context
+                            encoder.write_char( AsciiChar::from( char ).unwrap() );
                         } else {
                             //FIXME allow writing fws based on '\t'
                             encoder.write_fws();
+                            had_fws = true;
                         }
                     }
                     if !had_fws {
