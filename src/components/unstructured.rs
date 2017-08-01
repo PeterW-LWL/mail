@@ -2,7 +2,7 @@ use error::*;
 use codec::{ MailEncoder, MailEncodable };
 use char_validators::{ is_vchar, is_ws, MailType };
 use char_validators::encoded_word::EncodedWordContext;
-
+use super::utils::text_partition::{partition, Partition};
 use super::utils::item::Input;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -48,63 +48,16 @@ impl MailEncodable for Unstructured {
         //      for not encode them  but later have some "strictness" level
         //      deceiding weither to 1. drop them , 2. error on them
 
-        #[derive(Copy, Clone)]
-        enum Block {
-            //from -> to the start of the next block
-            FWS(usize),
-            VCHARS(usize)
-        }
 
-        // unwrap is ok, as we return earlier if len == 0
-        let start_with_vchar = is_vchar( text.chars().next().unwrap(), MailType::Internationalized);
-        let mut blocks =  Vec::new();
-        let mut current_block = if start_with_vchar {
-            Block::VCHARS(0)
-        } else {
-            Block::FWS(0)
-        };
-
-
-        for (idx, char) in text.char_indices() {
-            if is_vchar( char, MailType::Internationalized ) {
-                current_block = match current_block {
-                    Block::VCHARS( start )  => {
-                        Block::VCHARS( start )
-                    },
-                    Block::FWS( start ) => {
-                        blocks.push( Block::FWS( start ) );
-                        Block::VCHARS( idx )
-                    }
-                }
-            } else if is_ws( char ) || char == '\r' || char == '\n' {
-                current_block = match current_block {
-                    Block::VCHARS( start ) => {
-                        blocks.push( Block::VCHARS( start ) );
-                        Block::FWS( idx )
-                    },
-                    Block::FWS( start ) => {
-                        Block::FWS( start )
-                    }
-                }
-            } else {
-                bail!( "non encodable character in ustructured: {:?}", char );
-            }
-        }
-
-        blocks.push( current_block );
+        let blocks = partition( text )?;
 
         let mut biter = blocks.into_iter();
 
         //unwrap is safe because we pushed at last one (current_block)
         let this_block = biter.next().unwrap();
         for next_block in biter {
-            let end = match next_block {
-                Block::VCHARS( start ) => start,
-                Block::FWS( start ) => start
-            };
             match this_block {
-                Block::VCHARS( start ) => {
-                    let data = &text[start..end];
+                Partition::VCHAR( data ) => {
                     let needs_encoding = data
                         .chars()
                         .any(|ch| !is_vchar( ch, encoder.mail_type() ) );
@@ -119,7 +72,11 @@ impl MailEncodable for Unstructured {
                         encoder.write_str_unchecked( data )
                     }
                 },
-                Block::FWS( _fws ) => {
+                Partition::SPACE( data ) => {
+                    //NOTE: space has to be at last one horizontal-white-space
+                    // (required by the possibility of VCHAR partitions beeing
+                    //  encoded words)
+
                     //let data = text[start..end];
                     //FIXME it currently collapses all FWS into a single space, possible folding
                     // if the line would be to long otherwise, this has the benefit that there
