@@ -5,7 +5,7 @@ use ascii::{ AsciiChar, AsciiStr };
 
 use error::*;
 use codec::{ MailEncodable, MailEncoder };
-use char_validators::{ is_ctl, is_tspecial };
+use grammar::{is_ctl, is_tspecial };
 use types::FileMeta;
 
 

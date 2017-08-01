@@ -32,7 +32,7 @@ pub mod mail_composition;
 
 pub mod headers;
 pub mod components;
-pub mod char_validators;
+pub mod grammar;
 
 pub mod types;
 mod utils;

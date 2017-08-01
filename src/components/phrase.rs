@@ -1,7 +1,7 @@
 use error::*;
 use types::Vec1;
 use codec::{ MailEncodable, MailEncoder };
-use char_validators::encoded_word::EncodedWordContext;
+use grammar::encoded_word::EncodedWordContext;
 
 use super::utils::item::{ Input, Item };
 use super::utils::text_partition::{ Partition, partition };

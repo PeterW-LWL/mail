@@ -6,8 +6,8 @@ use std::mem;
 use ascii::{ AsciiChar,  AsciiStr };
 
 use error::*;
-use char_validators::{ is_atext, MailType };
-use char_validators::encoded_word::EncodedWordContext;
+use grammar::{is_atext, MailType };
+use grammar::encoded_word::EncodedWordContext;
 use super::MailEncoder;
 
 
@@ -21,8 +21,8 @@ macro_rules! ec_test {
 
             let mt_str = stringify!($mt).to_uppercase();
             let mt = match mt_str.as_str() {
-                "UTF8" => $crate::char_validators::MailType::Internationalized,
-                "ASCII" =>  $crate::char_validators::MailType::Ascii,
+                "UTF8" => $crate::grammar::MailType::Internationalized,
+                "ASCII" =>  $crate::grammar::MailType::Ascii,
                 other => panic!( "invalide string for mail type: {}", other)
             };
             let mut ec = TestMailEncoder::new(mt);

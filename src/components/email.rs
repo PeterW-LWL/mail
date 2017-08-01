@@ -4,7 +4,7 @@ use error::*;
 use codec::{ MailEncoder, MailEncodable };
 use codec::utf8_to_ascii::puny_code_domain;
 use codec::quote::quote;
-use char_validators::{ is_atext, MailType };
+use grammar::{is_atext, MailType };
 
 
 use super::utils::item::{ SimpleItem, Input, InnerAsciiItem, InnerUtf8Item };

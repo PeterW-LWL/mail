@@ -1,7 +1,7 @@
 
 
-use char_validators::{ is_atext, MailType };
-use char_validators::encoded_word::EncodedWordContext;
+use grammar::{is_atext, MailType };
+use grammar::encoded_word::EncodedWordContext;
 
 use ascii::{  AsciiStr, AsciiChar };
 

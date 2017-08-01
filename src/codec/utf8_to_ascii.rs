@@ -3,7 +3,7 @@
 use ascii::{ AsciiString, AsAsciiStr };
 use codec::MailEncoder;
 use quoted_printable::encode;
-use char_validators::encoded_word::EncodedWordContext;
+use grammar::encoded_word::EncodedWordContext;
 
 pub fn q_encode_for_encoded_word<E>( encoder: &mut E, _ctx: EncodedWordContext, input: &str )
     where E: MailEncoder

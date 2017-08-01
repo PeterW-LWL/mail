@@ -3,11 +3,11 @@ use codec::{ MailEncodable, MailEncoder };
 
 use super::utils::item::Item;
 
-use char_validators::{
+use grammar::{
     is_atext, is_ctl, MailType
 };
-use char_validators::quoted_word::is_quoted_word;
-use char_validators::encoded_word::{
+use grammar::quoted_word::is_quoted_word;
+use grammar::encoded_word::{
     is_encoded_word,
     EncodedWordContext
 };

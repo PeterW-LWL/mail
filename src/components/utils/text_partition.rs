@@ -1,5 +1,5 @@
 use error::*;
-use char_validators::{ is_vchar, is_ws, MailType };
+use grammar::{is_vchar, is_ws, MailType };
 
 #[derive(Copy, Clone)]
 pub enum Partition<'a> {

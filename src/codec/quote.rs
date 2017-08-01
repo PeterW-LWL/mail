@@ -2,7 +2,7 @@ use std::ops::Deref;
 
 use error::*;
 use ascii::AsciiString;
-use char_validators::{ is_qtext, is_ws, is_vchar, MailType };
+use grammar::{is_qtext, is_ws, is_vchar, MailType };
 
 //FIXME prevent construction of invalide Quoted
 #[derive( Debug, Clone, Hash, Eq, PartialEq )]

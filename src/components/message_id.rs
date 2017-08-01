@@ -45,7 +45,7 @@ impl MailEncodable for MessageID {
 
 mod parser_parts {
     use nom::IResult;
-    use char_validators::{ is_atext, is_dtext, MailType };
+    use grammar::{is_atext, is_dtext, MailType };
 
     pub fn id_left( input: &str ) -> IResult<&str, &str> {
         dot_atom_text( input )

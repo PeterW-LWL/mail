@@ -2,8 +2,8 @@ use ascii::AsciiChar;
 
 use error::*;
 use codec::{ MailEncoder, MailEncodable };
-use char_validators::is_vchar;
-use char_validators::encoded_word::EncodedWordContext;
+use grammar::is_vchar;
+use grammar::encoded_word::EncodedWordContext;
 
 use super::utils::text_partition::{partition, Partition};
 use super::utils::item::Input;
