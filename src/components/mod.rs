@@ -22,7 +22,7 @@ pub use self::message_id::{ MessageID, MessageIDList };
 
 
 mod cfws;
-pub use self::cfws::CFWS;
+pub use self::cfws::{ CFWS, FWS };
 
 mod header_name;
 pub use self::header_name::HeaderName;
