@@ -3,7 +3,8 @@ use ascii::{ AsciiChar,  IntoAsciiString };
 use error::*;
 use codec::{ MailEncoder, MailEncodable };
 use codec::utf8_to_ascii::puny_code_domain;
-use char_validators::{ is_atext, is_qtext, is_vchar, is_ws, MailType };
+use codec::quote::quote;
+use char_validators::{ is_atext, MailType };
 
 
 use super::utils::item::{ SimpleItem, Input, InnerAsciiItem, InnerUtf8Item };
@@ -82,7 +83,7 @@ impl LocalPart {
             }
         }
         let input = if requires_quoting {
-            Input::Owned( quote( &*input )? )
+            Input::Owned( quote( &*input )?.into_string() )
         } else {
             input
         };
@@ -152,29 +153,7 @@ impl MailEncodable for Domain {
 }
 
 
-fn quote( input: &str ) -> Result<String> {
-    let mut out = String::new();
-    out.push( '"' );
-    for char in input.chars() {
-        if is_qtext( char, MailType::Internationalized ) {
-           out.push( char )
-        } else {
-            //NOTE: while quoting ws is possible it is not nessesary as
-            // a quoted string can contain FWS, and only CRLF in a quoted
-            // string are semantically invisible (meaning the WSP after
-            // CRLF _is_ semantically visible)
-            if is_vchar( char, MailType::Internationalized) || is_ws( char ) {
-                out.push( '\\' );
-                out.push( char );
-            } else {
-                // char: 0-31
-                bail!( "can not quote char: {:?}", char );
-            }
-        }
-    }
-    out.push( '"' );
-    Ok( out )
-}
+
 
 
 #[cfg(test)]
@@ -184,12 +163,12 @@ mod test {
 
     #[test]
     fn quote_simple() {
-        assert_eq!( String::from( "\"tralala\""), quote("tralala").unwrap() );
+        assert_eq!( "\"tralala\"", &*quote("tralala").unwrap() );
     }
 
     #[test]
     fn quote_some_chars() {
-        assert_eq!( String::from( "\"tr@al\\ al\\\"a\""), quote("tr@al al\"a").unwrap() );
+        assert_eq!(  "\"tr@al\\ al\\\"a\"", &*quote("tr@al al\"a").unwrap() );
     }
 
     #[test]

@@ -10,6 +10,7 @@ use utils::insert_bytes;
 
 pub mod transfer_encoding;
 pub mod utf8_to_ascii;
+pub mod quote;
 
 #[cfg(test)]
 #[macro_use]

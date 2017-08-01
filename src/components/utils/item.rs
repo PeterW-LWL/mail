@@ -7,6 +7,8 @@ use std::result::{ Result as StdResult };
 use owning_ref::OwningRef;
 use ascii::{ AsciiString, AsciiStr, FromAsciiError };
 
+use codec::quote::Quoted;
+
 //FEATURE_TODO(non_utf8_input): use (Vec<u8>, Encoding) instead of String in Input
 //  but keep String in item, as there non utf8 input is not allowed
 
@@ -22,11 +24,21 @@ pub enum Input {
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]
 pub enum Item {
-    Ascii( InnerAsciiItem ),
-    Encoded( InnerAsciiItem ),
-    Utf8( InnerUtf8Item ),
-    //Other( InnerOtherItem )
+    /// A Item::Input, differs to Input as there can already be some restrictions on it,
+    /// e.g. a Item::Input in a Word is meant to be _one_ (possible encoded) word
+    Input(Input),
+
+    /// A Item which is an encoded word
+    EncodedWord(InnerAsciiItem),
+
+    /// A quoted string
+    QuotedString(Quoted),
+
+
+    //FEATURE_TODO(non_utf8_input):
+    // NonUtf8Input(...)
 }
+
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize)]
 pub enum SimpleItem {
