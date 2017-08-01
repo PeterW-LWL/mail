@@ -7,7 +7,6 @@ use ascii::AsciiStr;
 use error::*;
 use headers::Header;
 use headers::Header::*;
-use components::utils::item::Input;
 
 use components::{
     Disposition,
@@ -94,7 +93,7 @@ impl<T, C, CP, D> Compositor<T, C, CP, D>
         let mut data = data;
         //compose display name => create Address with display name;
         let ( subject, from_mailbox, to_mailbox ) =
-            self.preprocess_send_context( send_context, &mut data );
+            self.preprocess_send_context( send_context, &mut data )?;
 
         let core_headers = vec![
             From( MailboxList::from_single( from_mailbox ) ),
@@ -120,23 +119,23 @@ impl<T, C, CP, D> Compositor<T, C, CP, D>
     /// and converts the String subject into a "Unstructured" text
     /// returns (subjcet, from_mail, to_mail)
     pub fn preprocess_send_context( &self, sctx: MailSendContext, data: &mut D )
-        -> (Unstructured, Mailbox, Mailbox)
+        -> Result<(Unstructured, Mailbox, Mailbox)>
     {
         let from_mailbox = sctx.from;
         let to_mailbox = {
             let mut to_mailbox = sctx.to;
             if to_mailbox.display_name.is_none() {
-                to_mailbox.display_name = self.name_composer
-                    .compose_name( data )
-                    //FIXME handle error
-                    .and_then( |name| Phrase::from_input( Input::from( name ) ).ok() )
+                if let Some( new_name ) = self.name_composer.compose_name( data ) {
+                    let phrase = Phrase::from_input( new_name.into() )?;
+                    to_mailbox.display_name = Some( phrase );
+                }
             }
             to_mailbox
         };
         let subject = Unstructured:: from_string( sctx.subject );
         data.see_from_mailbox( &from_mailbox );
         data.see_to_mailbox( &to_mailbox );
-        ( subject, from_mailbox, to_mailbox )
+        Ok( ( subject, from_mailbox, to_mailbox ) )
     }
 
     /// Preprocesses the data moving attachments out of it and replacing
