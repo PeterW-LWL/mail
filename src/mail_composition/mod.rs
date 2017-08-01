@@ -102,7 +102,6 @@ impl<T, C, CP, D> Compositor<T, C, CP, D>
             //TODO: what else? MessageId? Signature? ... or is it added by relay
         ];
 
-        //FIXME[BUG] embeddings is unused?? that should not be the case!!
         let ( embeddings, mut attachments ) = self.preprocess_data( &mut data );
 
         let ( bodies, extracted_attachments ) =
