@@ -44,6 +44,16 @@ impl<T> Vec1<T> {
         Vec1( vec )
     }
 
+    pub fn last( &self ) -> &T {
+        //UNWRAP_SAFE: len is at last 1
+        self.0.last().unwrap()
+    }
+
+    pub fn last_mut( &mut self ) -> &mut T {
+        //UNWRAP_SAFE: len is at last 1
+        self.0.last_mut().unwrap()
+    }
+
     pub fn reserve(&mut self, additional: usize) {
         self.0.reserve( additional )
     }
