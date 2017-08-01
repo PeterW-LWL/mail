@@ -30,6 +30,14 @@ impl<T> Vec1<T> {
         Vec1( vec![ first ] )
     }
 
+    pub fn from_vec( vec: Vec<T> ) -> StdResult<Self, Vec<T>> {
+        if vec.len() > 0 {
+            Ok( Vec1( vec ) )
+        } else {
+            Err( vec )
+        }
+    }
+
     pub fn new_with_capacity( first: T, capacity: usize ) -> Self {
         let mut vec = Vec::with_capacity( capacity );
         vec.push( first );
