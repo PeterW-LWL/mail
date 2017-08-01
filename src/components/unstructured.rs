@@ -34,26 +34,12 @@ impl MailEncodable for Unstructured {
         if text.len() == 0 {
             return Ok( () )
         }
-        // unstructured    =   (*([FWS] VCHAR) *WSP)
-        // FWS             =   ([*WSP CRLF] 1*WSP)
-        // + encoded words
-
-        //1. split in sequence like FWS 1*VCHAR FWS 1*VCHAR ...
-        //    use nom to parse and have some alternating struc,
-        //    (e.g. (Vec<FWSBlock>, Vec<VCHARBlock>, started_with_FWS?)),
-        //2. write FWS's possible write VCHAR blocks as encoded word/words
-        //    - only at this point check for utf8, as in a Ascii we can
-        //      encode utf8
-        //    - also check for "malformed" FWS containing e.g. orphan '\n' or '\t'
-        //      for not encode them  but later have some "strictness" level
-        //      deceiding weither to 1. drop them , 2. error on them
-
 
         let blocks = partition( text )?;
 
         let mut biter = blocks.into_iter();
 
-        //unwrap is safe because we pushed at last one (current_block)
+        //UNWRAP_SAFETY: is safe because we pushed at last one (current_block)
         let this_block = biter.next().unwrap();
         for next_block in biter {
             match this_block {
@@ -73,28 +59,31 @@ impl MailEncodable for Unstructured {
                     }
                 },
                 Partition::SPACE( data ) => {
-                    //NOTE: space has to be at last one horizontal-white-space
-                    // (required by the possibility of VCHAR partitions beeing
-                    //  encoded words)
-
-                    //let data = text[start..end];
-                    //FIXME it currently collapses all FWS into a single space, possible folding
-                    // if the line would be to long otherwise, this has the benefit that there
-                    // won't be any "illegal" sequences like "\r \n"
-                    encoder.write_fws()
+                    //NOTE: the usage of write_fws is relevant for braking the line and CRLF
+                    // is still semantically ignored BUT, ther cant be any comments here,
+                    // as we are in a unstructured header field
+                    let mut had_fws = false;
+                    for char in data.chars() {
+                        if char == '\r' || char == '\n' {
+                            continue;
+                        } else if had_fws {
+                            encoder.write_char( char );
+                        } else {
+                            //FIXME allow writing fws based on '\t'
+                            encoder.write_fws();
+                        }
+                    }
+                    if !had_fws {
+                        //currently this can only happen if data only consists of '\r','\n'
+                        //NOTE: space has to be at last one horizontal-white-space
+                        // (required by the possibility of VCHAR partitions beeing
+                        //  encoded words)
+                        encoder.write_fws();
+                    }
                 }
             }
 
         }
-
-
-
-
-        //Note: the rfc 2047 does not directly state all use-cases of "unstructured" can be encoded
-        // with encoded word's, but it list practically all cases unstructured can appear in
-        //FIXME can contain encoded-word
-        //TODO allow the data to contains thinks like '\t' etc.
-        //FIXME do not replace any kind of whitespace with space
 
         Ok( () )
     }
