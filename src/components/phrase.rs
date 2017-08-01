@@ -1,15 +1,16 @@
 use error::*;
 use types::Vec1;
-use codec::{MailEncodable, MailEncoder };
-use ascii::AsciiStr;
-
-use super::utils::item::{ Input, Item };
-use super::word::{ Word, do_encode_word };
-use super::CFWS;
-
-use char_validators::is_ws;
+use codec::{ MailEncodable, MailEncoder };
 use char_validators::encoded_word::EncodedWordContext;
 
+use super::utils::item::{ Input, Item };
+use super::utils::text_partition::{ Partition, partition };
+use super::word::{ Word, do_encode_word };
+use super::{ CFWS, FWS };
+
+//FIXME PhraseWord's <==> Word's, just some other Word usage is more restricted we don't need this
+// mainly the other usage does not allow EncodedWords, but since the changes to Item this can
+// be checked at encoding time! Yay!
 #[derive( Debug, Clone, Eq, PartialEq, Hash )]
 pub struct PhraseWord( Word );
 
@@ -30,24 +31,62 @@ impl PhraseWord {
 
 deref0!{ +mut PhraseWord => Word }
 
-// while it is possible to store a single string,
-// it is not future prove as some words can be given
-// in a different encoding then the rest...
 #[derive( Debug, Clone, Eq, PartialEq, Hash )]
-pub enum Phrase {
-    ItemBased( Vec1<Word> ),
-    InputBased( Input )
-}
+pub struct Phrase( pub Vec1<Word> );
+
+//// while it is possible to store a single string,
+//// it is not future prove as some words can be given
+//// in a different encoding then the rest...
+//
+//pub enum Phrase {
+//    //TODO consider only using Vec1<Word> and converting from
+//    // Input if needed, we can put every "word" input eith
+//    // the Ascii, Encoded or Utf8 box and if we have a
+//    // Ascii Mail type + Utf8 we can just write an encoded word!
+//    // Problem: Quoted encoding can be Ascii AND/OR Utf8
+//    //
+//    // also if we have e.g. Quoted Utf8 on Ascii mail we would have
+//    // to "unquote" it and then use encoded word, that succs, but
+//    // if we don't use Quoted Encoded Words with utf8 as item it's
+//    // fine and the unquote=>encode_word think will become a "feature"
+//    ItemBased( Vec1<Word> ),
+//    InputBased( Input )
+//}
 
 
 impl Phrase {
 
     pub fn from_words( words: Vec1<Word> ) -> Self {
-        Phrase::ItemBased( words )
+        Phrase( words )
     }
 
-    pub fn from_input( words: Input ) -> Self {
-        Phrase::InputBased( words )
+    pub fn from_input( input: Input ) -> Result<Self> {
+        //OPTIMIZE: words => shared, then turn partition into shares, too
+        let mut last_gap = None;
+        let mut words = Vec::new();
+        for partition in partition( &*input )?.into_iter() {
+            match partition {
+                Partition::VCHAR( word ) => {
+                    let word_item = Item::Input( Input::Owned( word.into() ) );
+                    //FIXME change Word::from_parts
+                    let word = Word::from_parts( last_gap.take(), word_item, None, true )?;
+                    words.push( word );
+                },
+                Partition::SPACE( _gap ) => {
+                    //FIMXE currently collapses WS
+                    last_gap = Some( CFWS::SingleFws( FWS ) )
+                }
+            }
+        }
+
+        let mut words = Vec1::from_vec( words )
+            .map_err( |_|-> Error { "a phras has to have at last one word".into() } )?;
+
+        if let Some( right_padding ) = last_gap {
+            words.last_mut().pad_right( right_padding );
+        }
+
+        Ok( Phrase( words ) )
     }
 
 }
@@ -59,56 +98,11 @@ impl MailEncodable for Phrase  {
     //FEATURE_TODO(warn_on_bad_phrase): warn if the phrase contains chars it should not
     //  but can contain due to encoding, e.g. ascii CTL's
     fn encode<E>( &self, encoder:  &mut E ) -> Result<()> where E: MailEncoder {
-        use self::Phrase::*;
 
-        match *self {
-            ItemBased( ref words ) => {
-                for word in words.iter() {
-                    do_encode_word( &*word, encoder, Some( EncodedWordContext::Phrase ) )?;
-                }
-            },
-            //TODO handle input not containing a valid phrase (only ws's)
-            //TODO escape comments
-            InputBased( ref input ) => {
-                let mut last_ws = None;
-                let mut scanning_ws_section = true;
-                let mut section_start = 0;
-                for (index, char) in input.char_indices() {
-                    if is_ws( char ) {
-                        if !scanning_ws_section {
-                            //start next ws section
-                            scanning_ws_section = true;
-
-                            if let Some( last_ws ) = last_ws.take() {
-                                encoder.write_str(
-                                    //OPTIMIZE: use unsafe, it should only be '\t' or ' '
-                                    AsciiStr::from_ascii( last_ws ).unwrap()
-                                )
-                            }
-                            let word = &input[ section_start..index ];
-
-                            if !encoder.try_write_atext( word ).is_ok() {
-                                encoder.write_encoded_word( word, EncodedWordContext::Phrase )
-                            }
-
-                            section_start = index;
-                        }
-                    } else {
-                        if scanning_ws_section {
-                            //start next word section
-                            scanning_ws_section = false;
-                            //input starts with a word
-                            if index == 0 { continue }
-
-                            last_ws = Some( &input[ section_start..index ]);
-
-                            section_start = index;
-                        }
-                    }
-                }
-
-            }
+        for word in self.0.iter() {
+            do_encode_word( &*word, encoder, Some( EncodedWordContext::Phrase ) )?;
         }
+
         Ok( () )
 
     }

@@ -128,9 +128,8 @@ impl<T, C, CP, D> Compositor<T, C, CP, D>
             if to_mailbox.display_name.is_none() {
                 to_mailbox.display_name = self.name_composer
                     .compose_name( data )
-                    .map( |name| {
-                        Phrase::from_input( Input::from( name ) )
-                    })
+                    //FIXME handle error
+                    .and_then( |name| Phrase::from_input( Input::from( name ) ).ok() )
             }
             to_mailbox
         };

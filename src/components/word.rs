@@ -4,7 +4,7 @@ use codec::{ MailEncodable, MailEncoder };
 use super::utils::item::Item;
 
 use char_validators::{
-    is_atext, MailType
+    is_atext, is_ctl, MailType
 };
 use char_validators::quoted_word::is_quoted_word;
 use char_validators::encoded_word::{
@@ -23,9 +23,10 @@ pub struct Word(Option<CFWS>, Item, Option<CFWS> );
 impl Word {
     pub fn check_item_validity(item: &Item, allow_encoded_word: bool) -> Result<()> {
         match *item {
-            Item::Input( .. ) => {
-                // we don't have any restrictions on "Input",
-                // through if it contains a CTL encoding _will_ fail
+            Item::Input( ref input ) => {
+                if input.chars().any( is_ctl ) {
+                    bail!( "a word can never contain CTL characters" );
+                }
             },
 
             Item::QuotedString( ref quoted ) => {
