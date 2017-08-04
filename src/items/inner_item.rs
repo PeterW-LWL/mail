@@ -31,6 +31,7 @@ macro_rules! inner_impl {
                     v  => v
                 }
             }
+
         }
 
         impl From<$owned_form> for $name {
@@ -83,9 +84,28 @@ macro_rules! inner_impl {
     )
 }
 
+
 inner_impl!{ InnerAscii, AsciiString, AsciiStr }
 inner_impl!{ InnerUtf8, String, str }
 //inner_impl!{ InnerOtherItem, OtherString, OtherStr }
+
+impl InnerAscii {
+    pub fn as_str( &self ) -> &str {
+        match *self {
+            InnerAscii::Owned( ref owned ) => owned.as_str(),
+            InnerAscii::Shared( ref shared ) => shared.as_str()
+        }
+    }
+}
+
+impl InnerUtf8 {
+    pub fn as_str( &self ) -> &str {
+        match *self {
+            InnerUtf8::Owned( ref owned ) => owned.as_str(),
+            InnerUtf8::Shared( ref shared ) => &**shared
+        }
+    }
+}
 
 
 #[cfg(test)]
@@ -135,5 +155,19 @@ mod test {
                 .map(|v| &**v)
         );
         assert_ne!( a, b );
+    }
+
+    #[test]
+    fn has_as_str() {
+        use std::borrow::ToOwned;
+
+        assert_eq!(
+            "hy",
+            InnerAscii::Owned( ascii_str!{ h y }.to_owned() ).as_str()
+        );
+        assert_eq!(
+            "hy",
+            InnerUtf8::Owned( "hy".into() ).as_str()
+        );
     }
 }
