@@ -23,16 +23,19 @@ extern crate error_chain;
 
 #[macro_use]
 mod macros;
+
+mod utils;
+pub mod error;
+pub mod types;
+pub mod grammar;
 #[cfg_attr(test, macro_use)]
 pub mod codec;
-
-pub mod error;
+pub mod items;
+pub mod components;
+pub mod headers;
 pub mod mail;
 pub mod mail_composition;
 
-pub mod headers;
-pub mod components;
-pub mod grammar;
 
-pub mod types;
-mod utils;
+
+

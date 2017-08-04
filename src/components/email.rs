@@ -161,21 +161,6 @@ mod test {
     use super::*;
     use codec::test_utils::*;
 
-    #[test]
-    fn quote_simple() {
-        assert_eq!( "\"tralala\"", &*quote("tralala").unwrap() );
-    }
-
-    #[test]
-    fn quote_some_chars() {
-        assert_eq!(  "\"tr@al\\ al\\\"a\"", &*quote("tr@al al\"a").unwrap() );
-    }
-
-    #[test]
-    fn quote_ctl() {
-        let res = quote("\x01");
-        assert_eq!( false, res.is_ok() );
-    }
 
 
     #[test]

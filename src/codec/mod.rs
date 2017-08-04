@@ -2,6 +2,7 @@
 
 use grammar::{is_atext, MailType };
 use grammar::encoded_word::EncodedWordContext;
+use items::{EncodedWord, Encoding as ECWEncoding };
 
 use ascii::{  AsciiStr, AsciiChar };
 
@@ -16,7 +17,6 @@ pub mod quote;
 #[macro_use]
 pub mod test_utils;
 
-use self::utf8_to_ascii::q_encode_for_encoded_word;
 
 pub trait MailEncoder {
     fn mail_type( &self ) -> MailType;
@@ -175,17 +175,12 @@ impl MailEncoder for MailEncoderImpl {
     }
 
     fn write_encoded_word( &mut self, data: &str, ctx: EncodedWordContext ) {
-        //FIXME there are two limites:
-        // 1. the line length limit of 78 chars per line (including header name!)
-        // 2. the quotable_string limit of 75 chars including quotings IN HEADERS ONLY (=?utf8?Q?<data>?=)
-        //FIXME there are different limitations for different positions in which encoded-word appears
-        self.write_str( ascii_str! {
-            Equal Question u t f _8 Question Q Question
-        });
-        q_encode_for_encoded_word(self, ctx, data );
-        self.write_str( ascii_str! {
-            Question Equal
-        })
+        //FIXME possible directly write the encoded word, and return a lazy
+        // iterator or so
+        sep_for!{ ew in EncodedWord::encode_word( data, ECWEncoding::Base64, ctx ).iter();
+            sep { self.write_fws() };
+            self.write_str( &***ew );
+        }
     }
 
     fn write_body( &mut self, body: &[u8]) {

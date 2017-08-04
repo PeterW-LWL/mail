@@ -204,6 +204,8 @@ pub mod encoded_word {
             encoding: take_while!( is_ew_token_char ) >>
             char!( '?' ) >>
             text: take_while!( char_validator ) >>
+            char!( '?' ) >>
+            char!( '=' ) >>
             eof!() >>
             (charset, encoding, text)
         );

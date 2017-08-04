@@ -1,6 +1,13 @@
 use mime::Mime;
+use base64;
+use quoted_printable;
 
 error_chain! {
+
+    foreign_links {
+        DecodeBase64(base64::DecodeError);
+        DecodeQuotedPrintable(quoted_printable::QuotedPrintableError);
+    }
 
 
     errors {
