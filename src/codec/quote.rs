@@ -7,9 +7,9 @@ use grammar::{is_qtext, is_ws, is_vchar, MailType };
 //FIXME prevent construction of invalide Quoted
 #[derive( Debug, Clone, Hash, Eq, PartialEq )]
 pub enum Quoted {
-    //FIXME use Item/InnerAsciiItem after moving it out of components
+    //FIXME use Item/InnerAscii after moving it out of components
     Ascii( AsciiString ),
-    //FIXME use Item/InnerUtf8Item after movinf it out of components
+    //FIXME use Item/InnerUtf8 after movinf it out of components
     Utf8( String )
 }
 

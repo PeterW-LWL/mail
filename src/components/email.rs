@@ -7,7 +7,7 @@ use codec::quote::quote;
 use grammar::{is_atext, MailType };
 
 
-use super::utils::item::{ SimpleItem, Input, InnerAsciiItem, InnerUtf8Item };
+use super::utils::item::{ SimpleItem, Input, InnerAscii, InnerUtf8 };
 
 /// an email of the form `local-part@domain`
 /// corresponds to RFC5322 addr-spec, so `<`, `>` padding is _not_
@@ -126,8 +126,8 @@ impl Domain {
         };
 
         Domain( match string.into_ascii_string() {
-            Ok( ascii ) => SimpleItem::Ascii( InnerAsciiItem::Owned( ascii ) ),
-            Err( ascii_err ) => SimpleItem::Utf8( InnerUtf8Item::Owned( ascii_err.into_source() ) )
+            Ok( ascii ) => SimpleItem::Ascii( InnerAscii::Owned( ascii ) ),
+            Err( ascii_err ) => SimpleItem::Utf8( InnerUtf8::Owned( ascii_err.into_source() ) )
         } )
     }
 }

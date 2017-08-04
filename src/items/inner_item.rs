@@ -83,8 +83,8 @@ macro_rules! inner_impl {
     )
 }
 
-inner_impl!{ InnerAsciiItem, AsciiString, AsciiStr }
-inner_impl!{ InnerUtf8Item, String, str }
+inner_impl!{ InnerAscii, AsciiString, AsciiStr }
+inner_impl!{ InnerUtf8, String, str }
 //inner_impl!{ InnerOtherItem, OtherString, OtherStr }
 
 
@@ -95,8 +95,8 @@ mod test {
 
     #[test]
     fn inner_ascii_item_eq() {
-        let a = InnerAsciiItem::Owned( AsciiString::from_str( "same" ).unwrap() );
-        let b = InnerAsciiItem::Shared(
+        let a = InnerAscii::Owned( AsciiString::from_str( "same" ).unwrap() );
+        let b = InnerAscii::Shared(
             OwningRef::new(
                 Rc::new( AsciiString::from_str( "same" ).unwrap() ) )
                 .map(|v| &**v)
@@ -106,8 +106,8 @@ mod test {
 
     #[test]
     fn inner_ascii_item_neq() {
-        let a = InnerAsciiItem::Owned( AsciiString::from_str( "same" ).unwrap() );
-        let b = InnerAsciiItem::Shared(
+        let a = InnerAscii::Owned( AsciiString::from_str( "same" ).unwrap() );
+        let b = InnerAscii::Shared(
             OwningRef::new(
                 Rc::new( AsciiString::from_str( "not same" ).unwrap() ) )
                 .map(|v| &**v)
@@ -117,8 +117,8 @@ mod test {
 
     #[test]
     fn inner_utf8_item_eq() {
-        let a = InnerUtf8Item::Owned( String::from( "same" ) );
-        let b = InnerUtf8Item::Shared(
+        let a = InnerUtf8::Owned( String::from( "same" ) );
+        let b = InnerUtf8::Shared(
             OwningRef::new(
                 Rc::new( String::from( "same" ) ) )
                 .map(|v| &**v)
@@ -128,8 +128,8 @@ mod test {
 
     #[test]
     fn inner_utf8_item_neq() {
-        let a = InnerUtf8Item::Owned( String::from( "same" ) );
-        let b = InnerUtf8Item::Shared(
+        let a = InnerUtf8::Owned( String::from( "same" ) );
+        let b = InnerUtf8::Shared(
             OwningRef::new(
                 Rc::new( String::from( "not same" ) ) )
                 .map(|v| &**v)

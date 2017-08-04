@@ -6,7 +6,7 @@ use grammar::{is_qtext, is_ws, is_vchar, MailType };
 use grammar::quoted_word::is_quoted_word;
 
 use super::simple_item::SimpleItem;
-use super::inner_item::{ InnerAsciiItem, InnerUtf8Item };
+use super::inner_item::{ InnerAscii, InnerUtf8 };
 
 #[derive( Debug, Clone, Hash, Eq, PartialEq )]
 pub struct Quoted( SimpleItem );
@@ -96,11 +96,11 @@ impl Quoted {
 
         if self.is_ascii() {
             //SAFE: if we didn't head any non-ascii-utf8 then we can not get some by unquoting
-            SimpleItem::Ascii( InnerAsciiItem::Owned( unsafe {
+            SimpleItem::Ascii( InnerAscii::Owned( unsafe {
                 AsciiString::from_ascii_unchecked( out )
             }))
         } else {
-            SimpleItem::Utf8( InnerUtf8Item::Owned( out ) )
+            SimpleItem::Utf8( InnerUtf8::Owned( out ) )
         }
     }
 }

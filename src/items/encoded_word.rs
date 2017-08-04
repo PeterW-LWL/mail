@@ -9,7 +9,7 @@ use types::Vec1;
 
 use grammar::encoded_word::{ is_encoded_word, EncodedWordContext };
 use super::input::Input;
-use super::inner_item::InnerAsciiItem;
+use super::inner_item::InnerAscii;
 use codec::utf8_to_ascii::{
     base64_encoded_for_encoded_word,
     q_encode_for_encoded_word,
@@ -25,14 +25,14 @@ pub enum Encoding {
 
 #[derive( Debug, Clone, Hash, Eq, PartialEq )]
 pub struct EncodedWord {
-    inner: InnerAsciiItem,
+    inner: InnerAscii,
     ctx: EncodedWordContext
 }
 
 
 impl EncodedWord {
 
-    pub fn parse( already_encoded: InnerAsciiItem, ctx: EncodedWordContext ) -> Result<Self> {
+    pub fn parse( already_encoded: InnerAscii, ctx: EncodedWordContext ) -> Result<Self> {
         if is_encoded_word( already_encoded.as_str(), ctx ) {
             Ok( EncodedWord { ctx, inner: already_encoded } )
         } else {
@@ -69,7 +69,7 @@ impl EncodedWord {
         //FIXME currently we only return 1 word and ignore length limitations
         Vec1::new( EncodedWord {
             ctx,
-            inner: InnerAsciiItem::Owned( out ),
+            inner: InnerAscii::Owned( out ),
         } )
     }
 
@@ -137,7 +137,7 @@ impl EncodedWord {
 }
 
 impl Deref for EncodedWord {
-    type Target = InnerAsciiItem;
+    type Target = InnerAscii;
 
     fn deref( &self ) -> &Self::Target {
         &self.inner

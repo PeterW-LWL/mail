@@ -29,7 +29,7 @@ pub enum Item {
     Input(Input),
 
     /// A Item which is an encoded word
-    EncodedWord(InnerAsciiItem),
+    EncodedWord(InnerAscii),
 
     /// A quoted string
     QuotedString(Quoted),
@@ -43,9 +43,9 @@ pub enum Item {
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize)]
 pub enum SimpleItem {
     /// specifies that the Item is valid Ascii, nothing more
-    Ascii( InnerAsciiItem ),
+    Ascii( InnerAscii ),
     /// specifies that the Item is valid Utf8, nothing more
-    Utf8( InnerUtf8Item )
+    Utf8( InnerUtf8 )
 }
 
 impl Input {
@@ -61,45 +61,45 @@ impl Input {
     pub fn into_simple_item( self ) -> SimpleItem {
         match self {
             Input::Owned( string ) => match AsciiString::from_ascii( string ) {
-                Ok( ascii ) => SimpleItem::Ascii( InnerAsciiItem::Owned( ascii ) ),
-                Err( err ) => SimpleItem::Utf8( InnerUtf8Item::Owned( err.into_source() ) )
+                Ok( ascii ) => SimpleItem::Ascii( InnerAscii::Owned( ascii ) ),
+                Err( err ) => SimpleItem::Utf8( InnerUtf8::Owned( err.into_source() ) )
             },
             Input::Shared( shared ) => {
                 if AsciiStr::from_ascii( &*shared ).is_ok() {
-                    SimpleItem::Ascii( InnerAsciiItem::Owned( unsafe {
+                    SimpleItem::Ascii( InnerAscii::Owned( unsafe {
                         AsciiString::from_ascii_unchecked( String::from( &*shared ) )
                     } ) )
                 } else {
-                    SimpleItem::Utf8( InnerUtf8Item::Shared( shared ) )
+                    SimpleItem::Utf8( InnerUtf8::Shared( shared ) )
                 }
             }
         }
     }
 
-    pub fn into_ascii_item( self ) -> StdResult<InnerAsciiItem, FromAsciiError<String>> {
+    pub fn into_ascii_item( self ) -> StdResult<InnerAscii, FromAsciiError<String>> {
         Ok( match self {
             Input::Owned( string )
-                => InnerAsciiItem::Owned( AsciiString::from_ascii( string )? ),
+                => InnerAscii::Owned( AsciiString::from_ascii( string )? ),
             Input::Shared( shared )
-                => InnerAsciiItem::Owned(
+                => InnerAscii::Owned(
                     AsciiString::from_ascii( String::from( &*shared ) )? )
         } )
     }
 
-    pub unsafe fn into_ascii_item_unchecked( self ) -> InnerAsciiItem {
+    pub unsafe fn into_ascii_item_unchecked( self ) -> InnerAscii {
         match self {
             Input::Owned( string )
-                => InnerAsciiItem::Owned( AsciiString::from_ascii_unchecked( string ) ),
+                => InnerAscii::Owned( AsciiString::from_ascii_unchecked( string ) ),
             Input::Shared( shared )
-                => InnerAsciiItem::Owned(
+                => InnerAscii::Owned(
                     AsciiString::from_ascii_unchecked( String::from( &*shared ) ) )
         }
     }
 
-    pub fn into_utf8_item( self ) -> InnerUtf8Item {
+    pub fn into_utf8_item( self ) -> InnerUtf8 {
         match self {
-            Input::Owned( string ) => InnerUtf8Item::Owned( string ),
-            Input::Shared( orwf ) => InnerUtf8Item::Shared( orwf )
+            Input::Owned( string ) => InnerUtf8::Owned( string ),
+            Input::Shared( orwf ) => InnerUtf8::Shared( orwf )
         }
     }
 }
@@ -192,8 +192,8 @@ macro_rules! inner_impl {
     )
 }
 
-inner_impl!{ InnerAsciiItem, AsciiString, AsciiStr }
-inner_impl!{ InnerUtf8Item, String, str }
+inner_impl!{ InnerAscii, AsciiString, AsciiStr }
+inner_impl!{ InnerUtf8, String, str }
 //inner_impl!{ InnerOtherItem, OtherString, OtherStr }
 
 
@@ -226,8 +226,8 @@ mod test {
 
     #[test]
     fn inner_ascii_item_eq() {
-        let a = InnerAsciiItem::Owned( AsciiString::from_str( "same" ).unwrap() );
-        let b = InnerAsciiItem::Shared(
+        let a = InnerAscii::Owned( AsciiString::from_str( "same" ).unwrap() );
+        let b = InnerAscii::Shared(
             OwningRef::new(
                 Rc::new( AsciiString::from_str( "same" ).unwrap() ) )
                 .map(|v| &**v)
@@ -237,8 +237,8 @@ mod test {
 
     #[test]
     fn inner_ascii_item_neq() {
-        let a = InnerAsciiItem::Owned( AsciiString::from_str( "same" ).unwrap() );
-        let b = InnerAsciiItem::Shared(
+        let a = InnerAscii::Owned( AsciiString::from_str( "same" ).unwrap() );
+        let b = InnerAscii::Shared(
             OwningRef::new(
                 Rc::new( AsciiString::from_str( "not same" ).unwrap() ) )
                 .map(|v| &**v)
@@ -248,8 +248,8 @@ mod test {
 
     #[test]
     fn inner_utf8_item_eq() {
-        let a = InnerUtf8Item::Owned( String::from( "same" ) );
-        let b = InnerUtf8Item::Shared(
+        let a = InnerUtf8::Owned( String::from( "same" ) );
+        let b = InnerUtf8::Shared(
             OwningRef::new(
                 Rc::new( String::from( "same" ) ) )
                 .map(|v| &**v)
@@ -259,8 +259,8 @@ mod test {
 
     #[test]
     fn inner_utf8_item_neq() {
-        let a = InnerUtf8Item::Owned( String::from( "same" ) );
-        let b = InnerUtf8Item::Shared(
+        let a = InnerUtf8::Owned( String::from( "same" ) );
+        let b = InnerUtf8::Shared(
             OwningRef::new(
                 Rc::new( String::from( "not same" ) ) )
                 .map(|v| &**v)
