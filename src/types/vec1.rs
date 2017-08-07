@@ -56,6 +56,9 @@ impl<T> Vec1<T> {
         Vec1( vec )
     }
 
+    pub fn into_vec( self ) -> Vec<T> {
+        self.0
+    }
 
 
     /// returns a reference to the last element
