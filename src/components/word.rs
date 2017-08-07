@@ -88,3 +88,104 @@ pub fn do_encode_word<E: MailEncoder>(
     Ok( () )
 }
 
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use super::super::{ FWS as Fws };
+    use grammar::MailType;
+    use codec::test_utils::*;
+
+    //FIXME: fix q_encoding, as it currently encodes "=?" as "=3d?", but '?' is not a valid character
+    #[ignore]
+    #[test]
+    fn encode_pseudo_encoded_words() {
+        let word = Word::from_input( "=?".into() ).unwrap();
+        let mut encoder = TestMailEncoder::new( MailType::Ascii );
+        do_encode_word( &word, &mut encoder, Some( EncodedWordContext::Text ) ).unwrap();
+        assert_eq!(
+            vec![ LinePart( "=?utf8?Q?=3D=3F?=" ) ],
+            encoder.into_state_seq()
+        )
+    }
+
+    #[test]
+    fn encode_word() {
+        let word = Word::from_input( "a↑b".into() ).unwrap();
+        let mut encoder = TestMailEncoder::new( MailType::Ascii );
+        do_encode_word( &word, &mut encoder, Some( EncodedWordContext::Text ) ).unwrap();
+        assert_eq!(
+            vec![ LinePart( "=?utf8?Q?a=E2=86=91b?=" ) ],
+            encoder.into_state_seq()
+        )
+    }
+
+    #[test]
+    fn encode_fails() {
+        let word = Word::from_input( "a↑b".into() ).unwrap();
+        let mut encoder = TestMailEncoder::new( MailType::Ascii );
+        let res = do_encode_word( &word, &mut encoder, None );
+        assert_eq!( false, res.is_ok() );
+    }
+
+    #[test]
+    fn quoted_fallback() {
+        let word = Word::from_input( "a\"b".into() ).unwrap();
+        let mut encoder = TestMailEncoder::new( MailType::Ascii );
+        do_encode_word( &word, &mut encoder, None ).unwrap();
+        assert_eq!(
+            vec![ LinePart(r#""a\"b""#) ],
+            encoder.into_state_seq()
+        )
+    }
+
+    #[test]
+    fn encode_word_padding() {
+        let words = &[
+            ( Word {
+                left_padding: None,
+                input: "abc".into(),
+                right_padding: None,
+            }, vec![
+                LinePart( "abc" )
+            ] ),
+            ( Word {
+                left_padding: Some( CFWS::SingleFws( Fws ) ),
+                input: "abc".into(),
+                right_padding: None,
+            }, vec![
+                FWS,
+                LinePart( "abc" )
+            ] ),
+            ( Word {
+                left_padding: Some( CFWS::SingleFws( Fws ) ),
+                input: "abc".into(),
+                right_padding: Some( CFWS::SingleFws( Fws ) ),
+            }, vec![
+                FWS,
+                LinePart( "abc" ),
+                FWS
+            ] ),
+            ( Word {
+                left_padding: None,
+                input: "abc".into(),
+                right_padding: Some( CFWS::SingleFws( Fws ) ),
+            }, vec![
+                LinePart( "abc" ),
+                FWS
+            ] )
+        ];
+
+        for &( ref word, ref expection) in words.iter() {
+            let mut encoder = TestMailEncoder::new( MailType::Ascii );
+            do_encode_word( word, &mut encoder, None ).unwrap();
+            let seq = encoder.into_state_seq();
+            assert_eq!(
+                expection,
+                &seq
+            );
+        }
+    }
+
+
+}
