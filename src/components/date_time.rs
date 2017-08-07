@@ -20,7 +20,7 @@ mod test {
     use codec::test_utils::*;
 
     ec_test!{ simple, {
-        DateTime::test_time( 45 )
+        Some( DateTime::test_time( 45 ) )
     } => ascii => [
         LinePart( "Tue,  6 Aug 2013 04:11:45 +0000" )
     ]}

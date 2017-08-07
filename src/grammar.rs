@@ -31,6 +31,11 @@ pub fn is_space( ch: char ) -> bool {
 }
 
 #[inline(always)]
+pub fn is_ascii( ch: char ) -> bool {
+    (ch as u32) < 128
+}
+
+#[inline(always)]
 pub fn is_ascii_vchar( ch: char ) -> bool {
     let u32_ch = ch as u32;
     32 < u32_ch && u32_ch < 128
@@ -38,12 +43,16 @@ pub fn is_ascii_vchar( ch: char ) -> bool {
 
 //VCHAR as defined by RFC 5243
 #[inline(always)]
-pub fn is_vchar( ch: char, tp: MailType ) -> bool {
-    use self::MailType::*;
-    match tp {
-        Ascii => is_ascii_vchar( ch ),
-        Internationalized => is_ascii_vchar( ch ) || ch.len_utf8() > 1
-    }
+pub fn is_vchar( ch: char, mt: MailType ) -> bool {
+    is_ascii_vchar( ch ) || ( mt == MailType::Internationalized && !is_ascii( ch ) )
+}
+
+
+//can be quoted in a quoted string (internalized) based on RFC ... and RFC ...
+#[inline(always)]
+pub fn is_quotable( ch: char ) -> bool {
+    //FIMXE hceck with RFC
+    is_vchar( ch, MailType::Internationalized ) || is_ws( ch )
 }
 
 ///any whitespace (char::is_whitespace
@@ -53,17 +62,13 @@ pub fn is_any_whitespace(ch: char) -> bool {
 }
 
 //ctext as defined by RFC 5322
-pub fn is_ctext( ch: char, tp: MailType  ) -> bool {
-    use self::MailType::*;
+pub fn is_ctext( ch: char, mt: MailType  ) -> bool {
     match ch {
         '!'...'\'' |
         '*'...'[' |
         ']'...'~' => true,
         // obs-ctext
-        _ => match tp {
-            Ascii => false,
-            Internationalized => ch.len_utf8() > 1
-        }
+        _ => mt == MailType::Internationalized && !is_ascii( ch )
     }
 }
 
@@ -110,13 +115,12 @@ pub fn is_dtext( ch: char , mt: MailType ) -> bool {
     match ch as u32 {
         33...90 |
         94...126 => true,
-        _ => (mt == MailType::Internationalized && ch.len_utf8() > 1 )
+        _ => mt == MailType::Internationalized && !is_ascii( ch )
     }
 }
 
 //qtext as defined by RFC 5322
-pub fn is_qtext( ch: char, tp: MailType ) -> bool {
-    use self::MailType::*;
+pub fn is_qtext( ch: char, mt: MailType ) -> bool {
     match ch {
         //not ' ' [d:32]
         '!' |
@@ -125,10 +129,7 @@ pub fn is_qtext( ch: char, tp: MailType ) -> bool {
         //not '\\' [d:92]
         ']'...'~' => true,
         //obs-qtext
-        _ => match tp {
-            Ascii => false,
-            Internationalized => ch.len_utf8() > 1
-        }
+        _ => mt == MailType::Internationalized && !is_ascii( ch )
     }
 }
 
@@ -153,8 +154,37 @@ pub fn is_especial( ch: char ) -> bool {
         _ => false
     }
 }
+//
+//pub fn is_dot_atom_text( text: &str, mt: MailType ) -> bool {
+//    use nom::IResult;
+//    use self::parse::recognize_dot_atom_text;
+//
+//    let res = tuple!( text,
+//        call!( recognize_dot_atom_text, mt ),
+//        eof!()
+//    );
+//
+//    match res {
+//        IResult::Done(_, _) => true,
+//        _ => false
+//    }
+//}
 
-
+//pub mod parse {
+//    use nom::IResult;
+//    use super::{ is_atext, MailType };
+//
+//    pub fn recognize_dot_atom_text( input: &str, mt: MailType ) -> IResult<&str, &str> {
+//        recognize!( input, tuple!(
+//            take_while1!( call!( is_atext, mt ) ),
+//            many0!( tuple!(
+//                char!( "." ),
+//                take_while1!( call!( is_atext, mt ) )
+//            ) )
+//        ) )
+//    }
+//
+//}
 //TODO thisshould be some where else I think
 // (but it is used by `1. codec`, `2. components` )
 /// based on RFC 2047

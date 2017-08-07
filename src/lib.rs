@@ -30,7 +30,7 @@ pub mod types;
 pub mod grammar;
 #[cfg_attr(test, macro_use)]
 pub mod codec;
-pub mod items;
+pub mod data;
 pub mod components;
 pub mod headers;
 pub mod mail;

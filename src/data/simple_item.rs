@@ -22,6 +22,10 @@ impl SimpleItem {
         }
     }
 
+    pub fn from_utf8_input( s: Input ) -> Self {
+        SimpleItem::Utf8( s.0 )
+    }
+
     pub fn from_utf8( s: String ) -> Self {
         SimpleItem::Utf8( InnerUtf8::Owned( s ) )
     }

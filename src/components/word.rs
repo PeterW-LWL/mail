@@ -1,136 +1,88 @@
 use error::*;
 use codec::{ MailEncodable, MailEncoder };
 
-use super::utils::item::Item;
+use grammar::is_atext;
+use grammar::encoded_word::EncodedWordContext;
 
-use grammar::{
-    is_atext, is_ctl, MailType
+use data::{
+    FromInput,
+    Input,
+    EncodedWord,
+    Encoding as ECWEncoding,
+    QuotedString
 };
-use grammar::quoted_word::is_quoted_word;
-use grammar::encoded_word::{
-    is_encoded_word,
-    EncodedWordContext
-};
-use codec::quote::{ unquote, quote, Quoted };
+
 
 use super::CFWS;
 
 
-#[derive( Debug, Clone, Eq, PartialEq, Hash )]
-pub struct Word(Option<CFWS>, Item, Option<CFWS> );
 
+#[derive( Debug, Clone, Eq, PartialEq, Hash )]
+pub struct Word {
+    pub left_padding: Option<CFWS>,
+    pub input: Input,
+    pub right_padding: Option<CFWS>
+}
+
+impl FromInput for Word {
+
+    fn from_input( input: Input ) -> Result<Self> {
+        //FEATURE_TODO(fail_fast): check if input contains a CTL char,
+        //  which is/>>should<< always be an error (through in the standard you could but should
+        //  not have them in encoded words)
+        Ok( Word { left_padding: None, input, right_padding: None } )
+    }
+}
 
 impl Word {
-    pub fn check_item_validity(item: &Item, allow_encoded_word: bool) -> Result<()> {
-        match *item {
-            Item::Input( ref input ) => {
-                if input.chars().any( is_ctl ) {
-                    bail!( "a word can never contain CTL characters" );
-                }
-            },
-
-            Item::QuotedString( ref quoted ) => {
-                // Quoted already (should) do the checks, but does not for now
-                if !is_quoted_word( &**quoted, MailType::Internationalized ) {
-                    bail!( "invalide quoted word" );
-                }
-            },
-
-            Item::EncodedWord( ref inner_ascii ) => {
-                //FIXME we might want to place a EncodedWord Type there
-                if !(allow_encoded_word &&
-                        is_encoded_word( inner_ascii.as_str(), EncodedWordContext::Phrase ) )
-                {
-                    bail!( "invalide encoded word" );
-                }
-            }
-        }
-
-        Ok( () )
-    }
-
-    pub fn new( item: Item, allow_encoded_word: bool ) -> Result<Self> {
-        Self::check_item_validity( &item, allow_encoded_word )?;
-        Ok( Word( None, item, None ) )
-    }
-
-    pub fn from_parts(
-        left_padding: Option<CFWS>,
-        item: Item,
-        right_padding: Option<CFWS>,
-        allow_encoded_word: bool
-    ) -> Result<Self> {
-
-        Self::check_item_validity( &item, allow_encoded_word )?;
-        Ok( Word( left_padding, item, right_padding ) )
-    }
 
     pub fn pad_left( &mut self, padding: CFWS) {
-        self.0 = Some( padding )
+        self.left_padding = Some( padding )
     }
 
     pub fn pad_right( &mut self, padding: CFWS) {
-        self.2 = Some( padding )
+        self.right_padding = Some( padding )
     }
 
 }
 
-/// != encoded-word, through it might create an encoded-word
+
+/// As word has to be differently encoded, depending on the context it
+/// appears in it cannot implement MailEncodable, instead we have
+/// a function which can be used by type containing it which (should)
+/// implement MailEncodable
+///
+/// If `ecw_ctx` is `None` the word can not be encoded as a "encoded-word",
+/// if it is `Some(context)` the `context` represents in which context the
+/// word does appear, which changes some properties of the encoded word.
+///
+/// NOTE: != encoded-word, through it might create an encoded-word
 pub fn do_encode_word<E: MailEncoder>(
     word: &Word,
     encoder: &mut E,
     ecw_ctx: Option<EncodedWordContext>,
 ) -> Result<()> {
-    use self::Item::*;
-    if let Some( pad ) = word.0.as_ref() {
+
+    if let Some( pad ) = word.left_padding.as_ref() {
         pad.encode( encoder )?;
     }
-    match word.1 {
-        Input( ref word ) => {
-            let mail_type = encoder.mail_type();
-            let ok = (!word.starts_with("=?")) && word.chars()
-                .all( |ch| is_atext( ch, mail_type ) );
 
-            if ok {
-                encoder.write_str_unchecked( &*word )
-            } else {
-                if let Some( ecw_ctx ) = ecw_ctx {
-                    encoder.write_encoded_word( &*word, ecw_ctx )
-                } else if let Ok( quoted ) = quote( &*word ) {
-                    match quoted {
-                        Quoted::Ascii( ref data ) => encoder.write_str( data ),
-                        Quoted::Utf8( ref data ) => {
-                            if encoder.try_write_utf8( data ).is_err() {
-                                bail!( "can not write utf8 quoted string to ascii mail" );
-                            }
-                        }
-                    }
-                } else {
-                    bail!( "can neither quote nor encode word: {:?}", &*word );
-                }
-            }
-        },
-        EncodedWord( ref ecw ) => {
-            encoder.write_str( ecw );
-        },
-        QuotedString( ref quoted ) => {
-            let status = match *quoted {
-                Quoted::Ascii( ref astring ) => {
-                    encoder.write_str( astring );
-                    Ok( () )
-                },
-                Quoted::Utf8( ref string ) => encoder.try_write_utf8( string )
-            };
-            if status.is_err() {
-                if let Some( ecw_ctx ) = ecw_ctx {
-                    encoder.write_encoded_word( &*unquote( quoted ), ecw_ctx );
-                } else {
-                    bail!( "can not encode utf8 for this word, as encoded-words are not allowed" );
-                }
-            }
+    let input: &str = &*word.input;
+
+    let ok = (!input.starts_with("=?")) && word.input.chars()
+        .all( |ch| is_atext( ch, encoder.mail_type() ) );
+
+    if ok {
+        encoder.write_str_unchecked( input )
+    } else {
+        if let Some( ecw_ctx ) = ecw_ctx {
+            EncodedWord::write_into( encoder, input, ECWEncoding::QuotedPrintable, ecw_ctx );
+        } else {
+            QuotedString::write_into( encoder, input )?;
         }
     }
-    if let Some( pad ) = word.2.as_ref() {
+
+    if let Some( pad ) = word.right_padding.as_ref() {
         pad.encode( encoder )?;
     }
     Ok( () )

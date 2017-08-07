@@ -1,33 +1,52 @@
 use std::ops::Deref;
 
-use error::*;
 use ascii::AsciiString;
-use grammar::{is_qtext, is_ws, is_vchar, MailType };
+
+use error::*;
+use grammar::{is_qtext, is_ascii, is_ws, is_vchar, MailType };
 use grammar::quoted_word::is_quoted_word;
+use codec::MailEncoder;
 
 use super::simple_item::SimpleItem;
 use super::inner_item::{ InnerAscii, InnerUtf8 };
 
 #[derive( Debug, Clone, Hash, Eq, PartialEq )]
-pub struct Quoted( SimpleItem );
+pub struct QuotedString( SimpleItem );
 
 
-impl Quoted {
+impl QuotedString {
+
+    pub fn write_into<E>( encoder: &mut E, input: &str ) -> Result<()>
+        where E: MailEncoder
+    {
+        //OPTIMIZE: do not unnecessarily allocate strings, but directly write to Encoder
+        use self::SimpleItem::*;
+        let quoted = QuotedString::quote( input )?;
+        match *quoted {
+            Ascii( ref inner ) => {
+                encoder.write_str( &*inner );
+            },
+            Utf8( ref inner ) => {
+                encoder.try_write_utf8( &*inner )?
+            }
+        }
+        Ok( () )
+    }
 
     pub fn parse( already_quoted: SimpleItem ) -> Result<Self> {
         if is_quoted_word( &*already_quoted, MailType::Internationalized ) {
-            Ok( Quoted( already_quoted ) )
+            Ok( QuotedString( already_quoted ) )
         } else {
             bail!( "already quoted item is not actualy valid: {:?}", &*already_quoted );
         }
     }
 
     pub fn quote( input: &str ) -> Result<Self> {
-        let mut is_ascii = true;
+        let mut ascii = true;
         let mut out = String::new();
         out.push( '"' );
         for char in input.chars() {
-            if is_ascii { is_ascii = (char as u32 & !0x7F_u32) == 0 }
+            if ascii { ascii = is_ascii( char ) }
             if is_qtext( char, MailType::Internationalized ) {
                 out.push( char )
             } else {
@@ -45,11 +64,11 @@ impl Quoted {
             }
         }
         out.push( '"' );
-        if is_ascii {
+        if ascii {
             let asciied = unsafe { AsciiString::from_ascii_unchecked( out ) };
-            Ok( Quoted( asciied.into() ) )
+            Ok( QuotedString( asciied.into() ) )
         } else {
-            Ok( Quoted( SimpleItem::from_utf8( out.into() ) ) )
+            Ok( QuotedString( SimpleItem::from_utf8( out.into() ) ) )
         }
     }
 
@@ -106,7 +125,7 @@ impl Quoted {
 }
 
 
-impl Into<String> for Quoted {
+impl Into<String> for QuotedString {
 
     fn into( self ) -> String {
         self.0.into()
@@ -114,7 +133,7 @@ impl Into<String> for Quoted {
 }
 
 
-impl Deref for Quoted {
+impl Deref for QuotedString {
     type Target = SimpleItem;
 
     fn deref( &self ) -> &Self::Target {
@@ -129,31 +148,31 @@ mod test {
 
     #[test]
     fn quote_simple() {
-        let quoted = Quoted::quote( "tralala" ).unwrap();
+        let quoted = QuotedString::quote( "tralala" ).unwrap();
         assert_eq!( "\"tralala\"", &**quoted );
     }
 
     #[test]
     fn quote_some_chars() {
-        let quoted = Quoted::quote( "tr@al al\"a" ).unwrap();
+        let quoted = QuotedString::quote( "tr@al al\"a" ).unwrap();
         assert_eq!(  "\"tr@al\\ al\\\"a\"", &**quoted );
     }
 
     #[test]
     fn quote_ctl() {
-        let res = Quoted::quote("\x01");
+        let res = QuotedString::quote("\x01");
         assert_eq!( false, res.is_ok() );
     }
 
     #[test]
     fn unquote_simple() {
-        let quoted = Quoted::parse( "\"simple\"".into() ).unwrap();
+        let quoted = QuotedString::parse( "\"simple\"".into() ).unwrap();
         assert_eq!( "simple", &*quoted.unquote() )
     }
 
     #[test]
     fn unquote() {
-        let quoted = Quoted::parse( r#""\ \\_\"<>""#.into() ).unwrap();
+        let quoted = QuotedString::parse( r#""\ \\_\"<>""#.into() ).unwrap();
         assert_eq!( r#" \_"<>"#, &*quoted.unquote() )
     }
 
@@ -166,7 +185,7 @@ mod test {
             r#""\ ""#
         ];
         for sample in samples {
-            assert_eq!( *sample, &*Quoted::quote( sample ).unwrap().unquote() )
+            assert_eq!( *sample, &*QuotedString::quote( sample ).unwrap().unquote() )
         }
     }
 }

@@ -1,5 +1,4 @@
 use std::path::{ Path, PathBuf };
-use std::ascii::AsciiExt;
 use std::fs::File;
 use std::io::{ Write, BufWriter, BufRead, BufReader, Error as IoError };
 use std::env;

@@ -47,7 +47,7 @@ mod test {
 
     ec_test!{simple,{
         let mime: Mime = "text/wtf;charset=utf8;random=alot".parse().unwrap();
-        mime
+        Some( mime )
     } => ascii => [
         LinePart("text/wtf;charset=utf8;random=alot")
     ]}

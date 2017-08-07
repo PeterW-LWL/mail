@@ -28,10 +28,11 @@ impl MailEncodable for Path {
 #[cfg(test)]
 mod test {
     use super::*;
+    use data::FromInput;
     use codec::test_utils::*;
 
     ec_test!{empty_path, {
-        Path( None )
+        Some( Path( None ) )
     } => ascii => [
         OptFWS,
         LinePart( "<>" ),
@@ -39,7 +40,7 @@ mod test {
     ]}
 
     ec_test!{simple_path, {
-        Path( Some( Email::from_input( "abc@de.fg".into() ).unwrap() ) )
+        Some( Path( Some( Email::from_input( "abc@de.fg".into() ).unwrap() ) ) )
     } => ascii => [
         OptFWS,
         LinePart( "<" ),

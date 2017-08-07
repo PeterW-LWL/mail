@@ -37,7 +37,7 @@ mod path;
 pub use self::path::Path;
 
 mod received_token;
-pub use self::received_token::{ ReceivedToken, ReceivedTokenWord };
+pub use self::received_token::ReceivedToken;
 
 
 mod transfer_encoding;
@@ -47,7 +47,7 @@ pub mod word;
 pub use self::word::Word;
 
 mod phrase;
-pub use self::phrase::{ Phrase, PhraseWord };
+pub use self::phrase::Phrase;
 
 mod phrase_list;
 pub use self::phrase_list::PhraseList;

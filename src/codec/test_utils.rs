@@ -26,7 +26,7 @@ macro_rules! ec_test {
                 other => panic!( "invalide string for mail type: {}", other)
             };
             let mut ec = TestMailEncoder::new(mt);
-            let to_encode = $inp;
+            let to_encode = $inp.unwrap();
             to_encode.encode( &mut ec ).unwrap();
             assert_eq!( vec![
                 $($state),*
@@ -40,7 +40,6 @@ macro_rules! ec_test {
 pub enum State {
     Line(String),
     LinePart(String),
-    EncodedWord(String, EncodedWordContext),
     FWS,
     OptFWS,
     Body(String)
@@ -55,9 +54,7 @@ pub fn LinePart<S: Into<String>>(data: S) -> State {
 pub fn Body<S: Into<String>>(data: S) -> State {
     State::Body(data.into())
 }
-pub fn EncodedWord<S: Into<String>>(data: S, ctx: EncodedWordContext) -> State {
-    State::EncodedWord(data.into(), ctx)
-}
+
 
 pub const FWS: State = State::FWS;
 pub const OptFWS: State = State::OptFWS;
@@ -145,10 +142,6 @@ impl MailEncoder for TestMailEncoder {
         }
     }
 
-    fn write_encoded_word( &mut self, data: &str, ctx: EncodedWordContext ) {
-        self.push_line_part();
-        self.state_seq.push( State::EncodedWord( data.into(), ctx ) );
-    }
 
     /// writes a string to the encoder without checking if it is compatible
     /// with the mail type, if not used correctly this can write Utf8 to

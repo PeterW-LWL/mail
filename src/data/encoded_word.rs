@@ -10,11 +10,12 @@ use types::Vec1;
 use grammar::encoded_word::{ is_encoded_word, EncodedWordContext };
 use super::input::Input;
 use super::inner_item::InnerAscii;
+use codec::MailEncoder;
 use codec::utf8_to_ascii::{
     base64_encoded_for_encoded_word,
     q_encode_for_encoded_word,
     base64_decode_for_encoded_word,
-    q_decode_for_encoded_word
+    q_decode_for_encoded_word,
 };
 
 
@@ -31,6 +32,21 @@ pub struct EncodedWord {
 
 
 impl EncodedWord {
+
+    pub fn write_into<E>(
+        encoder: &mut E,
+        word: &str,
+        encoding: Encoding,
+        ctx: EncodedWordContext
+    ) where E: MailEncoder {
+        //OPTIMIZE: do not unnecessarily allocate strings, but directly write to Encoder
+        //  REQUIREMENT: write_into style method for encode base64/quoted-printable
+        let iter = EncodedWord::encode_word( word, encoding, ctx ).into_iter();
+        sep_for!{ word in iter;
+            sep { encoder.write_fws() };
+            encoder.write_str( &**word )
+        }
+    }
 
     pub fn parse( already_encoded: InnerAscii, ctx: EncodedWordContext ) -> Result<Self> {
         if is_encoded_word( already_encoded.as_str(), ctx ) {

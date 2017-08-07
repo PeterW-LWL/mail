@@ -2,6 +2,8 @@ use mime::Mime;
 use base64;
 use quoted_printable;
 
+
+#[allow(unused_doc_comment)]
 error_chain! {
 
     foreign_links {
@@ -11,6 +13,7 @@ error_chain! {
 
 
     errors {
+
         /// Certain components might not be encodable under some circumstances.
         /// E.g. they might have non-ascii values and are not encodable into ascii
         ///

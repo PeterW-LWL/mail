@@ -1,12 +1,13 @@
 use ascii::AsciiChar;
 
 use error::*;
-use codec::{ MailEncoder, MailEncodable };
 use grammar::is_vchar;
 use grammar::encoded_word::EncodedWordContext;
+use codec::{ MailEncoder, MailEncodable };
+use data::{ Encoding, EncodedWord };
 
 use super::utils::text_partition::{partition, Partition};
-use super::utils::item::Input;
+use data::Input;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Unstructured {
@@ -49,7 +50,10 @@ impl MailEncodable for Unstructured {
                         .any(|ch| !is_vchar( ch, encoder.mail_type() ) );
 
                     if needs_encoding {
-                        encoder.write_encoded_word( data, EncodedWordContext::Text )
+                        EncodedWord::write_into( encoder,
+                                                 data,
+                                                 Encoding::QuotedPrintable,
+                                                 EncodedWordContext::Text );
                     } else {
                         // if needs_encoding is false all chars a vchars wrt. the mail
                         // type, therefore if the mail type is Ascii this can only be

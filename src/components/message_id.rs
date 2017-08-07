@@ -6,7 +6,7 @@ use error::*;
 use types::Vec1;
 use codec::{ MailEncoder, MailEncodable };
 
-use super::utils::item::{ Input, SimpleItem };
+use data::{ Input, SimpleItem };
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize)]
 pub struct MessageID {
@@ -17,17 +17,17 @@ impl MessageID {
     pub fn from_input( input: Input ) ->  Result<Self> {
         use self::parser_parts::{ id_left, id_right };
 
-        match do_parse!( &*input,
+        match do_parse!( &**input,
             id_left >>
             char!( '@' ) >>
             id_right >>
             (())
         ) {
             IResult::Done( .. ) => {},
-            _ => bail!( "invalid message id: {}", &*input )
+            _ => bail!( "invalid message id: {:?}", &*input )
         }
 
-        Ok( MessageID { message_id: input.into_simple_item() } )
+        Ok( MessageID { message_id: input.into() } )
     }
 }
 

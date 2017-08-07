@@ -3,6 +3,8 @@ use std::fmt;
 use std::ops::{ Deref, DerefMut };
 use std::result::{ Result as StdResult };
 use std::error::{ Error as StdError };
+use std::vec::IntoIter;
+use std::iter::IntoIterator;
 
 #[derive(Debug, Hash, Eq, PartialEq, Copy, Clone)]
 pub struct Size0Error;
@@ -22,6 +24,16 @@ type Vec1Result<T> = StdResult<T, Size0Error>;
 
 #[derive( Debug, Clone, Eq, PartialEq, Hash )]
 pub struct Vec1<T>(Vec<T>);
+
+impl<T> IntoIterator for Vec1<T> {
+    type Item = T;
+    type IntoIter = IntoIter<T>;
+
+    fn into_iter( self ) -> Self::IntoIter {
+        self.0.into_iter()
+    }
+
+}
 
 impl<T> Vec1<T> {
 
@@ -44,6 +56,11 @@ impl<T> Vec1<T> {
         Vec1( vec )
     }
 
+
+
+    /// returns a reference to the last element
+    /// as Vec1 contains always at last one element
+    /// there is always a last element
     pub fn last( &self ) -> &T {
         //UNWRAP_SAFE: len is at last 1
         self.0.last().unwrap()

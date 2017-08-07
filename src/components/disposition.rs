@@ -157,25 +157,25 @@ mod test {
     use components::DateTime;
 
     ec_test!{ no_params_inline, {
-        Disposition::inline()
+        Some( Disposition::inline() )
     } => ascii => [
         LinePart("inline")
     ]}
 
     ec_test!{ no_params_attachment, {
-        Disposition::attachment()
+        Some( Disposition::attachment() )
     } => ascii => [
         LinePart("attachment")
     ]}
 
     ec_test!{ attachment_all_params, {
-        Disposition::new( DispositionKind::Attachment, FileMeta {
+        Some( Disposition::new( DispositionKind::Attachment, FileMeta {
             file_name: Some( "random.png".into_ascii_string().unwrap() ),
             creation_date: Some( DateTime::test_time( 1 ) ),
             modification_date: Some( DateTime::test_time( 2 ) ),
             read_date: Some( DateTime::test_time( 3 ) ),
             size: Some( 4096 )
-        })
+        }) )
     } => ascii => [
         LinePart( concat!( "attachment",
             ";filename=random.png",

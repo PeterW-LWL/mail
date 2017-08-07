@@ -1,8 +1,6 @@
 
 
 use grammar::{is_atext, MailType };
-use grammar::encoded_word::EncodedWordContext;
-use items::{EncodedWord, Encoding as ECWEncoding };
 
 use ascii::{  AsciiStr, AsciiChar };
 
@@ -11,7 +9,7 @@ use utils::insert_bytes;
 
 pub mod transfer_encoding;
 pub mod utf8_to_ascii;
-pub mod quote;
+
 
 #[cfg(test)]
 #[macro_use]
@@ -30,7 +28,7 @@ pub trait MailEncoder {
 
     fn try_write_utf8( &mut self, str: &str ) -> Result<()>;
     fn try_write_atext( &mut self, str: &str ) -> Result<()>;
-    fn write_encoded_word( &mut self, data: &str, ctx: EncodedWordContext );
+    //fn write_encoded_word( &mut self, data: &str, ctx: EncodedWordContext );
 
     /// writes a string to the encoder without checking if it is compatible
     /// with the mail type, if not used correctly this can write Utf8 to
@@ -174,14 +172,14 @@ impl MailEncoder for MailEncoderImpl {
         self.write_data_unchecked( str.as_bytes() )
     }
 
-    fn write_encoded_word( &mut self, data: &str, ctx: EncodedWordContext ) {
-        //FIXME possible directly write the encoded word, and return a lazy
-        // iterator or so
-        sep_for!{ ew in EncodedWord::encode_word( data, ECWEncoding::Base64, ctx ).iter();
-            sep { self.write_fws() };
-            self.write_str( &***ew );
-        }
-    }
+//    fn write_encoded_word( &mut self, data: &str, ctx: EncodedWordContext ) {
+//        //FIXME possible directly write the encoded word, and return a lazy
+//        // iterator or so
+//        sep_for!{ ew in EncodedWord::encode_word( data, ECWEncoding::Base64, ctx ).iter();
+//            sep { self.write_fws() };
+//            self.write_str( &***ew );
+//        }
+//    }
 
     fn write_body( &mut self, body: &[u8]) {
         self.write_data_unchecked( body );

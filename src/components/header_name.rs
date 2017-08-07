@@ -69,7 +69,7 @@ mod test {
     }
 
     ec_test!{ encode_header_name, {
-        HeaderName::new( "X-Random".into() ).unwrap()
+        HeaderName::new( "X-Random".into() )
     } => ascii => [
         LinePart( "X-Random" )
     ]}

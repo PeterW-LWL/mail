@@ -3,33 +3,12 @@ use types::Vec1;
 use codec::{ MailEncodable, MailEncoder };
 use grammar::encoded_word::EncodedWordContext;
 
-use super::utils::item::{ Input, Item };
+use data::{ FromInput, Input };
 use super::utils::text_partition::{ Partition, partition };
 use super::word::{ Word, do_encode_word };
 use super::{ CFWS, FWS };
 
-//FIXME PhraseWord's <==> Word's, just some other Word usage is more restricted we don't need this
-// mainly the other usage does not allow EncodedWords, but since the changes to Item this can
-// be checked at encoding time! Yay!
-#[derive( Debug, Clone, Eq, PartialEq, Hash )]
-pub struct PhraseWord( Word );
 
-impl PhraseWord {
-    pub fn new( item: Item ) -> Result<Self> {
-        Ok( PhraseWord( Word::new( item, true )? ) )
-    }
-
-    pub fn from_parts(
-        left_padding: Option<CFWS>,
-        item: Item,
-        right_padding: Option<CFWS>,
-    ) -> Result<Self> {
-        Ok( PhraseWord( Word::from_parts( left_padding, item, right_padding, true )? ) )
-    }
-
-}
-
-deref0!{ +mut PhraseWord => Word }
 
 #[derive( Debug, Clone, Eq, PartialEq, Hash )]
 pub struct Phrase( pub Vec1<Word> );
@@ -67,9 +46,10 @@ impl Phrase {
         for partition in partition( &*input )?.into_iter() {
             match partition {
                 Partition::VCHAR( word ) => {
-                    let word_item = Item::Input( Input::Owned( word.into() ) );
-                    //FIXME change Word::from_parts
-                    let word = Word::from_parts( last_gap.take(), word_item, None, true )?;
+                    let mut word = Word::from_input( word.into() )?;
+                    if let Some( fws ) = last_gap.take() {
+                        word.pad_left( fws );
+                    }
                     words.push( word );
                 },
                 Partition::SPACE( _gap ) => {

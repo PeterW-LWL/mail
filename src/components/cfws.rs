@@ -51,7 +51,7 @@ mod test {
 
     ec_test!{ simple_encode,
         {
-            CFWS::SingleFws( FWS )
+            Some( CFWS::SingleFws( FWS ) )
         } => utf8 => [
             t::FWS
         ]
