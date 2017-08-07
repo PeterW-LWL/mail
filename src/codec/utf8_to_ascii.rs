@@ -7,6 +7,7 @@ use quoted_printable;
 use base64;
 use grammar::encoded_word::EncodedWordContext;
 
+
 macro_rules! base64_config {
     () => {
         // as we neither have const_fn constructors (currently) nor is
@@ -42,6 +43,7 @@ pub fn q_decode_for_encoded_word( input: &str ) -> Result<Vec<u8>> {
 //FEATURE_TODO(char_sing): instead of returning a AsciiString, pass in a Sink (
 // which e.g. forwards to the Encoder)
 pub fn q_encode_for_encoded_word( input: &str, _ctx: EncodedWordContext ) -> AsciiString {
+
     //TODO I suspect the `quoted_printable` crate is not
     // completely correct wrt. to some aspects, have to
     // check this

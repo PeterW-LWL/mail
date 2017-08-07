@@ -190,10 +190,12 @@ pub fn is_especial( ch: char ) -> bool {
 /// based on RFC 2047
 pub mod encoded_word {
     use nom;
-
     use error::*;
-
     use super::{  is_especial, is_ascii_vchar };
+
+    pub const MAX_ECW_LEN: usize = 75;
+    // the overhead from: `=?<>?<>?<>?=` not including the length of the `<>`
+    pub const ECW_SEP_OVERHEAD: usize = 6;
 
     #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq)]
     pub enum EncodedWordContext {

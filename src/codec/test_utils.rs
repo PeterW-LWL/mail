@@ -7,7 +7,8 @@ use ascii::{ AsciiChar,  AsciiStr };
 
 use error::*;
 use grammar::{is_atext, MailType };
-use super::MailEncoder;
+
+use super::traits::MailEncoder;
 
 
 #[macro_export]
