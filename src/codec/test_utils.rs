@@ -7,7 +7,6 @@ use ascii::{ AsciiChar,  AsciiStr };
 
 use error::*;
 use grammar::{is_atext, MailType };
-use grammar::encoded_word::EncodedWordContext;
 use super::MailEncoder;
 
 
