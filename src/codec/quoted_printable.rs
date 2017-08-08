@@ -1,6 +1,5 @@
 //FUTURE_TODO: make it it's own crate, possible push to `quoted_printable`
 use ascii::{ AsciiChar, AsciiStr, AsciiString };
-use error::*;
 use types::Vec1;
 
 use grammar::encoded_word::{ MAX_ECW_LEN, ECW_SEP_OVERHEAD };
@@ -109,10 +108,6 @@ impl<'a, E> EncodedWordWriter for WriterWrapper<'a, E> where E: MailEncoder + 'a
 /// quoted' ', '\t', '?', '(', ')'. Also '\n','\r' see the note below for more
 /// details.
 ///
-/// # Error:
-///
-/// a error is returned if a single encoded chunk can not be written as one
-/// because of the length limitation AFTER a new encoded word was started.
 ///
 /// # Panics:
 ///
@@ -122,6 +117,9 @@ impl<'a, E> EncodedWordWriter for WriterWrapper<'a, E> where E: MailEncoder + 'a
 ///
 /// 2. if max size if >76 as no new line handling is implemented and
 ///    the max size for the use case can be at most 67 chars
+///
+/// 3. if a single encoded chunk can not be written as one because of
+///    the length limitation AFTER a new encoded word was started.
 ///
 /// # Note:
 ///   as it has to be a token no new line characters can appear in the output,
@@ -136,12 +134,12 @@ impl<'a, E> EncodedWordWriter for WriterWrapper<'a, E> where E: MailEncoder + 'a
 ///   might be encoded with completely different bytes, but when the RFC speaks of
 ///   '\r','\n' it normally means the bytes 10/13 independent of the character set,
 ///   or if they appear in a image, zip-archiev etc. )
-pub fn header_encode<'a, I, O>(input: I, out: &mut O, max_size: usize) -> Result<()>
+pub fn header_encode<'a, I, O>(input: I, out: &mut O )
     where I: Iterator<Item=&'a [u8]>, O: EncodedWordWriter
 {
 
-    assert!( max_size <= 76 );
-    let mut remaining = max_size;
+    let mut remaining = out.max_payload_len();
+    assert!( remaining <= 76 );
     let mut buf = [33; 16];
 
     for chunk in input {
@@ -172,17 +170,16 @@ pub fn header_encode<'a, I, O>(input: I, out: &mut O, max_size: usize) -> Result
         }
         if buf_idx > remaining {
             remaining = out.start_new_encoded_word();
+            assert!( remaining <= 76 );
         }
         if buf_idx > remaining {
-            bail!( "single character longer then max length ({:?}) of encoded word", remaining );
+            panic!( "single character longer then max length ({:?}) of encoded word", remaining );
         }
         for idx in 0..buf_idx {
             out.write_char( unsafe { AsciiChar::from_unchecked( buf[idx] ) } )
         }
         remaining -= buf_idx;
     }
-    Ok( () )
-
 }
 
 
@@ -232,7 +229,7 @@ mod test {
                 let iter = test_data.char_indices().map( |(idx, ch)| {
                     &test_data.as_bytes()[idx..idx+ch.len_utf8()]
                 });
-                header_encode( iter, &mut out, 67 ).unwrap();
+                header_encode( iter, &mut out );
 
                 let expected = &[
                     $($item),*
