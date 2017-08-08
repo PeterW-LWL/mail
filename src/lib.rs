@@ -26,6 +26,7 @@ mod macros;
 
 mod utils;
 pub mod error;
+#[macro_use]
 pub mod types;
 pub mod grammar;
 #[cfg_attr(test, macro_use)]

@@ -128,7 +128,7 @@ impl<T, C, CP, D> Compositor<T, C, CP, D>
             let mut to_mailbox = sctx.to;
             if to_mailbox.display_name.is_none() {
                 if let Some( new_name ) = self.name_composer.compose_name( data ) {
-                    let phrase = Phrase::from_input( new_name.into() )?;
+                    let phrase = Phrase::from_input( new_name )?;
                     to_mailbox.display_name = Some( phrase );
                 }
             }

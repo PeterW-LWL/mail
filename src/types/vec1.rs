@@ -6,6 +6,15 @@ use std::error::{ Error as StdError };
 use std::vec::IntoIter;
 use std::iter::IntoIterator;
 
+#[macro_export]
+macro_rules! vec1 {
+    ( $first:expr, $($item:expr),* ) => ({
+        let mut tmp = Vec1::new( $first );
+        $( tmp.push( $item ); )*
+        tmp
+    });
+}
+
 #[derive(Debug, Hash, Eq, PartialEq, Copy, Clone)]
 pub struct Size0Error;
 
@@ -50,7 +59,7 @@ impl<T> Vec1<T> {
         }
     }
 
-    pub fn new_with_capacity( first: T, capacity: usize ) -> Self {
+    pub fn with_capacity( first: T, capacity: usize ) -> Self {
         let mut vec = Vec::with_capacity( capacity );
         vec.push( first );
         Vec1( vec )

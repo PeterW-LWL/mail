@@ -32,14 +32,10 @@ pub struct Phrase( pub Vec1<Word> );
 //    InputBased( Input )
 //}
 
+impl FromInput for Phrase {
+    fn from_input<I: Into<Input>>( input: I ) -> Result<Self> {
+        let input = input.into();
 
-impl Phrase {
-
-    pub fn from_words( words: Vec1<Word> ) -> Self {
-        Phrase( words )
-    }
-
-    pub fn from_input( input: Input ) -> Result<Self> {
         //OPTIMIZE: words => shared, then turn partition into shares, too
         let mut last_gap = None;
         let mut words = Vec::new();
@@ -68,9 +64,7 @@ impl Phrase {
 
         Ok( Phrase( words ) )
     }
-
 }
-
 
 
 impl MailEncodable for Phrase  {
