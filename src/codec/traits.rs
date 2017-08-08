@@ -4,7 +4,18 @@ use ascii::{  AsciiStr, AsciiChar };
 
 pub trait EncodedWordWriter {
     fn write_char( &mut self, ch: AsciiChar );
-    fn start_new_encoded_word( &mut self ) -> usize;
+
+    fn write_ecw_start( &mut self );
+    fn write_ecw_end( &mut self );
+    fn write_ecw_seperator( &mut self );
+    fn max_payload_len( &self ) -> usize;
+
+    fn start_new_encoded_word( &mut self ) -> usize {
+        self.write_ecw_end();
+        self.write_ecw_seperator();
+        self.write_ecw_start();
+        self.max_payload_len()
+    }
 }
 
 pub trait MailEncoder {

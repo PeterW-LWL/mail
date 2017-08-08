@@ -6,8 +6,39 @@ use types::Vec1;
 use grammar::encoded_word::{ MAX_ECW_LEN, ECW_SEP_OVERHEAD };
 use super::traits::{ EncodedWordWriter, MailEncoder };
 
-pub struct VecWriter( Vec1<AsciiString> );
+pub struct VecWriter {
+    data: Vec1<AsciiString >,
+    max_len: usize
+}
 
+impl VecWriter {
+    pub fn new(max_len: usize) -> Self {
+        let data = Vec1::new( AsciiString::new() );
+        VecWriter { data, max_len }
+    }
+
+    pub fn data( &self ) -> &[AsciiString] {
+        &*self.data
+    }
+}
+
+impl EncodedWordWriter for VecWriter {
+    fn write_char( &mut self, ch: AsciiChar ) {
+        self.data.last_mut().push( ch );
+    }
+
+    fn write_ecw_seperator( &mut self ) {
+        self.data.push( AsciiString::new() )
+    }
+
+    fn write_ecw_start( &mut self ) {}
+
+    fn write_ecw_end( &mut self ) {}
+
+    fn max_payload_len( &self ) -> usize {
+        self.max_len
+    }
+}
 
 pub struct WriterWrapper<'a, E:'a>{
     charset: &'a AsciiStr,
@@ -26,18 +57,26 @@ impl<'a, E> EncodedWordWriter for WriterWrapper<'a, E> where E: MailEncoder + 'a
         self.encoder.write_char( ch )
     }
 
-    fn start_new_encoded_word( &mut self ) -> usize {
-        self.encoder.write_char( AsciiChar::Question );
-        self.encoder.write_char( AsciiChar::Equal );
+    fn write_ecw_seperator( &mut self ) {
         self.encoder.write_fws();
+    }
+
+    fn write_ecw_start( &mut self ) {
         self.encoder.write_char( AsciiChar::Equal );
         self.encoder.write_char( AsciiChar::Question );
         self.encoder.write_str( self.charset );
         self.encoder.write_char( AsciiChar::Question );
-        // this wrapper is (for now) just for quoted printable
+        // this is (for now) just for quoted printable
         self.encoder.write_char( AsciiChar::Q );
         self.encoder.write_char( AsciiChar::Question );
-        // -1 because of encoding len i.e. the len of "Q"
+    }
+
+    fn write_ecw_end( &mut self ) {
+        self.encoder.write_char( AsciiChar::Question );
+        self.encoder.write_char( AsciiChar::Equal );
+    }
+
+    fn max_payload_len( &self ) -> usize {
         MAX_ECW_LEN - ECW_SEP_OVERHEAD - self.charset.len() - 1
     }
 }
@@ -111,17 +150,19 @@ pub fn header_encode<'a, I, O>(input: I, out: &mut O, max_size: usize) -> Result
         for byte in chunk {
             let byte = *byte;
             match byte {
-                33...39 |
-                // 40,41 == '(',')'
-                42...60 |
-                // 61 == '='
-                62 |
-                // 63 == '?'
-                64...126 => {
+                // this is the way to go as long as we don't want to behave differently for
+                // different context, the COMMENT context allows more chars, and the
+                // TEXT context even more
+                b'!' | b'*' |
+                b'+' | b'-' |
+                b'/' | b'_' |
+                b'0'...b'9' |
+                b'A'...b'Z' |
+                b'a'...b'z'  => {
                     buf[buf_idx] = byte;
                     buf_idx += 1;
                 },
-                otherwise => {
+                _otherwise => {
                     buf[buf_idx] = b'=';
                     buf[buf_idx+1] = lower_nibble_to_hex( byte >> 4 ) as u8;
                     buf[buf_idx+2] = lower_nibble_to_hex( byte ) as u8;
@@ -165,8 +206,6 @@ fn lower_nibble_to_hex( half_byte: u8 ) -> AsciiChar {
 
 #[cfg(test)]
 mod test {
-    use ascii::AsciiString;
-    use types::Vec1;
     use super::*;
 
 
@@ -184,97 +223,90 @@ mod test {
         }
     }
 
-    struct TestWriter( Vec1<AsciiString> );
+    macro_rules! test {
+        ($name:ident, data $data:expr => [$($item:expr),*]) => {
+            #[test]
+            fn $name() {
+                let test_data = $data;
+                let mut out = VecWriter::new( 67 );
+                let iter = test_data.char_indices().map( |(idx, ch)| {
+                    &test_data.as_bytes()[idx..idx+ch.len_utf8()]
+                });
+                header_encode( iter, &mut out, 67 ).unwrap();
 
-    deref0!{ +mut TestWriter => Vec1<AsciiString> }
+                let expected = &[
+                    $($item),*
+                ];
+                let iter = expected.iter()
+                    .zip( out.data().iter().map(|x|x.as_str()) )
+                    .enumerate();
 
+                for ( idx, (expected, got) ) in iter {
+                    if  *expected != got {
+                        panic!( " item nr {}: {:?} != {:?} ", idx, expected, got );
+                    }
+                }
 
-    impl TestWriter {
-        fn new() -> Self {
-            TestWriter( Vec1::new( AsciiString::new() ) )
-        }
+                let e_len = expected.len();
+                let g_len = out.data().len();
+                if e_len > g_len {
+                    panic!( "expected following additional items: {:?}", &expected[g_len..e_len])
+                }
+                if e_len < g_len {
+                    panic!( "got following additional items: {:?}", &out.data()[e_len..g_len])
+                }
+            }
+        };
     }
-    impl EncodedWordWriter for TestWriter {
-        fn write_char( &mut self, ch: AsciiChar ) {
-            self.0.last_mut().push( ch )
-        }
-        fn start_new_encoded_word( &mut self ) -> usize {
-            self.0.push( AsciiString::new() );
-            67
-        }
+
+    test! { can_be_used_in_comments,
+        data "()\"" => [
+            "=28=29=22"
+        ]
     }
 
-    #[test]
-    fn encode_ascii() {
-        let test_data = "abcdefghijklmnopqrstuvwxyz \t?=0123456789!@#$%^&*()_+-";
-        let mut out = TestWriter::new();
-        let iter = test_data.char_indices().map( |(idx, ch)| {
-            &test_data.as_bytes()[idx..idx+ch.len_utf8()]
-        });
-        header_encode( iter, &mut out, 67 ).unwrap();
-
-        let expected = &[
-            "abcdefghijklmnopqrstuvwxyz=20=09=3F=3D0123456789!@#$%^&*()_+-"
-        ];
-        for (expected, got) in expected.iter().zip( out.iter().map(|x|x.as_str())) {
-            assert_eq!( *expected, got );
-        }
+    test! { can_be_used_in_phrase,
+        data "{}~@#$%^&*()=|\\[]';:." => [
+            "=7B=7D=7E=40=23=24=25=5E=26*=28=29=3D=7C=5C=5B=5D=27=3B=3A=2E"
+        ]
     }
 
-    #[test]
-    fn how_it_handles_newlines() {
-        let test_data = "\r\n";
-        let mut out = TestWriter::new();
-        let iter = test_data.char_indices().map( |(idx, ch)| {
-            &test_data.as_bytes()[idx..idx+ch.len_utf8()]
-        });
-        header_encode( iter, &mut out, 67 ).unwrap();
+    test! { bad_chars_in_all_contexts,
+        data "?= \t\r\n" => [
+            "=3F=3D=20=09=0D=0A"
+        ]
+    }
 
-        let expected = &[
+    test!{ encode_ascii,
+        data  "abcdefghijklmnopqrstuvwxyz \t?=0123456789!@#$%^&*()_+-" => [
+             "abcdefghijklmnopqrstuvwxyz=20=09=3F=3D0123456789!=40=23=24=25=5E=26",
+             "*=28=29_+-"
+        ]
+    }
+
+    test! { how_it_handales_newlines,
+        data "\r\n" => [
             "=0D=0A"
-        ];
-        for (expected, got) in expected.iter().zip( out.iter().map(|x|x.as_str())) {
-            assert_eq!( *expected, got );
-        }
+        ]
     }
 
-    #[test]
-    fn line_break() {
-        let test_data = "abcagain";
-        let mut out = TestWriter::new();
-        let iter = test_data.char_indices().map( |(idx, ch)| {
-            &test_data.as_bytes()[idx..idx+ch.len_utf8()]
-        });
-        header_encode( iter, &mut out, 3 ).unwrap();
 
-        let expected = &[
-            "abc",
-            "again"
-        ];
-        for (expected, got) in expected.iter().zip( out.iter().map(|x|x.as_str())) {
-            assert_eq!( *expected, got );
-        }
+    test! { split_into_multiple_ecws,
+        data "0123456789012345678901234567890123456789012345678901234567891234567newline" => [
+            "0123456789012345678901234567890123456789012345678901234567891234567",
+            "newline"
+        ]
     }
 
-    #[test]
-    fn bigger_chunks() {
-        let test_data = "ランダムテキスト ראַנדאָם טעקסט";
-        let mut out = TestWriter::new();
-        let iter = test_data.char_indices().map( |(idx, ch)| {
-            &test_data.as_bytes()[idx..idx+ch.len_utf8()]
-        });
-        header_encode( iter, &mut out, 67 ).unwrap();
-
-        let expected = &[
+    test!{ bigger_chunks,
+        data "ランダムテキスト ראַנדאָם טעקסט" => [
             //ランダムテキス
             "=E3=83=A9=E3=83=B3=E3=83=80=E3=83=A0=E3=83=86=E3=82=AD=E3=82=B9",
             //ト ראַנדאָם
             "=E3=83=88=20=D7=A8=D7=90=D6=B7=D7=A0=D7=93=D7=90=D6=B8=D7=9D=20",
             //ראַנדאָם
             "=D7=98=D7=A2=D7=A7=D7=A1=D7=98"
-        ];
-        for (expected, got) in expected.iter().zip( out.iter().map(|x|x.as_str())) {
-            assert_eq!( *expected, got );
-        }
+        ]
     }
+
 }
