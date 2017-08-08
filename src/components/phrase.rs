@@ -34,6 +34,7 @@ pub struct Phrase( pub Vec1<Word> );
 
 impl FromInput for Phrase {
     fn from_input<I: Into<Input>>( input: I ) -> Result<Self> {
+        //TODO isn't this 90% the same code as used by Unstructured
         let input = input.into();
 
         //OPTIMIZE: words => shared, then turn partition into shares, too
@@ -80,6 +81,32 @@ impl MailEncodable for Phrase  {
         Ok( () )
 
     }
+}
+
+#[cfg(test)]
+mod test {
+    use data::FromInput;
+    use codec::test_utils::*;
+    use super::Phrase;
+
+    ec_test!{ simple, {
+        Phrase::from_input("simple think")
+    } => ascii => [
+        LinePart("simple"),
+        FWS,
+        LinePart("think")
+    ]}
+
+    ec_test!{ with_encoding, {
+        Phrase::from_input(" hm nääds encoding")
+    } => ascii => [
+        FWS,
+        LinePart("hm"),
+        FWS,
+        LinePart( "=?utf8?Q?n=C3=A4=C3=A4ds?=" ),
+        FWS,
+        LinePart( "encoding" )
+    ]}
 }
 
 
