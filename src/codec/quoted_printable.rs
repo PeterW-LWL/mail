@@ -71,8 +71,8 @@ pub fn header_encode<'a, I, O>(input: I, out: &mut O )
 {
     out.write_ecw_start();
     let mut remaining = out.max_payload_len();
-    assert!( remaining <= 76 );
-    let mut buf = [33; 16];
+    //WARN: on remaining being > 67
+    let mut buf = [AsciiChar::A; 16];
 
     for chunk in input {
         let mut buf_idx = 0;
@@ -89,26 +89,27 @@ pub fn header_encode<'a, I, O>(input: I, out: &mut O )
                 b'0'...b'9' |
                 b'A'...b'Z' |
                 b'a'...b'z'  => {
-                    buf[buf_idx] = byte;
+                    //SAFE:  byte can only be one of the chars listed above, which are all ascii
+                    buf[buf_idx] = unsafe { AsciiChar::from_unchecked( byte ) };
                     buf_idx += 1;
                 },
                 _otherwise => {
-                    buf[buf_idx] = b'=';
-                    buf[buf_idx+1] = lower_nibble_to_hex( byte >> 4 ) as u8;
-                    buf[buf_idx+2] = lower_nibble_to_hex( byte ) as u8;
+                    buf[buf_idx] = AsciiChar::Equal;
+                    buf[buf_idx+1] = lower_nibble_to_hex( byte >> 4 );
+                    buf[buf_idx+2] = lower_nibble_to_hex( byte );
                     buf_idx += 3;
                 }
             }
         }
         if buf_idx > remaining {
             remaining = out.start_new_encoded_word();
-            assert!( remaining <= 76 );
+            //WARN: on remaining being > 67
         }
         if buf_idx > remaining {
             panic!( "single character longer then max length ({:?}) of encoded word", remaining );
         }
         for idx in 0..buf_idx {
-            out.write_char( unsafe { AsciiChar::from_unchecked( buf[idx] ) } )
+            out.write_char( buf[idx]  )
         }
         remaining -= buf_idx;
     }
