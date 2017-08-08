@@ -35,13 +35,6 @@ pub struct Mail {
 
 pub enum MailPart {
     SingleBody {
-        // a future stream of bytes?
-        // we apply content transfer encoding on it but no dot-staching as that
-        // is done by the protocol, through its part of the mail so it would be
-        // interesting to dispable dot staching on protocol level as we might
-        // have to implement support for it in this lib for non smtp mail transfer
-        // also CHUNKED does not use dot-staching making it impossible to use it
-        // with tokio-smtp
         body: Body
     },
     MultipleBodies {
