@@ -96,8 +96,6 @@ mod test {
     use grammar::MailType;
     use codec::test_utils::*;
 
-    //FIXME: fix q_encoding, as it currently encodes "=?" as "=3d?", but '?' is not a valid character
-    #[ignore]
     #[test]
     fn encode_pseudo_encoded_words() {
         let word = Word::from_input( "=?".into() ).unwrap();
