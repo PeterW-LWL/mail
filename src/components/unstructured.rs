@@ -4,7 +4,7 @@ use error::*;
 use grammar::is_vchar;
 use grammar::encoded_word::EncodedWordContext;
 use codec::{ MailEncoder, MailEncodable };
-use data::{ Encoding, EncodedWord };
+use data::{ FromInput, Encoding, EncodedWord };
 
 use super::utils::text_partition::{partition, Partition};
 use data::Input;
@@ -15,22 +15,12 @@ pub struct Unstructured {
     text: Input,
 }
 
-impl Unstructured {
-    pub fn from_input( text: Input ) -> Self {
-        Unstructured { text }
+impl FromInput for Unstructured {
+    fn from_input<I: Into<Input>>( text: I ) -> Result<Self> {
+        Ok( Unstructured { text: text.into() } )
     }
-
-    pub fn from_string<I>( string: I ) -> Self
-        where I: Into<String>
-    {
-        let string: String = string.into();
-
-        Unstructured {
-            text: Input::from( string )
-        }
-    }
-
 }
+
 
 impl MailEncodable for Unstructured {
     fn encode<E>( &self, encoder:  &mut E ) -> Result<()> where E: MailEncoder {
@@ -41,10 +31,11 @@ impl MailEncodable for Unstructured {
 
         let blocks = partition( text )?;
 
-        //UNWRAP_SAFETY: is safe because we pushed at last one (current_block)
+        let mut had_word = false;
         for block in blocks.into_iter() {
             match block {
                 Partition::VCHAR( data ) => {
+                    had_word = true;
                     let needs_encoding = data
                         .chars()
                         .any(|ch| !is_vchar( ch, encoder.mail_type() ) );
@@ -91,6 +82,12 @@ impl MailEncodable for Unstructured {
 
         }
 
-        Ok( () )
+        if had_word {
+            Ok( () )
+        } else {
+            bail!( concat!( "can not encode WSP only phrase,",
+                            "a phrase is required to contain at last one word" ) );
+        }
+
     }
 }

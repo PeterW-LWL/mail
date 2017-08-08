@@ -26,11 +26,11 @@ pub struct Word {
 
 impl FromInput for Word {
 
-    fn from_input( input: Input ) -> Result<Self> {
+    fn from_input<I: Into<Input>>( input: I ) -> Result<Self> {
         //FEATURE_TODO(fail_fast): check if input contains a CTL char,
         //  which is/>>should<< always be an error (through in the standard you could but should
         //  not have them in encoded words)
-        Ok( Word { left_padding: None, input, right_padding: None } )
+        Ok( Word { left_padding: None, input: input.into(), right_padding: None } )
     }
 }
 
@@ -98,7 +98,7 @@ mod test {
 
     #[test]
     fn encode_pseudo_encoded_words() {
-        let word = Word::from_input( "=?".into() ).unwrap();
+        let word = Word::from_input( "=?" ).unwrap();
         let mut encoder = TestMailEncoder::new( MailType::Ascii );
         do_encode_word( &word, &mut encoder, Some( EncodedWordContext::Text ) ).unwrap();
         assert_eq!(
@@ -109,7 +109,7 @@ mod test {
 
     #[test]
     fn encode_word() {
-        let word = Word::from_input( "a↑b".into() ).unwrap();
+        let word = Word::from_input( "a↑b" ).unwrap();
         let mut encoder = TestMailEncoder::new( MailType::Ascii );
         do_encode_word( &word, &mut encoder, Some( EncodedWordContext::Text ) ).unwrap();
         assert_eq!(
@@ -120,7 +120,7 @@ mod test {
 
     #[test]
     fn encode_fails() {
-        let word = Word::from_input( "a↑b".into() ).unwrap();
+        let word = Word::from_input( "a↑b" ).unwrap();
         let mut encoder = TestMailEncoder::new( MailType::Ascii );
         let res = do_encode_word( &word, &mut encoder, None );
         assert_eq!( false, res.is_ok() );
@@ -128,7 +128,7 @@ mod test {
 
     #[test]
     fn quoted_fallback() {
-        let word = Word::from_input( "a\"b".into() ).unwrap();
+        let word = Word::from_input( "a\"b" ).unwrap();
         let mut encoder = TestMailEncoder::new( MailType::Ascii );
         do_encode_word( &word, &mut encoder, None ).unwrap();
         assert_eq!(

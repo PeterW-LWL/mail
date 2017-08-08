@@ -40,7 +40,7 @@ mod test {
     ]}
 
     ec_test!{simple_path, {
-        Some( Path( Some( Email::from_input( "abc@de.fg".into() ).unwrap() ) ) )
+        Some( Path( Some( Email::from_input( "abc@de.fg" ).unwrap() ) ) )
     } => ascii => [
         OptFWS,
         LinePart( "<" ),

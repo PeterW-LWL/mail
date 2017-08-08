@@ -25,6 +25,9 @@ use mail::{
     Mail,
     Builder, BuilderContext
 };
+
+use data::FromInput;
+
 use self::data::{
     preprocess_data
 };
@@ -40,7 +43,7 @@ use self::templates::{
 
 pub use self::data::{
     EmbeddingInData, AttachmentInData,
-    DataInterface
+    DataInterface,
 };
 pub use self::resource::{
     EmbeddingInMail, AttachmentInMail,
@@ -131,7 +134,7 @@ impl<T, C, CP, D> Compositor<T, C, CP, D>
             }
             to_mailbox
         };
-        let subject = Unstructured:: from_string( sctx.subject );
+        let subject = Unstructured::from_input( sctx.subject )?;
         data.see_from_mailbox( &from_mailbox );
         data.see_to_mailbox( &to_mailbox );
         Ok( ( subject, from_mailbox, to_mailbox ) )

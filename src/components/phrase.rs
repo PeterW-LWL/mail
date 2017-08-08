@@ -46,7 +46,7 @@ impl Phrase {
         for partition in partition( &*input )?.into_iter() {
             match partition {
                 Partition::VCHAR( word ) => {
-                    let mut word = Word::from_input( word.into() )?;
+                    let mut word = Word::from_input( word )?;
                     if let Some( fws ) = last_gap.take() {
                         word.pad_left( fws );
                     }

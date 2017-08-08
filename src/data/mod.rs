@@ -19,7 +19,7 @@ pub use self::encoded_word::*;
 //  but keep String in item, as there non utf8 input is not allowed
 
 pub trait FromInput: Sized {
-    fn from_input( input: Input ) -> Result<Self>;
+    fn from_input<I: Into<Input>>( input: I ) -> Result<Self>;
 }
 
 
