@@ -23,6 +23,12 @@ impl<'a> VecWriter<'a> {
     }
 }
 
+impl<'a> Into<Vec1<AsciiString>> for VecWriter<'a> {
+    fn into(self) -> Vec1<AsciiString> {
+        self.data
+    }
+}
+
 impl<'a> EncodedWordWriter for VecWriter<'a> {
 
     fn encoding( &self ) -> Encoding {

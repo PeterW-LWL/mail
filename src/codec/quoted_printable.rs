@@ -4,6 +4,15 @@ use ascii::AsciiChar;
 use super::traits::EncodedWordWriter;
 
 
+/// Simple wrapper around header_encode for utf8 strings only
+pub fn header_encode_utf8<'a,  O>( word: &str, writer: &mut O )
+    where O: EncodedWordWriter
+{
+    let iter = word.char_indices().map( |(idx, ch)| {
+        &word.as_bytes()[idx..idx+ch.len_utf8()]
+    });
+    header_encode( iter, writer );
+}
 
 ///
 /// Quoted Printable encoding for MIME-Headers
@@ -152,10 +161,8 @@ mod test {
             fn $name() {
                 let test_data = $data;
                 let mut out = VecWriter::new( ascii_str!{ u t f _8 }, Encoding::QuotedPrintable );
-                let iter = test_data.char_indices().map( |(idx, ch)| {
-                    &test_data.as_bytes()[idx..idx+ch.len_utf8()]
-                });
-                header_encode( iter, &mut out );
+
+                header_encode_utf8( test_data, &mut out );
 
                 let expected = &[
                     $($item),*

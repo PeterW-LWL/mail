@@ -13,7 +13,7 @@ use super::inner_item::InnerAscii;
 use codec::MailEncoder;
 use codec::{ WriterWrapper, VecWriter };
 use codec::quoted_printable::{
-    header_encode as q_header_encode
+    header_encode_utf8 as q_header_encode
 };
 use codec::utf8_to_ascii::{
     base64_encoded_for_encoded_word,
@@ -60,10 +60,7 @@ impl EncodedWord {
                     Encoding::QuotedPrintable,
                     encoder
                 );
-                let iter = word.char_indices().map( |(idx, ch)| {
-                    &word.as_bytes()[idx..idx+ch.len_utf8()]
-                });
-                q_header_encode( iter, &mut writer );
+                q_header_encode( word, &mut writer );
             }
         }
     }
@@ -85,29 +82,35 @@ impl EncodedWord {
     // of which both can be on the stack
     pub fn encode_word( word: &str, encoding: Encoding, ctx: EncodedWordContext ) -> Vec1<Self> {
         use self::Encoding::*;
-        let mut out = AsciiString::with_capacity( 11 + 4*word.len()/3 + 1 );
-        out.extend( ascii_str!{ Equal Question u t f _8 Question } );
-        let encoded = match encoding {
+        match encoding {
             Base64 => {
+                let mut out = AsciiString::with_capacity( 11 + 4*word.len()/3 + 1 );
+                out.extend( ascii_str!{ Equal Question u t f _8 Question } );
+                //not yet fixed
                 out.push( AsciiChar::B );
-                base64_encoded_for_encoded_word( &*word, ctx )
+                out.push( AsciiChar::Question );
+                out.extend( base64_encoded_for_encoded_word( &*word, ctx ).chars() );
+                out.push( AsciiChar::Question );
+                out.push( AsciiChar::Equal );
+                //FIXME currently this can not fail, but the question is if encoding e.g. \x00-\x31 is ok?
+                //FIXME currently we only return 1 word and ignore length limitations
+                Vec1::new( EncodedWord {
+                    ctx,
+                    inner: InnerAscii::Owned( out ),
+                } )
             },
             QuotedPrintable => {
-                out.push( AsciiChar::Q );
-                unimplemented!();
-                //q_encode_for_encoded_word( &*word, ctx )
+                let mut writer = VecWriter::new( ascii_str!{ u t f _8 }, QuotedPrintable );
+                q_header_encode( word, &mut writer );
+                let parts: Vec1<AsciiString> = writer.into();
+                Vec1::from_vec(
+                    parts.into_iter().map( |astr| EncodedWord {
+                        ctx,
+                        inner: InnerAscii::Owned( astr )
+                    }).collect()
+                ).expect( "[BUG] Vec1 -> iter -> map -> Vec1 can not lead to 0 elements" )
             }
-        };
-        out.push( AsciiChar::Question );
-        out.extend( encoded.chars() );
-        out.push( AsciiChar::Question );
-        out.push( AsciiChar::Equal );
-        //FIXME currently this can not fail, but the question is if encoding e.g. \x00-\x31 is ok?
-        //FIXME currently we only return 1 word and ignore length limitations
-        Vec1::new( EncodedWord {
-            ctx,
-            inner: InnerAscii::Owned( out ),
-        } )
+        }
     }
 
     pub fn context( &self ) -> EncodedWordContext {
@@ -188,17 +191,17 @@ mod test {
     // we do NOT test if encoding/decoding on itself work in this function, it is teste where
     // the function is defined
 
-//    #[test]
-//    fn encode_quoted_printable() {
-//        let res =
-//            EncodedWord::encode_word( "täst", Encoding::QuotedPrintable, EncodedWordContext::Text );
-//
-//        assert_eq!( 1, res.len() );
-//        assert_eq!(
-//            "=?utf8?Q?t=C3=A4st?=",
-//            &*res[0].inner
-//        );
-//    }
+    #[test]
+    fn encode_quoted_printable() {
+        let res =
+            EncodedWord::encode_word( "täst", Encoding::QuotedPrintable, EncodedWordContext::Text );
+
+        assert_eq!( 1, res.len() );
+        assert_eq!(
+            "=?utf8?Q?t=C3=A4st?=",
+            &*res[0].inner
+        );
+    }
 
     #[test]
     fn encode_base64() {
