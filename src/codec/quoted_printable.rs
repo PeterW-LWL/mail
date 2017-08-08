@@ -65,6 +65,11 @@ impl<'a, E> EncodedWordWriter for WriterWrapper<'a, E> where E: MailEncoder + 'a
 /// Note that a chunk can with more than 21 byte is not guranteed to
 /// work, and can trigger a panic.
 ///
+/// As this has to be safe for usage in all header contexts, additional
+/// to the chars required by the standard (i.e. '=') following chars are ALWAYS
+/// quoted' ', '\t', '?', '(', ')'. Also '\n','\r' see the note below for more
+/// details.
+///
 /// # Error:
 ///
 /// a error is returned if a single encoded chunk can not be written as one
@@ -105,15 +110,23 @@ pub fn header_encode<'a, I, O>(input: I, out: &mut O, max_size: usize) -> Result
 
         for byte in chunk {
             let byte = *byte;
-            //VCHAR without '=' and '?'
-            if ( 33 <= byte && byte <= 60 ) || byte == 62 || ( 64 <= byte && byte <= 126 ) {
-                buf[buf_idx] = byte;
-                buf_idx += 1;
-            } else {
-                buf[buf_idx] = b'=';
-                buf[buf_idx+1] = lower_nibble_to_hex( byte >> 4 ) as u8;
-                buf[buf_idx+2] = lower_nibble_to_hex( byte ) as u8;
-                buf_idx += 3;
+            match byte {
+                33...39 |
+                // 40,41 == '(',')'
+                42...60 |
+                // 61 == '='
+                62 |
+                // 63 == '?'
+                64...126 => {
+                    buf[buf_idx] = byte;
+                    buf_idx += 1;
+                },
+                otherwise => {
+                    buf[buf_idx] = b'=';
+                    buf[buf_idx+1] = lower_nibble_to_hex( byte >> 4 ) as u8;
+                    buf[buf_idx+2] = lower_nibble_to_hex( byte ) as u8;
+                    buf_idx += 3;
+                }
             }
         }
         if buf_idx > remaining {
