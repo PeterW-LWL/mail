@@ -1,14 +1,35 @@
+use ascii::{  AsciiStr, AsciiChar };
+
 use error::*;
 use grammar::MailType;
-use ascii::{  AsciiStr, AsciiChar };
+use data::encoded_word::Encoding;
 
 pub trait EncodedWordWriter {
     fn write_char( &mut self, ch: AsciiChar );
-
-    fn write_ecw_start( &mut self );
-    fn write_ecw_end( &mut self );
+    fn write_charset( &mut self );
+    fn encoding( &self ) -> Encoding;
     fn write_ecw_seperator( &mut self );
     fn max_payload_len( &self ) -> usize;
+
+    fn write_ecw_start( &mut self ) {
+
+        self.write_char( AsciiChar::Equal );
+        self.write_char( AsciiChar::Question );
+        self.write_charset();
+        self.write_char( AsciiChar::Question );
+        let encoding = self.encoding();
+        self.write_char( match encoding {
+            Encoding::Base64 => AsciiChar::B,
+            Encoding::QuotedPrintable => AsciiChar::Q
+        } );
+        self.write_char( AsciiChar::Question );
+    }
+
+    fn write_ecw_end( &mut self ) {
+        self.write_char( AsciiChar::Question );
+        self.write_char( AsciiChar::Equal );
+    }
+
 
     fn start_new_encoded_word( &mut self ) -> usize {
         self.write_ecw_end();

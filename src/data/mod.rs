@@ -12,7 +12,7 @@ pub use self::simple_item::*;
 mod quoted;
 pub  use self::quoted::*;
 
-mod encoded_word;
+pub mod encoded_word;
 pub use self::encoded_word::*;
 
 //FEATURE_TODO(non_utf8_input): use (Vec<u8>, Encoding) instead of String in Input

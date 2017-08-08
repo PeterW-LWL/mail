@@ -1,84 +1,7 @@
 //FUTURE_TODO: make it it's own crate, possible push to `quoted_printable`
-use ascii::{ AsciiChar, AsciiStr, AsciiString };
-use types::Vec1;
+use ascii::AsciiChar;
 
-use grammar::encoded_word::{ MAX_ECW_LEN, ECW_SEP_OVERHEAD };
-use super::traits::{ EncodedWordWriter, MailEncoder };
-
-pub struct VecWriter {
-    data: Vec1<AsciiString >,
-    max_len: usize
-}
-
-impl VecWriter {
-    pub fn new(max_len: usize) -> Self {
-        let data = Vec1::new( AsciiString::new() );
-        VecWriter { data, max_len }
-    }
-
-    pub fn data( &self ) -> &[AsciiString] {
-        &*self.data
-    }
-}
-
-impl EncodedWordWriter for VecWriter {
-    fn write_char( &mut self, ch: AsciiChar ) {
-        self.data.last_mut().push( ch );
-    }
-
-    fn write_ecw_seperator( &mut self ) {
-        self.data.push( AsciiString::new() )
-    }
-
-    fn write_ecw_start( &mut self ) {}
-
-    fn write_ecw_end( &mut self ) {}
-
-    fn max_payload_len( &self ) -> usize {
-        self.max_len
-    }
-}
-
-pub struct WriterWrapper<'a, E:'a>{
-    charset: &'a AsciiStr,
-    encoder: &'a mut E
-}
-
-impl<'a, E> WriterWrapper<'a, E> where E: MailEncoder + 'a {
-    pub fn new( charset: &'a AsciiStr, encoder: &'a mut E ) -> Self {
-        WriterWrapper { charset, encoder }
-    }
-}
-
-impl<'a, E> EncodedWordWriter for WriterWrapper<'a, E> where E: MailEncoder + 'a {
-
-    fn write_char( &mut self, ch: AsciiChar ) {
-        self.encoder.write_char( ch )
-    }
-
-    fn write_ecw_seperator( &mut self ) {
-        self.encoder.write_fws();
-    }
-
-    fn write_ecw_start( &mut self ) {
-        self.encoder.write_char( AsciiChar::Equal );
-        self.encoder.write_char( AsciiChar::Question );
-        self.encoder.write_str( self.charset );
-        self.encoder.write_char( AsciiChar::Question );
-        // this is (for now) just for quoted printable
-        self.encoder.write_char( AsciiChar::Q );
-        self.encoder.write_char( AsciiChar::Question );
-    }
-
-    fn write_ecw_end( &mut self ) {
-        self.encoder.write_char( AsciiChar::Question );
-        self.encoder.write_char( AsciiChar::Equal );
-    }
-
-    fn max_payload_len( &self ) -> usize {
-        MAX_ECW_LEN - ECW_SEP_OVERHEAD - self.charset.len() - 1
-    }
-}
+use super::traits::EncodedWordWriter;
 
 
 
@@ -137,7 +60,7 @@ impl<'a, E> EncodedWordWriter for WriterWrapper<'a, E> where E: MailEncoder + 'a
 pub fn header_encode<'a, I, O>(input: I, out: &mut O )
     where I: Iterator<Item=&'a [u8]>, O: EncodedWordWriter
 {
-
+    out.write_ecw_start();
     let mut remaining = out.max_payload_len();
     assert!( remaining <= 76 );
     let mut buf = [33; 16];
@@ -180,6 +103,7 @@ pub fn header_encode<'a, I, O>(input: I, out: &mut O )
         }
         remaining -= buf_idx;
     }
+    out.write_ecw_end()
 }
 
 
@@ -203,8 +127,9 @@ fn lower_nibble_to_hex( half_byte: u8 ) -> AsciiChar {
 
 #[cfg(test)]
 mod test {
+    use data::encoded_word::Encoding;
+    use super::super::writer_impl::VecWriter;
     use super::*;
-
 
     #[test]
     fn to_hex() {
@@ -218,6 +143,7 @@ mod test {
         for &(char, byte) in data {
             assert_eq!( char, lower_nibble_to_hex( byte) );
         }
+
     }
 
     macro_rules! test {
@@ -225,7 +151,7 @@ mod test {
             #[test]
             fn $name() {
                 let test_data = $data;
-                let mut out = VecWriter::new( 67 );
+                let mut out = VecWriter::new( ascii_str!{ u t f _8 }, Encoding::QuotedPrintable );
                 let iter = test_data.char_indices().map( |(idx, ch)| {
                     &test_data.as_bytes()[idx..idx+ch.len_utf8()]
                 });
@@ -258,51 +184,51 @@ mod test {
 
     test! { can_be_used_in_comments,
         data "()\"" => [
-            "=28=29=22"
+            "=?utf8?Q?=28=29=22?="
         ]
     }
 
     test! { can_be_used_in_phrase,
         data "{}~@#$%^&*()=|\\[]';:." => [
-            "=7B=7D=7E=40=23=24=25=5E=26*=28=29=3D=7C=5C=5B=5D=27=3B=3A=2E"
+            "=?utf8?Q?=7B=7D=7E=40=23=24=25=5E=26*=28=29=3D=7C=5C=5B=5D=27=3B=3A=2E?="
         ]
     }
 
     test! { bad_chars_in_all_contexts,
         data "?= \t\r\n" => [
-            "=3F=3D=20=09=0D=0A"
+            "=?utf8?Q?=3F=3D=20=09=0D=0A?="
         ]
     }
 
     test!{ encode_ascii,
         data  "abcdefghijklmnopqrstuvwxyz \t?=0123456789!@#$%^&*()_+-" => [
-             "abcdefghijklmnopqrstuvwxyz=20=09=3F=3D0123456789!=40=23=24=25=5E=26",
-             "*=28=29_+-"
+             "=?utf8?Q?abcdefghijklmnopqrstuvwxyz=20=09=3F=3D0123456789!=40=23=24=25=5E?=",
+             "=?utf8?Q?=26*=28=29_+-?="
         ]
     }
 
     test! { how_it_handales_newlines,
         data "\r\n" => [
-            "=0D=0A"
+            "=?utf8?Q?=0D=0A?="
         ]
     }
 
 
     test! { split_into_multiple_ecws,
-        data "0123456789012345678901234567890123456789012345678901234567891234567newline" => [
-            "0123456789012345678901234567890123456789012345678901234567891234567",
-            "newline"
+        data "0123456789012345678901234567890123456789012345678901234567891234newline" => [
+            "=?utf8?Q?0123456789012345678901234567890123456789012345678901234567891234?=",
+            "=?utf8?Q?newline?="
         ]
     }
 
     test!{ bigger_chunks,
         data "ランダムテキスト ראַנדאָם טעקסט" => [
             //ランダムテキス
-            "=E3=83=A9=E3=83=B3=E3=83=80=E3=83=A0=E3=83=86=E3=82=AD=E3=82=B9",
+            "=?utf8?Q?=E3=83=A9=E3=83=B3=E3=83=80=E3=83=A0=E3=83=86=E3=82=AD=E3=82=B9?=",
             //ト ראַנדאָם
-            "=E3=83=88=20=D7=A8=D7=90=D6=B7=D7=A0=D7=93=D7=90=D6=B8=D7=9D=20",
+            "=?utf8?Q?=E3=83=88=20=D7=A8=D7=90=D6=B7=D7=A0=D7=93=D7=90=D6=B8=D7=9D=20?=",
             //ראַנדאָם
-            "=D7=98=D7=A2=D7=A7=D7=A1=D7=98"
+            "=?utf8?Q?=D7=98=D7=A2=D7=A7=D7=A1=D7=98?="
         ]
     }
 

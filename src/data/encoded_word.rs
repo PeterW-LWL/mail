@@ -10,13 +10,10 @@ use types::Vec1;
 use grammar::encoded_word::{ is_encoded_word, EncodedWordContext };
 use super::input::Input;
 use super::inner_item::InnerAscii;
-use codec::{
-    MailEncoder,
-    EncodedWordWriter
-};
+use codec::MailEncoder;
+use codec::{ WriterWrapper, VecWriter };
 use codec::quoted_printable::{
-    WriterWrapper as QWriterWrapper,
-    header_encode as q_header_encode,
+    header_encode as q_header_encode
 };
 use codec::utf8_to_ascii::{
     base64_encoded_for_encoded_word,
@@ -58,13 +55,15 @@ impl EncodedWord {
                 }
             },
             QuotedPrintable => {
-                let mut writer = QWriterWrapper::new( ascii_str!{ u t f _8 }, encoder );
-                writer.write_ecw_start();
+                let mut writer = WriterWrapper::new(
+                    ascii_str!{ u t f _8 },
+                    Encoding::QuotedPrintable,
+                    encoder
+                );
                 let iter = word.char_indices().map( |(idx, ch)| {
                     &word.as_bytes()[idx..idx+ch.len_utf8()]
                 });
                 q_header_encode( iter, &mut writer );
-                writer.write_ecw_end();
             }
         }
     }
