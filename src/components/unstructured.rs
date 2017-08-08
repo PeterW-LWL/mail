@@ -91,3 +91,88 @@ impl MailEncodable for Unstructured {
 
     }
 }
+
+
+#[cfg(test)]
+mod test {
+    use grammar::MailType;
+    use codec::test_utils::*;
+    use super::*;
+
+    ec_test! { simple_encoding, {
+        Unstructured::from_input( "this simple case" )
+    } => ascii => [
+        LinePart( "this"),
+        FWS,
+        LinePart( "simple" ),
+        FWS,
+        LinePart( "case" )
+    ]}
+
+    ec_test!{ simple_utf8,  {
+         Unstructured::from_input( "thüs sümple cäse" )
+    } => utf8 => [
+        LinePart( "thüs"),
+        FWS,
+        LinePart( "sümple" ),
+        FWS,
+        LinePart( "cäse" )
+    ]}
+
+    ec_test!{ encoded_words,  {
+         Unstructured::from_input( "↑ ↓ ←→ bA" )
+    } => ascii => [
+        LinePart( "=?utf8?Q?=E2=86=91?=" ),
+        FWS,
+        LinePart( "=?utf8?Q?=E2=86=93?=" ),
+        FWS,
+        LinePart( "=?utf8?Q?=E2=86=90=E2=86=92?="),
+        FWS,
+        LinePart( "bA" )
+    ]}
+
+    ec_test!{ eats_cr_lf, {
+        Unstructured::from_input( "a \rb\n c\r\n " )
+    } => ascii => [
+        LinePart("a"),
+        FWS,
+        LinePart("b"),
+        FWS,
+        LinePart("c"),
+        FWS
+    ]}
+
+    ec_test!{ at_last_one_fws, {
+        Unstructured::from_input( "a\rb\nc\r\n" )
+    } => ascii => [
+        LinePart("a"),
+        FWS,
+        LinePart("b"),
+        FWS,
+        LinePart("c"),
+        FWS
+    ]}
+
+    ec_test!{ kinda_keeps_wsp, {
+        Unstructured::from_input("\t\ta  b \t")
+    } => ascii => [
+        FWS,
+        LinePart( "\ta" ),
+        FWS,
+        LinePart( " b" ),
+        FWS,
+        LinePart( "\t" )
+    ]}
+
+
+    #[test]
+    fn wsp_only_phrase_fails() {
+        use codec::MailEncodable;
+        use codec::test_utils::TestMailEncoder;
+
+        let mut ec = TestMailEncoder::new( MailType::Ascii );
+        let input = Unstructured::from_input( " \t " ).unwrap();
+        let res = input.encode( &mut ec );
+        assert_eq!( false, res.is_ok() );
+    }
+}
