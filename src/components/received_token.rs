@@ -37,3 +37,62 @@ impl MailEncodable for ReceivedToken {
     }
 }
 
+#[cfg(test)]
+mod test {
+    use grammar::MailType;
+    use data::FromInput;
+    use codec::test_utils::*;
+    use super::*;
+
+    ec_test!{ a_domain, {
+        Domain::from_input( "random.mailnot" )
+    } => ascii => [
+        OptFWS,
+        LinePart( "random.mailnot" ),
+        OptFWS
+    ]}
+
+    ec_test!{ a_address, {
+        Email::from_input( "modnar@random.mailnot").map( |mail| {
+            ReceivedToken::Address( mail )
+        })
+    } => ascii => [
+        LinePart( "<" ),
+        OptFWS,
+        LinePart( "modnar" ),
+        OptFWS,
+        LinePart( "@" ),
+        OptFWS,
+        LinePart( "random.mailnot" ),
+        OptFWS,
+        LinePart( ">" )
+    ]}
+
+    ec_test!{ a_word, {
+        Word::from_input( "simple" ).map( |word| {
+            ReceivedToken::Word( word )
+        })
+    } => ascii => [
+        LinePart( "simple" )
+    ]}
+
+    ec_test!{ a_quoted_word, {
+        Word::from_input( "sim ple" ).map( |word|  {
+            ReceivedToken::Word( word )
+        } )
+    } => ascii => [
+        LinePart( r#""sim\ ple""# )
+    ]}
+
+
+    #[test]
+    fn no_encoded_word() {
+        use codec::MailEncodable;
+        use codec::test_utils::TestMailEncoder;
+
+        let mut ec = TestMailEncoder::new( MailType::Ascii );
+        let input = ReceivedToken::Word( Word::from_input( "↓right" ).unwrap() );
+        let res = input.encode( &mut ec );
+        assert_eq!( false, res.is_ok() );
+    }
+}
