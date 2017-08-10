@@ -48,43 +48,80 @@ fn encode_list<'a, E, I>( list_iter: I, encoder: &mut E ) -> Result<()>
 
 deref0!{ +mut OptMailboxList => Vec<Mailbox> }
 deref0!{ +mut MailboxList => Vec<Mailbox> }
-//
-//#[cfg(test)]
-//mod test {
-//    use super::*;
-//
-//    mod encode {
-//        use super::*;
-//
-//        fn parse( s: &str ) -> Address {
-//            unimplemented!()
-//        }
-//
-//        macro_rules! test {
-//            ($name:ident, [$($addr:expr),*], $output:expr) => {
-//                #[test]
-//                fn $name() {
-//                    let list = AddressList::new( vec![ $($addr),* ] ).unwrap();
-//                    let mut encoder = MailEncoder::new( false );
-//                    list.encode( &mut encoder ).expect( "encoding failed" );
-//                    let encoded_bytes: Vec<_> = encoder.into();
-//                    assert_eq!( $output, String::from_utf8_lossy( &*encoded_bytes ) );
-//                }
-//            }
-//        }
-//
-//        //FIXME empty should err
-////        test!{ empty,
-////            [], "" }
-//
-//        test!{ one,
-//            [ parse( "X <a@b.d>" ) ],
-//            "X <a@b.d>" }
-//
-//        test!{ multiple,
-//            [ parse( "X <a@b.d>" ), parse( "e@d.e" ), parse( "xe@de.de" ) ],
-//            "X <a@b.d>, e@d.e, xe@de.de" }
-//
-//
-//    }
-//}
+
+#[cfg(test)]
+mod test {
+    use data::FromInput;
+    use components::{ Mailbox, Email, Phrase };
+    use codec::test_utils::*;
+    use super::*;
+
+
+    ec_test! { empty_list, {
+        Some( OptMailboxList( Vec::new() ) )
+    } => ascii => [
+
+    ]}
+
+    ec_test! { single, {
+        Some( MailboxList( vec1![
+            Mailbox {
+                display_name: Some( Phrase::from_input( "hy ho" ).unwrap() ),
+                email: Email::from_input( "ran@dom" ).unwrap()
+            },
+        ] ) )
+    } => ascii => [
+        LinePart( "hy" ),
+        FWS,
+        LinePart( "ho" ),
+        FWS,
+        LinePart( "<" ),
+        OptFWS,
+        LinePart( "ran" ),
+        OptFWS,
+        LinePart( "@" ),
+        OptFWS,
+        LinePart( "dom" ),
+        OptFWS,
+        LinePart( ">")
+    ]}
+
+    ec_test! { multiple, {
+         Some( MailboxList( vec1![
+            Mailbox {
+                display_name: Some( Phrase::from_input( "hy ho" ).unwrap() ),
+                email: Email::from_input( "nar@mod" ).unwrap()
+            },
+            Mailbox {
+                display_name: None,
+                email: Email::from_input( "ran@dom" ).unwrap()
+            }
+        ] ) )
+    } => ascii => [
+        LinePart( "hy" ),
+        FWS,
+        LinePart( "ho" ),
+        FWS,
+        LinePart( "<" ),
+        OptFWS,
+        LinePart( "nar" ),
+        OptFWS,
+        LinePart( "@" ),
+        OptFWS,
+        LinePart( "mod" ),
+        OptFWS,
+        LinePart( ">,"),
+        FWS,
+        LinePart( "<" ),
+        OptFWS,
+        LinePart( "ran" ),
+        OptFWS,
+        LinePart( "@" ),
+        OptFWS,
+        LinePart( "dom" ),
+        OptFWS,
+        LinePart( ">")
+
+
+    ]}
+}
