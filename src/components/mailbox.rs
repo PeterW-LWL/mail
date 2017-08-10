@@ -20,6 +20,7 @@ impl MailEncodable for Mailbox {
     {
         if let Some( display_name ) = self.display_name.as_ref() {
             display_name.encode( encoder )?;
+            encoder.write_fws();
         }
         //for now this always uses the "<user@do.main>" form even if no display-name is given
         encoder.write_char( AsciiChar::LessThan );
