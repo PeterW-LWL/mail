@@ -244,8 +244,7 @@ pub mod encoded_word {
 
         match res {
             nom::IResult::Done( rest, result ) => {
-                //we used eof, so this should be true
-                assert!( rest.len() == 0 );
+                assert!( rest.len() == 0, "[BUG] used nom::eof!() but rest.len() > 0" );
                 Ok( result )
             },
             nom::IResult::Incomplete( .. ) => bail!( "incomplete encoded word: {:?}", word ),
