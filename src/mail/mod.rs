@@ -42,8 +42,10 @@ pub enum MailPart {
     }
 }
 
+/// a future returning an EncodableMail once all futures contained in the wrapped Mail are resolved
 pub struct MailFuture( Option<Mail> );
 
+/// a mail with all contained futures resolved, so that it can be encoded
 pub struct EncodableMail( Mail );
 
 impl Mail {
