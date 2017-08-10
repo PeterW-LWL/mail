@@ -14,7 +14,6 @@ use headers::Header;
 use self::body::Body;
 pub use self::builder::*;
 
-mod utils;
 pub mod body;
 pub mod resource;
 pub mod mime;
