@@ -211,9 +211,3 @@ impl<E: BuilderContext> MultipartBuilder<E> {
         }
     }
 }
-
-
-#[cfg(test)]
-mod test {
-
-}

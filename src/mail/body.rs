@@ -141,3 +141,98 @@ impl From<TransferEncodedFileBuffer> for Body {
         Self::new_resolved( data )
     }
 }
+
+
+#[cfg(test)]
+mod test {
+    use components::TransferEncoding;
+    use mime::TEXT_PLAIN;
+    use types::buffer::FileBuffer;
+    use futures::{ self, Future };
+
+
+    use super::*;
+
+    fn _tenc_fb() -> TransferEncodedFileBuffer {
+        TransferEncodedFileBuffer::buffer_is_encoded(
+            FileBuffer::new( TEXT_PLAIN, Vec::new() ),
+            TransferEncoding::_7Bit
+        )
+    }
+
+    #[test]
+    fn file_buffer_ref() {
+        let body = Body { body: InnerBody::Future(
+            futures::future::err( "fail".into() ).boxed()
+        ) };
+        assert_eq!( false, body.file_buffer_ref().is_some() );
+        let body = Body { body: InnerBody::Failed };
+        assert_eq!( false, body.file_buffer_ref().is_some() );
+        let body = Body { body: InnerBody::Value( _tenc_fb() ) };
+        assert_eq!( true, body.file_buffer_ref().is_some() );
+    }
+
+    #[test]
+    fn poll_body_on_failed() {
+        let mut body = Body { body: InnerBody::Failed };
+        let res = body.poll_body();
+        assert_eq!( false, res.is_ok() );
+    }
+
+    #[test]
+    fn poll_body_on_value() {
+        let mut body = Body { body: InnerBody::Value( _tenc_fb() ) };
+        let res = body.poll_body();
+        assert_eq!( true, res.is_ok() );
+        assert_eq!( true, res.unwrap().is_some() );
+    }
+
+    #[test]
+    fn poll_body_in_ready_future() {
+        let mut body = Body {
+            body: InnerBody::Future(
+                futures::future::ok(_tenc_fb()).boxed()
+            )
+        };
+        {
+            let res = body.poll_body();
+            assert_eq!(true, res.is_ok());
+            assert_eq!(true, res.unwrap().is_some());
+        }
+        match body.body {
+            InnerBody::Value( .. ) => {},
+            other => panic!( "excepted value got {:?}", other )
+        }
+    }
+
+    #[test]
+    fn poll_body_in_err_future() {
+        let mut body = Body {
+            body: InnerBody::Future(
+                futures::future::err( "failed".into() ).boxed()
+            )
+        };
+        {
+            let res = body.poll_body();
+            assert_eq!( false, res.is_ok() );
+        }
+        match body.body {
+            InnerBody::Failed => {}
+            other => panic!( "except Failed got {:?}", other )
+        }
+    }
+
+    #[test]
+    fn poll_body_in_not_ready_future() {
+        use std::result::Result;
+        fn not_ready() -> Result<futures::Async<TransferEncodedFileBuffer>, Error> {
+            Ok( futures::Async::NotReady )
+        }
+        let mut body = Body { body: InnerBody::Future(
+            futures::future::poll_fn( not_ready ).boxed()
+        ) };
+        let res = body.poll_body();
+        assert_eq!( true, res.is_ok() );
+        assert_eq!( false, res.unwrap().is_some() );
+    }
+}
