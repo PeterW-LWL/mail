@@ -94,6 +94,8 @@ impl MailEncoder for MailEncoderImpl {
     }
 
     fn note_optional_fws(&mut self ) {
+        //NOTE: has to be able to combine seqences of OptFWS/FWS into a single one
+        // currently we just remember the last one, so it kinda does happen
         self.last_cfws_pos = match self.inner.len() {
             0 => None,
             len =>  Some( len - 1 )
@@ -158,3 +160,8 @@ impl Into<Vec<u8>> for MailEncoderImpl {
         self.inner
     }
 }
+
+
+//FIXME currently if you have a e.g. a phrase ending in FWS WSP WSP* and the last WSP* is over the
+// end of the line there will be a line breake if you then have enough FWS+WSP only folowing
+// to trigger another line break you have a illegal WSP only line
