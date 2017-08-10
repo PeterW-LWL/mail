@@ -1,3 +1,5 @@
+use std::io;
+
 use mime::Mime;
 use base64;
 use quoted_printable;
@@ -7,6 +9,7 @@ use quoted_printable;
 error_chain! {
 
     foreign_links {
+        Io( io::Error );
         DecodeBase64(base64::DecodeError);
         DecodeQuotedPrintable(quoted_printable::QuotedPrintableError);
     }
