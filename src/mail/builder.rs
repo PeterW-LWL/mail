@@ -79,6 +79,42 @@ impl<I: RunElsewhere> RunElsewhere for Arc<I> {
 pub trait BuilderContext: FileLoader + RunElsewhere + Clone + Send + 'static {}
 impl<T> BuilderContext for T where T: FileLoader+RunElsewhere+Clone+Send + 'static{}
 
+#[derive(Debug, Clone, Hash, Eq, PartialEq, Default)]
+pub struct CompositeBuilderContext<FL, EW> {
+    file_loader: FL,
+    elsewhere: EW
+}
+
+impl<FL, EW> CompositeBuilderContext<FL, EW>
+    where FL: FileLoader,
+          EW: RunElsewhere
+{
+    pub fn new( file_loader: FL, elsewhere: EW ) -> Self {
+        CompositeBuilderContext { file_loader, elsewhere }
+    }
+}
+
+impl<FL: FileLoader, EW>  FileLoader for CompositeBuilderContext<FL, EW> {
+    type FileFuture = FL::FileFuture;
+    /// load file specified by path, wile it returns
+    /// a future it is not required to load the file
+    /// in the background, as such you should not relay
+    /// on it beeing non-blocking, it might just load
+    /// the file in place and return futures::ok
+    fn load_file( &self, path: &Path ) -> Self::FileFuture {
+        self.file_loader.load_file( path )
+    }
+}
+
+impl<FL, EW: RunElsewhere> RunElsewhere for CompositeBuilderContext<FL, EW> {
+    fn execute<F>( &self, fut: F) -> BoxFuture<F::Item, F::Error>
+        where F: Future + Send + 'static,
+              F::Item: Send+'static,
+              F::Error: Send+'static
+    {
+        self.elsewhere.execute( fut )
+    }
+}
 
 pub struct Builder<E: BuilderContext>(pub E);
 
