@@ -8,11 +8,14 @@ use std::iter::IntoIterator;
 
 #[macro_export]
 macro_rules! vec1 {
-    ( $first:expr, $($item:expr),* ) => ({
-        let mut tmp = Vec1::new( $first );
-        $( tmp.push( $item ); )*
-        tmp
-    });
+    ( $first:expr, $($item:expr),* ) => (
+        #[allow(unused_mut)]
+        {
+            let mut tmp = Vec1::new( $first );
+            $( tmp.push( $item ); )*
+            tmp
+        }
+    );
 }
 
 #[derive(Debug, Hash, Eq, PartialEq, Copy, Clone)]
