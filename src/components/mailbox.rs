@@ -42,10 +42,52 @@ impl MailEncodable for Mailbox {
 }
 
 
+#[cfg(test)]
+mod test {
+    use data::FromInput;
+    use components::{ Email, Phrase };
+    use codec::test_utils::*;
+    use super::*;
 
+    ec_test!{ email_only, {
+        Email::from_input( "affen@haus" )
+            .map(Mailbox::from)
+    } => ascii => [
+        LinePart( "<" ),
+        OptFWS,
+        LinePart( "affen" ),
+        OptFWS,
+        LinePart( "@" ),
+        OptFWS,
+        LinePart( "haus" ),
+        OptFWS,
+        LinePart( ">" )
+    ]}
+
+    ec_test!{ with_display_text, { Some(
+        Mailbox {
+            display_name: Some( Phrase::from_input( "ay ya" ).unwrap() ),
+            email: Email::from_input( "affen@haus" ).unwrap(),
+        }
+    ) } => ascii => [
+        LinePart( "ay" ),
+        FWS,
+        LinePart( "ya" ),
+        FWS,
+        LinePart( "<" ),
+        OptFWS,
+        LinePart( "affen" ),
+        OptFWS,
+        LinePart( "@" ),
+        OptFWS,
+        LinePart( "haus" ),
+        OptFWS,
+        LinePart( ">" )
+    ]}
+}
 
 #[cfg(unimplemented_test)]
-mod test {
+mod _test {
     use std::ops::Range;
     use std::rc::Rc;
 
