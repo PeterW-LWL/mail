@@ -18,6 +18,7 @@ macro_rules! ec_test {
         fn $name() {
             use codec::MailEncodable;
             use codec::test_utils::TestMailEncoder;
+            use codec::test_utils::State;
 
             let mt_str = stringify!($mt).to_uppercase();
             let mt = match mt_str.as_str() {
@@ -28,9 +29,10 @@ macro_rules! ec_test {
             let mut ec = TestMailEncoder::new(mt);
             let to_encode = $inp.unwrap();
             to_encode.encode( &mut ec ).unwrap();
-            assert_eq!( vec![
+            let exp: Vec<State> =  vec![
                 $($state),*
-            ], ec.into_state_seq() );
+            ];
+            assert_eq!( exp, ec.into_state_seq() );
         }
     );
 }
@@ -221,6 +223,7 @@ mod test {
             LinePart( "abc" )
         ], ec.into_state_seq() )
     }
+
 
     #[test]
     fn write_new_line() {
