@@ -13,6 +13,17 @@ pub struct Mailbox {
 }
 
 
+impl From<Email> for Mailbox {
+
+    fn from( email: Email ) -> Self {
+        Mailbox {
+            email,
+            display_name: None,
+        }
+    }
+}
+
+
 impl MailEncodable for Mailbox {
 
     fn encode<E>(&self, encoder: &mut E) -> Result<()>
