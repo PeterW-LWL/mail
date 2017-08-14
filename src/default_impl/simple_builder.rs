@@ -13,6 +13,7 @@ use mail::{ FileLoader, RunElsewhere, CompositeBuilderContext };
 pub struct SimpleBuilderContext( Arc< CompositeBuilderContext<VFSFileLoader, CpuPool>  > );
 
 
+
 impl fmt::Debug for SimpleBuilderContext {
     fn fmt( &self, fter: &mut fmt::Formatter ) -> fmt::Result {
         fter.debug_struct( "SimpleBuilderContext" )
@@ -31,9 +32,21 @@ impl Default for SimpleBuilderContext {
 impl SimpleBuilderContext {
 
     pub fn new() -> Self {
+        Self::with_cpupool( Builder::new() )
+    }
+
+    pub fn with_vfs( vfs: VFSFileLoader ) -> Self {
+        Self::with_vfs_and_cpupool( vfs, Builder::new() )
+    }
+
+    pub fn with_cpupool( cpupool: Builder ) -> Self {
+        Self::with_vfs_and_cpupool( VFSFileLoader::new(), cpupool )
+    }
+
+    pub fn with_vfs_and_cpupool( vfs: VFSFileLoader, mut cpupool: Builder ) -> Self {
         SimpleBuilderContext( Arc::new( CompositeBuilderContext::new(
-            VFSFileLoader::new(),
-            Builder::new().create()
+            vfs,
+            cpupool.create()
         ) ) )
     }
 

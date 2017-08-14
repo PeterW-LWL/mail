@@ -9,6 +9,7 @@ use mail_composition::context::{
     ContentIdGen
 };
 
+#[derive( Debug, Clone, Hash, Eq, PartialEq )]
 pub struct RandomContentId {
     postfix: String
 }
