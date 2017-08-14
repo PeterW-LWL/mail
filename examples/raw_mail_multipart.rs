@@ -9,7 +9,7 @@ use mail_codec::error::*;
 use mail_codec::types::buffer::FileBuffer;
 use mail_codec::mail::Builder;
 use mail_codec::mail::resource::Resource;
-use mail_codec::mail::test_utils::TestBuilderContext;
+use mail_codec::default_impl::SimpleBuilderContext;
 use mail_codec::codec::MailEncodable;
 
 use mail_codec::codec::MailEncoderImpl;
@@ -35,7 +35,7 @@ fn main() {
 fn _main() -> Result<()> {
     let mut encoder = MailEncoderImpl::new( MailType::Ascii );
 
-    let builder_ctx = TestBuilderContext::default();
+    let builder_ctx = SimpleBuilderContext::default();
 
 
     let mail = Builder(builder_ctx).multipart(
