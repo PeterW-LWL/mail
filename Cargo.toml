@@ -39,5 +39,10 @@ version = "0.1.5"
 default = ["default_impl"]
 default_impl = ["default_impl_mail", "default_impl_compose"]
 default_impl_compose = [ "default_impl_any" ]
-default_impl_mail = [ "futures-cpupool" , "default_impl_any" ]
+default_impl_mail = [ "default_impl_cpupool", "default_impl_fs", "default_impl_vfs" ]
+
+default_impl_cpupool = [ "futures-cpupool" , "default_impl_any" ]
+default_impl_fs = [  "default_impl_any" ]
+default_impl_vfs = [  "default_impl_any" ]
+
 default_impl_any = []
