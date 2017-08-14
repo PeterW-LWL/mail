@@ -1,15 +1,15 @@
 //  Builder
 //     .multipart( MultipartMime ) -> MultipartBuilder
-//          .add_header( Header )
-//          .add_body( |builder| builder.singlepart( ... )...build() )
-//          .add_body( |builder| builder.multipart( Mime )...build() )
-//          .build()
+//          .set_header( Header )?
+//          .set_body( |builder| builder.singlepart( ... )...build() )?
+//          .set_body( |builder| builder.multipart( Mime )...build() )?
+//          .build()?
 //     .singlepart( Resource ) -> SinglePartBuilder
-//          .add_header( Header )
+//          .set_header( Header )
 //          .build()
 //
 //
-//
+/// TODO set_** in builder to just **
 
 
 use ascii::AsciiString;
@@ -26,7 +26,7 @@ use super::mime::MultipartMime;
 use super::resource::Resource;
 use super::{ MailPart, Mail, Headers, Body };
 
-#[cfg(test)]
+//#[cfg(test)]
 pub mod test_utils;
 
 mod context;

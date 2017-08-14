@@ -30,3 +30,10 @@ quoted_printable = "0.3.0"
 rand = "0.3.15"
 serde = "1.0.10"
 serde_derive = "1.0.10"
+
+
+[features]
+default = [ "default_impl" ]
+default_impl = [ "default_impl_mail", "default_impl_compose" ]
+default_impl_mail = []
+default_impl_compose = []
