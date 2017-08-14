@@ -22,3 +22,8 @@ pub use self::vfs::*;
 mod simple_builder;
 #[cfg(all(feature="default_impl_cpupool", feature="default_impl_vfs"))]
 pub use self::simple_builder::*;
+
+#[cfg(feature="default_impl_name_composer")]
+mod name_composer;
+#[cfg(feature="default_impl_name_composer")]
+pub use self::name_composer::*;
