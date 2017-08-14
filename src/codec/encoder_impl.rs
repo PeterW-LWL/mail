@@ -78,12 +78,10 @@ impl MailEncoder for MailEncoderImpl {
     }
 
     fn write_new_line( &mut self ) {
-        if self.current_line_byte_length != 0 {
-            self.write_char( AsciiChar::CarriageReturn );
-            self.write_char( AsciiChar::LineFeed );
-            self.current_line_byte_length = 0;
-            self.last_cfws_pos = None;
-        }
+        self.write_char( AsciiChar::CarriageReturn );
+        self.write_char( AsciiChar::LineFeed );
+        self.current_line_byte_length = 0;
+        self.last_cfws_pos = None;
     }
 
     //FIXME forbid writing cfws at begin of line
