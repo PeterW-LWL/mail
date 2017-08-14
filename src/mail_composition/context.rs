@@ -1,27 +1,63 @@
 use std::sync::Arc;
 use std::ops::Deref;
+use std::path::Path;
 
-use mail::BuilderContext;
+use futures::{ Future, BoxFuture };
+
+use mail::{ FileLoader, RunElsewhere, BuilderContext };
 use components::{ Mailbox,  MessageID };
-
-//TODO replace with types::ContentId
-#[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize)]
-pub struct ContentId( String );
-
-
-pub trait Context: BuilderContext+Send+Sync {
-    fn new_content_id( &self ) -> MessageID;
-}
-
-impl<T: Context> Context for Arc<T> {
-    fn new_content_id( &self ) -> MessageID {
-        self.deref().new_content_id()
-    }
-}
-
 
 pub struct MailSendContext {
     pub from: Mailbox,
     pub to: Mailbox,
     pub subject: String
 }
+
+pub trait ContentIdGen {
+    fn new_content_id( &self ) -> MessageID;
+}
+
+pub trait Context: BuilderContext + ContentIdGen + Send + Sync {}
+
+impl<T: ContentIdGen> ContentIdGen for Arc<T> {
+    fn new_content_id( &self ) -> MessageID {
+        self.deref().new_content_id()
+    }
+}
+
+
+
+
+
+pub struct ComposedContext<CIG, BC> {
+    id_gen: CIG,
+    builder_context: BC
+}
+
+impl<CIG, BC: BuilderContext> FileLoader for ComposedContext<CIG, BC> {
+    type FileFuture = <BC as FileLoader>::FileFuture;
+    fn load_file( &self, path: &Path ) -> Self::FileFuture {
+        self.builder_context.load_file( path )
+    }
+}
+
+impl<CIG, BC: BuilderContext> RunElsewhere for ComposedContext<CIG, BC> {
+    fn execute<F>( &self, fut: F) -> BoxFuture<F::Item, F::Error>
+        where F: Future + Send + 'static,
+              F::Item: Send+'static,
+              F::Error: Send+'static
+    {
+        self.builder_context.execute( fut )
+    }
+}
+
+
+impl<CIG: ContentIdGen, BC> ContentIdGen for ComposedContext<CIG, BC> {
+
+    fn new_content_id( &self ) -> MessageID {
+        self.id_gen.new_content_id()
+    }
+}
+
+
+
