@@ -94,7 +94,8 @@ pub fn encode_mail_part<E>(mail: &Mail, encoder:  &mut E ) -> Result<()>
     match mail.body {
         SingleBody { ref body } => {
             if let Some( file_buffer ) = body.file_buffer_ref() {
-                encoder.write_body( file_buffer )
+                encoder.write_body( file_buffer );
+                encoder.write_new_line();
             } else {
                 bail!( "unresolved body" )
             }
