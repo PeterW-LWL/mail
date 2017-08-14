@@ -31,9 +31,13 @@ rand = "0.3.15"
 serde = "1.0.10"
 serde_derive = "1.0.10"
 
+[dependencies.futures-cpupool]
+optional = true
+version = "0.1.5"
 
 [features]
-default = [ "default_impl" ]
-default_impl = [ "default_impl_mail", "default_impl_compose" ]
-default_impl_mail = []
-default_impl_compose = []
+default = ["default_impl"]
+default_impl = ["default_impl_mail", "default_impl_compose"]
+default_impl_compose = [ "default_impl_any" ]
+default_impl_mail = [ "futures-cpupool" , "default_impl_any" ]
+default_impl_any = []

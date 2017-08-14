@@ -1,4 +1,14 @@
 
+#[cfg(test)]
+#[macro_export]
+macro_rules! assert_ok {
+    ($val:expr) => ({
+        match $val {
+            Ok( res ) => res,
+            Err( err ) => panic!( "expected Ok(..) got Err({:?})", err)
+        }
+    });
+}
 
 #[macro_export]
 macro_rules! ascii_str {
