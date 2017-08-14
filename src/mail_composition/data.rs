@@ -21,15 +21,15 @@ use super::context::{
 pub trait DataInterface: serde::Serialize {
 
     /// calls the function visit_emb with all embeddings contained
-    /// in the data and the function vitis_att with all attachments
-    /// contained in the data, if any call of visit_emb/vitis_att
+    /// in the data and the function visit_att with all attachments
+    /// contained in the data, if any call of visit_emb/visit_att
     /// fails with an error the error is returned
-    fn find_externals<F1,F2>( &mut self, visit_emb: F1, vitis_att: F2 ) -> Result<()>
+    fn find_externals<F1,F2>( &mut self, visit_emb: &mut F1, visit_att: &mut F2 ) -> Result<()>
         where F1: FnMut( &mut EmbeddingInData) -> Result<()>,
               F2: FnMut( &mut AttachmentInData) -> Result<()>;
 
-    fn see_from_mailbox(&mut self, mbox: &Mailbox ) {}
-    fn see_to_mailbox(&mut self, mbox: &Mailbox ) {}
+    fn see_from_mailbox(&mut self, _mbox: &Mailbox ) {}
+    fn see_to_mailbox(&mut self, _mbox: &Mailbox ) {}
 }
 
 
@@ -123,7 +123,7 @@ pub fn preprocess_data<C: Context, D: DataInterface>( ctx: &C, data: &mut D )
     let mut embeddings = Vec::new();
     let mut attachments = Vec::new();
     data.find_externals(
-        |embedding| {
+        &mut |embedding| {
             //FEATURE_TODO(context_sensitive_content_id): pass ing &data
             let new_cid = ctx.new_content_id()?;
             if let Some( embedding ) = embedding.swap_with_content_id( new_cid.clone() ) {
@@ -134,7 +134,7 @@ pub fn preprocess_data<C: Context, D: DataInterface>( ctx: &C, data: &mut D )
             }
             Ok( () )
         },
-        |attachment| {
+        &mut |attachment| {
             if let Some( attachment ) = attachment.move_out() {
                 attachments.push( attachment )
             }
