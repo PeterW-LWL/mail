@@ -59,8 +59,8 @@ impl<T> BuilderContext for T where T: FileLoader+RunElsewhere+Clone+Send + 'stat
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Default)]
 pub struct CompositeBuilderContext<FL, EW> {
-    file_loader: FL,
-    elsewhere: EW
+    pub file_loader: FL,
+    pub elsewhere: EW
 }
 
 impl<FL, EW> CompositeBuilderContext<FL, EW>
