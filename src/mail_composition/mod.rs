@@ -105,7 +105,7 @@ impl<T, C, CP, D> Compositor<T, C, CP, D>
             //TODO: what else? MessageId? Signature? ... or is it added by relay
         ];
 
-        let ( embeddings, mut attachments ) = self.preprocess_data( &mut data );
+        let ( embeddings, mut attachments ) = self.preprocess_data( &mut data )?;
 
         let ( bodies, extracted_attachments ) =
             self.preprocess_templates(
@@ -143,7 +143,7 @@ impl<T, C, CP, D> Compositor<T, C, CP, D>
     /// Preprocesses the data moving attachments out of it and replacing
     /// embeddings with a ContentID created for them
     /// returns the extracted embeddings and attchments
-    pub fn preprocess_data( &self, data: &mut D ) -> (Embeddings, Attachments) {
+    pub fn preprocess_data( &self, data: &mut D ) -> Result<(Embeddings, Attachments)> {
         preprocess_data( &self.context, data )
     }
 

@@ -4,6 +4,7 @@ use std::path::Path;
 
 use futures::{ Future, BoxFuture };
 
+use error::*;
 use mail::{ FileLoader, RunElsewhere, BuilderContext };
 use components::{ Mailbox,  MessageID };
 
@@ -14,13 +15,13 @@ pub struct MailSendContext {
 }
 
 pub trait ContentIdGen {
-    fn new_content_id( &self ) -> MessageID;
+    fn new_content_id( &self ) -> Result<MessageID>;
 }
 
 pub trait Context: BuilderContext + ContentIdGen + Send + Sync {}
 
 impl<T: ContentIdGen> ContentIdGen for Arc<T> {
-    fn new_content_id( &self ) -> MessageID {
+    fn new_content_id( &self ) -> Result<MessageID> {
         self.deref().new_content_id()
     }
 }
@@ -54,7 +55,7 @@ impl<CIG, BC: BuilderContext> RunElsewhere for ComposedContext<CIG, BC> {
 
 impl<CIG: ContentIdGen, BC> ContentIdGen for ComposedContext<CIG, BC> {
 
-    fn new_content_id( &self ) -> MessageID {
+    fn new_content_id( &self ) -> Result<MessageID> {
         self.id_gen.new_content_id()
     }
 }

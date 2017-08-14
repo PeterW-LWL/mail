@@ -1,5 +1,7 @@
 
 use rand::{ self, Rng };
+
+use error::*;
 use components::MessageID;
 use data::FromInput;
 
@@ -23,12 +25,12 @@ impl RandomContentId {
 impl ContentIdGen for RandomContentId {
 
 
-    fn new_content_id( &self ) -> MessageID {
+    fn new_content_id( &self ) -> Result<MessageID> {
         let mut rng = rand::thread_rng();
         let mut msg_id = rng.gen_ascii_chars().take( 10 ).collect::<String>();
         msg_id.push( '@' );
         msg_id += &*self.postfix;
-        MessageID::from_input( msg_id ).unwrap()
+        MessageID::from_input( msg_id )
     }
 }
 
