@@ -28,8 +28,8 @@ pub trait DataInterface: serde::Serialize {
         where F1: FnMut( &mut EmbeddingInData) -> Result<()>,
               F2: FnMut( &mut AttachmentInData) -> Result<()>;
 
-    fn see_from_mailbox(&mut self, mbox: &Mailbox );
-    fn see_to_mailbox(&mut self, mbox: &Mailbox );
+    fn see_from_mailbox(&mut self, mbox: &Mailbox ) {}
+    fn see_to_mailbox(&mut self, mbox: &Mailbox ) {}
 }
 
 
