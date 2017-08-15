@@ -35,7 +35,7 @@ use self::context::{
     Context,
     MailSendContext
 };
-use self::templates::{
+pub use self::templates::{
     Template,
     TemplateEngine
 };
@@ -50,11 +50,13 @@ pub use self::resource::{
     Embeddings, Attachments
 };
 
-
+//TODO make context module private
 pub mod context;
+pub use self::context::*;
 pub mod templates;
 mod resource;
 mod data;
+mod serializer;
 
 
 pub trait NameComposer<D> {

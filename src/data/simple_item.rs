@@ -14,6 +14,14 @@ pub enum SimpleItem {
 
 impl SimpleItem {
 
+    pub fn as_str( &self ) -> &str {
+        use self::SimpleItem::*;
+        match *self {
+            Ascii( ref value ) => value.as_str(),
+            Utf8( ref value ) => value.as_str()
+        }
+    }
+
     pub fn is_ascii( &self ) -> bool {
         use self::SimpleItem::*;
         match *self {

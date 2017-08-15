@@ -16,12 +16,16 @@ extern crate rand;
 extern crate serde_derive;
 
 #[macro_use]
+extern crate scoped_tls;
+
+#[macro_use]
 extern crate nom;
 
 #[macro_use]
 extern crate error_chain;
 
-#[cfg(feature="default_impl_mail")]
+
+#[cfg(feature="default_impl_cpupool")]
 extern crate futures_cpupool;
 
 #[macro_use]
