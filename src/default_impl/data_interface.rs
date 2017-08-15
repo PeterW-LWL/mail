@@ -1,7 +1,7 @@
 use std::collections;
 use std::hash::Hash;
 use std::mem::replace;
-
+use std::result::{ Result as StdResult };
 use serde;
 
 use error::*;
@@ -10,10 +10,6 @@ use mail_composition::{
     EmbeddingInData,
     AttachmentInData
 };
-
-
-
-// impl D.I. for JSONLike
 
 
 impl DataInterface for EmbeddingInData {
@@ -37,6 +33,35 @@ impl DataInterface for AttachmentInData {
     }
 
 }
+
+impl<T> DataInterface for Option<T> where T: DataInterface {
+
+    fn find_externals<F1,F2>( &mut self, visit_emb: &mut F1, visit_att: &mut F2 ) -> Result<()>
+        where F1: FnMut( &mut EmbeddingInData) -> Result<()>,
+              F2: FnMut( &mut AttachmentInData) -> Result<()>
+    {
+        if let Some( mut_ref ) = self.as_mut() {
+            mut_ref.find_externals( visit_emb, visit_att )
+        } else {
+            Ok( () )
+        }
+    }
+}
+
+impl<T, F> DataInterface for StdResult<T, F> where T: DataInterface, F: serde::Serialize {
+
+    fn find_externals<F1,F2>( &mut self, visit_emb: &mut F1, visit_att: &mut F2 ) -> Result<()>
+        where F1: FnMut( &mut EmbeddingInData) -> Result<()>,
+              F2: FnMut( &mut AttachmentInData) -> Result<()>
+    {
+        if let Ok( ref mut val ) =  *self {
+            val.find_externals( visit_emb, visit_att )
+        } else {
+            Ok( () )
+        }
+    }
+}
+
 
 
 impl<T: DataInterface> DataInterface for Vec<T> {
