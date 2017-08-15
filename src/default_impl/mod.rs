@@ -44,3 +44,6 @@ mod simple_context;
     feature="default_impl_vfs",
     feature="default_impl_component_id"))]
 pub use self::simple_context::*;
+
+mod data_interface;
+pub use self::data_interface::*;
