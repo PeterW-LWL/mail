@@ -26,8 +26,8 @@ use super::mime::MultipartMime;
 use super::resource::Resource;
 use super::{ MailPart, Mail, Headers, Body };
 
-//#[cfg(test)]
-pub mod test_utils;
+#[cfg(test)]
+mod test_utils;
 
 mod context;
 pub use self::context::*;

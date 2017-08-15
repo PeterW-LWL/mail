@@ -21,6 +21,9 @@ extern crate nom;
 #[macro_use]
 extern crate error_chain;
 
+#[cfg(feature="default_impl_mail")]
+extern crate futures_cpupool;
+
 #[macro_use]
 mod macros;
 
@@ -36,6 +39,9 @@ pub mod components;
 pub mod headers;
 pub mod mail;
 pub mod mail_composition;
+
+#[cfg(feature="default_impl_any")]
+pub mod default_impl;
 
 
 
