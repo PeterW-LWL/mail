@@ -1,8 +1,29 @@
+
+#[cfg(test)]
+use futures::sync::oneshot;
+#[cfg(test)]
+use std::time::Duration;
+#[cfg(test)]
+use std::thread;
+
 use mime::Mime;
 use mime::MULTIPART;
 
 pub fn is_multipart_mime( mime: &Mime ) -> bool {
     mime.type_() == MULTIPART
+}
+
+
+#[cfg(test)]
+pub fn timeout( s: u32, ms: u32 ) -> oneshot::Receiver<()> {
+    let (timeout_trigger, timeout) = oneshot::channel::<()>();
+
+    thread::spawn( move || {
+        thread::sleep( Duration::new( s as u64, ms * 1_000_000) );
+        timeout_trigger.send( () ).unwrap()
+    });
+
+    timeout
 }
 
 
