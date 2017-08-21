@@ -13,9 +13,9 @@ pub trait FileLoader {
     type FileFuture: Future<Item=Vec<u8>, Error=Error> + Send + 'static;
     /// load file specified by path, wile it returns
     /// a future it is not required to load the file
-    /// in the background, as such you should not relay
-    /// on it beeing non-blocking, it might just load
-    /// the file in place and return futures::ok
+    /// in the background, but it is required to load
+    /// it in context of polling this futures, e.g.
+    /// by using `futures::lazy`
     fn load_file( &self, path: &Path ) -> Self::FileFuture;
 }
 
@@ -54,8 +54,8 @@ impl<I: RunElsewhere> RunElsewhere for Arc<I> {
     }
 }
 
-pub trait BuilderContext: FileLoader + RunElsewhere + Clone + Send + 'static {}
-impl<T> BuilderContext for T where T: FileLoader+RunElsewhere+Clone+Send + 'static{}
+pub trait BuilderContext: FileLoader + RunElsewhere + Clone + Send + Sync + 'static {}
+impl<T> BuilderContext for T where T: FileLoader + RunElsewhere + Clone + Send + Sync + 'static {}
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Default)]
 pub struct CompositeBuilderContext<FL, EW> {

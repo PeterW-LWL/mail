@@ -5,20 +5,22 @@ use std::borrow::Cow;
 
 use codec::{ MailEncoder, MailEncodable };
 use ascii::{ AsciiString, AsciiStr, AsciiChar };
-use futures::{ Future, Async, Poll, IntoFuture };
+use futures::{ Future, Async, Poll };
 
 use error::*;
 use utils::is_multipart_mime;
 use headers::Header;
+use self::resource::Resource;
 
-use self::body::Body;
 pub use self::builder::*;
+pub use self::context::*;
 
-pub mod body;
+
 pub mod resource;
 pub mod mime;
 mod builder;
 mod encode;
+mod context;
 
 
 type Headers = HashMap<Cow<'static, AsciiStr>, Header>;
@@ -34,7 +36,7 @@ pub struct Mail {
 
 pub enum MailPart {
     SingleBody {
-        body: Body
+        body: Resource
     },
     MultipleBodies {
         bodies: Vec<Mail>,
@@ -43,7 +45,10 @@ pub enum MailPart {
 }
 
 /// a future returning an EncodableMail once all futures contained in the wrapped Mail are resolved
-pub struct MailFuture( Option<Mail> );
+pub struct MailFuture<'a, T: 'a> {
+    mail: Option<Mail>,
+    ctx: &'a T
+}
 
 /// a mail with all contained futures resolved, so that it can be encoded
 pub struct EncodableMail( Mail );
@@ -89,8 +94,15 @@ impl Mail {
         &self.body
     }
 
+    pub fn into_future<'a, C: BuilderContext>( self, ctx: &'a C ) -> MailFuture<'a, C> {
+        MailFuture {
+            ctx,
+            mail: Some( self )
+        }
+    }
+
     fn walk_mail_bodies_mut<FN>( &mut self, use_it_fn: &mut FN) -> Result<()>
-        where FN: FnMut( &mut Body ) -> Result<()>
+        where FN: FnMut( &mut Resource ) -> Result<()>
     {
         use self::MailPart::*;
         match self.body {
@@ -108,23 +120,6 @@ impl Mail {
 
 
 
-impl IntoFuture for Mail {
-    type Future = MailFuture;
-    type Item = EncodableMail;
-    type Error = Error;
-
-    /// converts the Mail into a future,
-    ///
-    /// the future resolves once
-    /// all contained BodyFutures are resolved (or one of
-    /// them resolves into an error in which case it will
-    /// resolve to the error and cancel all other BodyFutures)
-    ///
-    ///
-    fn into_future(self) -> Self::Future {
-        MailFuture( Some(self) )
-    }
-}
 
 
 
@@ -140,24 +135,25 @@ impl MailPart {
 }
 
 
-impl Future for MailFuture {
+impl<'a, T> Future for MailFuture<'a, T> where T: BuilderContext {
     type Item = EncodableMail;
     type Error = Error;
 
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
         let mut done = true;
-        self.0.as_mut()
+        let ctx: &T = &self.ctx;
+        self.mail.as_mut()
             // this is conform with how futures work, as calling poll on a random future
             // after it completes has unpredictable results (through one of NotRady/Err/Panic)
             // use `Fuse` if you want more preditable behaviour in this edge case
             .expect( "poll not to be called after completion" )
-            .walk_mail_bodies_mut( &mut |body| {
-                match body.poll_body() {
-                    Ok( None ) => {
+            .walk_mail_bodies_mut( &mut |body: &mut Resource| {
+                match body.poll_encoding_completion( ctx ) {
+                    Ok( Async::NotReady ) => {
                         done = false;
                         Ok(())
                     },
-                    Ok( Some(..) ) => {
+                    Ok( Async::Ready( .. ) ) => {
                         Ok(())
                     },
                     Err( err ) => {
@@ -167,7 +163,7 @@ impl Future for MailFuture {
             })?;
 
         if done {
-            Ok( Async::Ready( EncodableMail( self.0.take().unwrap() ) ) )
+            Ok( Async::Ready( EncodableMail( self.mail.take().unwrap() ) ) )
         } else {
             Ok( Async::NotReady )
         }
@@ -189,6 +185,6 @@ impl MailEncodable for EncodableMail {
     {
         // does not panic as a EncodableMail only is constructed from
         // a Mail which has all of it's bodies resolved, without failure
-        encode::encode_mail( &self.0, true, encoder )
+        encode::encode_mail( &self, true, encoder )
     }
 }

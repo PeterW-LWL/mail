@@ -6,9 +6,9 @@ use futures::{ self, Future };
 use futures::future::BoxFuture;
 
 use error::*;
-use super::{ FileLoader, RunElsewhere, CompositeBuilderContext };
+use super::{ FileLoader, RunElsewhere };
 
-pub type TestBuilderContext = CompositeBuilderContext<TestFileLoader, TestElsewhere>;
+
 
 #[derive( Debug, Clone, PartialEq, Default )]
 pub struct TestFileLoader {
