@@ -1,151 +1,93 @@
-use std::rc::Rc;
 use std::cell::{ RefCell, Ref };
-use std::ops::{ Deref, DerefMut };
 use std::result::{ Result as StdResult };
-use std::fmt::Debug;
 
 use serde::{ self, Serialize, Serializer };
 
 use error::*;
 use components::MessageID;
 use mail::resource::Resource;
-use mail_composition::{
-    EmbeddingInMail,
-    AttachmentInMail,
-    ContentIdGen
-
-};
+use mail_composition::ContentIdGen;
 
 
-
+#[derive(Debug)]
 pub struct Embedding {
-    resource: RefCell<Option<Resource>>,
+    resource: Resource,
     content_id: RefCell<Option<MessageID>>
 }
 
-pub struct Attachment( RefCell<Option<Resource>> );
+#[derive(Debug)]
+pub struct Attachment {
+    resource: Resource
+}
 
 impl Embedding {
     pub fn new( resource: Resource ) -> Self {
-        Embedding {
-            resource: RefCell::new( Some( resource ) ),
-            content_id: RefCell::new( None )
-        }
+        Embedding { resource, content_id: RefCell::new( None ) }
     }
 
     pub fn with_content_id( resource: Resource, content_id: MessageID ) -> Self {
         Embedding {
-            resource: RefCell::new( Some( resource ) ),
+            resource: resource,
             content_id: RefCell::new( Some( content_id ) )
         }
     }
 
-    pub fn resource( &self ) -> Ref<Resource> {
-        Ref::map( self.resource.borrow(), |opt_resource| opt_resource.as_ref().unwrap() )
+    pub fn resource( &self ) -> &Resource {
+        &self.resource
     }
 
     pub fn resource_mut( &mut self ) -> &mut Resource {
-        self.resource.get_mut().as_mut().unwrap()
-    }
-    pub fn content_id( &self ) -> Ref<MessageID> {
-        Ref::map( self.content_id.borrow(), |opt_cid| opt_cid.as_ref().unwrap() )
+        &mut self.resource
     }
 
-    pub fn content_id_mut( &mut self ) -> &mut MessageID {
-        self.content_id.get_mut().as_mut().unwrap()
+    pub fn content_id( &self ) -> Option<Ref<MessageID>> {
+        let borrow = self.content_id.borrow();
+        if borrow.is_some() {
+            Some( Ref::map( borrow, |opt_content_id| {
+                opt_content_id.as_ref().unwrap()
+            } ) )
+        } else {
+            None
+        }
     }
 
-    fn move_out<CIDGen: ContentIdGen+?Sized>( &self, cid_gen: &CIDGen ) -> Result<(MessageID, Resource)> {
-        use std::mem::replace;
-        let resource = self.resource.borrow_mut();
-        let ret_resource = match self.resource.borrow_mut().take() {
-            Some( resc ) => resc,
-            None => bail!( "extracting resource from empty resource" )
-        };
+    pub fn set_content_id( &mut self, cid: MessageID ) {
+        self.content_id = RefCell::new( Some( cid ) )
+    }
+
+    pub fn has_content_id( &self ) -> bool {
+        self.content_id.borrow().is_some()
+    }
+
+    fn assure_content_id<CIDGen: ContentIdGen + ?Sized>(
+        &self,
+        cid_gen: &CIDGen
+    ) -> Result<MessageID> {
 
         let mut cid = self.content_id.borrow_mut();
-        let ret_cid;
-
-        if cid.is_some() {
-            //UNWRAP_SAFE: the only reason we conat use `if let Some` is lexical lifetimes wrt. else
-            ret_cid = cid.as_ref().unwrap().clone();
+        Ok( if cid.is_some() {
+            //UNWRAP_SAFE: would use if let Some, if we had non lexical livetimes
+            cid.as_ref().unwrap().clone()
         } else {
-            ret_cid = cid_gen.new_content_id()?;
-            *cid = Some( ret_cid.clone() );
-        }
-        Ok( ( ret_cid, ret_resource ) )
+            let new_cid = cid_gen.new_content_id()?;
+            *cid = Some( new_cid.clone() );
+            new_cid
+        } )
     }
-
 }
+
 
 impl Attachment {
-    pub fn new( resource: Resource ) -> Self {
-        Attachment( RefCell::new( Some( resource ) ) )
+    pub fn new(resource: Resource) -> Self {
+        Attachment { resource }
     }
 
-    pub fn resource( &self ) -> Ref<Resource> {
-        Ref::map( self.0.borrow(), |opt_resource| opt_resource.as_ref().unwrap() )
+    pub fn resource(&self) -> &Resource {
+        &self.resource
     }
 
-    pub fn resource_mut( &mut self ) -> &mut Resource {
-        self.0.get_mut().as_mut().unwrap()
-    }
-
-    fn move_out( &self ) -> Result<Resource> {
-        self.0.borrow_mut()
-            .take()
-            .ok_or_else( || "extracting resource which was already moved out".into() )
-    }
-}
-
-
-struct ExtractionDump {
-    embeddings: Vec<(MessageID, Resource)>,
-    attachments: Vec<Resource>,
-    //BLOCKED(unsized_thread_locals): use ContentIdGen instead in another thread_local when possible
-    cid_gen: Box<ContentIdGen>
-}
-
-scoped_thread_local!(static EXTRACTION_DUMP: RefCell<ExtractionDump> );
-
-pub fn with_resource_sidechanel<FN, R>( cid_gen: Box<ContentIdGen>, func: FN ) -> R
-    where FN: FnOnce() -> R
-{
-    let dump: RefCell<ExtractionDump> = RefCell::new( ExtractionDump {
-        cid_gen,
-        embeddings: Default::default(),
-        attachments: Default::default()
-    } );
-
-    EXTRACTION_DUMP.set( &dump, func )
-}
-
-
-
-#[derive(Serialize)]
-pub struct SerializeOnly<T: Serialize> {
-    data: T
-}
-
-
-impl Serialize for Attachment {
-    fn serialize<S>(&self, serializer: S) -> StdResult<S::Ok, S::Error> where S: Serializer {
-        if !EXTRACTION_DUMP.is_set() {
-            return Err( serde::ser::Error::custom(
-                "can only serialize an Attachment in when wrapped with serialize_and_extract" ) );
-        }
-        EXTRACTION_DUMP.with( |dump: &RefCell<ExtractionDump>| {
-            let mut dump = dump.borrow_mut();
-            match self.move_out() {
-                Ok( resource ) => {
-                    dump.attachments.push( resource );
-                    serializer.serialize_none()
-                },
-                Err( e ) => {
-                    Err( serde::ser::Error::custom( e ) )
-                }
-            }
-        })
+    pub fn resource_mut(&mut self) -> &mut Resource {
+        &mut self.resource
     }
 }
 
@@ -157,16 +99,79 @@ impl Serialize for Embedding {
         }
         EXTRACTION_DUMP.with( |dump: &RefCell<ExtractionDump>| {
             let mut dump = dump.borrow_mut();
-            match self.move_out( &*dump.cid_gen ) {
-                Ok( (content_id, resource ) ) => {
-                    let res = serializer.serialize_str( content_id.as_str() );
-                    dump.embeddings.push( (content_id, resource) );
-                    res
+            match self.assure_content_id( &*dump.cid_gen ) {
+                Ok( cid ) => {
+                    let ser_res = serializer.serialize_str( cid.as_str() );
+                    if ser_res.is_ok() {
+                        // Resource is (now) meant to be shared, and cloning is sheap (Arc inc)
+                        let resource = self.resource().clone();
+                        dump.embeddings.push( (cid, resource) );
+                    }
+                    ser_res
                 },
-                Err( e ) => {
-                    Err( serde::ser::Error::custom( e ) )
+                Err( err ) => {
+                    Err( serde::ser::Error::custom( err ) )
                 }
             }
+        } )
+    }
+}
+
+
+impl Serialize for Attachment {
+    fn serialize<S>(&self, serializer: S) -> StdResult<S::Ok, S::Error> where S: Serializer {
+        if !EXTRACTION_DUMP.is_set() {
+            return Err( serde::ser::Error::custom(
+                "can only serialize an Attachment in when wrapped with serialize_and_extract" ) );
+        }
+        EXTRACTION_DUMP.with( |dump: &RefCell<ExtractionDump>| {
+            let mut dump = dump.borrow_mut();
+            let ser_res = serializer.serialize_none();
+            if ser_res.is_ok() {
+                let resource = self.resource.clone();
+                dump.attachments.push( resource );
+            }
+            ser_res
         })
     }
+}
+
+
+
+
+struct ExtractionDump {
+    embeddings: Vec<(MessageID, Resource)>,
+    attachments: Vec<Resource>,
+    //BLOCKED(unsized_thread_locals): use ContentIdGen instead in another thread_local when possible
+    cid_gen: Box<ContentIdGen>
+}
+
+scoped_thread_local!(static EXTRACTION_DUMP: RefCell<ExtractionDump> );
+
+
+#[derive(Serialize)]
+pub struct SerializeOnly<T: Serialize> {
+    data: T
+}
+
+///
+/// use this to get access to Embedding/Attachment Resources while serializing
+/// structs containing the Embedding/Attachment types. This also includes the
+/// gneration of a ContentId for embeddings which do not jet have one.
+///
+/// This might be a strange approach, but this allows you to "just" embed Embedding/Attachment
+/// types in data struct and still handle them correctly when passing them to a template
+/// engine without having to explicitly implement a trait allowing interation of all
+/// (even transistive) contained Embeddings/Attachments
+///
+pub fn with_resource_sidechanel<FN, R>( cid_gen: Box<ContentIdGen>, func: FN ) -> R
+    where FN: FnOnce() -> R
+{
+    let dump: RefCell<ExtractionDump> = RefCell::new( ExtractionDump {
+        cid_gen,
+        embeddings: Default::default(),
+        attachments: Default::default()
+    } );
+
+    EXTRACTION_DUMP.set( &dump, func )
 }
