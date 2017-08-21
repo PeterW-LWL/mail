@@ -5,10 +5,7 @@ use types::Vec1;
 use mail::resource::Resource;
 
 use super::context::Context;
-use super::resource::{
-    Embeddings,
-    Attachments
-};
+use super::serializer::{ Attachments, Embeddings };
 
 pub trait TemplateEngine {
     type TemplateId;

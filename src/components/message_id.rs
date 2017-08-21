@@ -1,3 +1,4 @@
+
 use ascii::AsciiChar;
 
 use nom::IResult;
@@ -11,6 +12,15 @@ use data::{ FromInput, Input, SimpleItem };
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize)]
 pub struct MessageID {
     message_id: SimpleItem
+}
+
+
+impl MessageID {
+
+    //FIXME make into AsRef<str> for MessageID
+    pub fn as_str( &self ) -> &str {
+        self.message_id.as_str()
+    }
 }
 
 impl FromInput for MessageID {

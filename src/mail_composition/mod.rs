@@ -1,5 +1,6 @@
 use std::marker::PhantomData;
 
+use serde::Serialize;
 use rand;
 use rand::Rng;
 use ascii::AsciiStr;
@@ -14,13 +15,8 @@ use components::{
     Mailbox, MailboxList,
     Phrase
 };
-
-use mail::mime::{
-    MultipartMime
-};
-use mail::resource::{
-    Resource
-};
+use mail::mime::MultipartMime;
+use mail::resource::Resource;
 use mail::{
     Mail,
     Builder, BuilderContext
@@ -28,41 +24,21 @@ use mail::{
 
 use data::FromInput;
 
-use self::data::{
-    preprocess_data
-};
-use self::context::{
-    Context,
-    MailSendContext
-};
-use self::templates::{
-    Template,
-    TemplateEngine
-};
+pub use self::context::*;
+pub use self::templates::*;
+pub use self::serializer::*;
 
 
-pub use self::data::{
-    EmbeddingInData, AttachmentInData,
-    DataInterface,
-};
-pub use self::resource::{
-    EmbeddingInMail, AttachmentInMail,
-    Embeddings, Attachments
-};
+mod context;
+mod templates;
+mod serializer;
 
-
-pub mod context;
-pub mod templates;
-mod resource;
-mod data;
+pub type BodyWithEmbeddings = (Resource, Vec<EmbeddingWithCID>);
 
 
 pub trait NameComposer<D> {
     fn compose_name( &self, data: &D ) -> Option<String>;
 }
-
-pub type BodyWithEmbeddings = (Resource, Embeddings);
-
 
 pub struct Compositor<T, C, CP, D> {
     template_engine: T,
@@ -76,7 +52,7 @@ impl<T, C, CP, D> Compositor<T, C, CP, D>
     where T: TemplateEngine,
           C: Context,
           CP: NameComposer<D>,
-          D: DataInterface
+          D: Serialize
 {
     pub fn new( template_engine: T, context: C, name_composer: CP ) -> Self {
         Compositor { template_engine, context, name_composer, _d: PhantomData }
@@ -89,8 +65,8 @@ impl<T, C, CP, D> Compositor<T, C, CP, D>
     /// composes a mail based on the given template_id, data and send_context
     pub fn compose_mail( &self,
                          send_context: MailSendContext,
+                         template_id: T::TemplateId,
                          data: D,
-                         template_id: T::TemplateId
     ) -> Result<Mail> {
 
         let mut data = data;
@@ -105,16 +81,30 @@ impl<T, C, CP, D> Compositor<T, C, CP, D>
             //TODO: what else? MessageId? Signature? ... or is it added by relay
         ];
 
-        let ( embeddings, mut attachments ) = self.preprocess_data( &mut data )?;
-
-        let ( bodies, extracted_attachments ) =
-            self.preprocess_templates(
-                TemplateEngine::templates( &self.template_engine,
-                                           &self.context, template_id, data)?.into() );
-
-        attachments.extend( extracted_attachments );
+        let (bodies, embeddings, attachments) = self.use_template_engine( template_id, data )?;
 
         self.build_mail( bodies, embeddings, attachments, core_headers )
+    }
+
+    pub fn use_template_engine( &self, template_id: T::TemplateId, data: D )
+        -> Result<( Vec<BodyWithEmbeddings>, Vec<EmbeddingWithCID>, Vec<Attachment> )>
+    {
+        let ( (bodies, mut attachments), embeddings, attachments2 ) =
+            with_resource_sidechanel( Box::new(self.context.clone()), || -> Result<_> {
+                // we just want to make sure that the template engine does
+                // really serialize the data, so we make it so that it can
+                // only do so (if we pass in the data directly it could use
+                // TypeID+Transmut or TraitObject+downcast to undo the generic
+                // type erasure and then create the template in some other way
+                // but this would break the whole Embedding/Attachment extraction )
+                let sdata = SerializeOnly::new( data );
+                self.preprocess_templates(
+                    self.template_engine.templates( &self.context, template_id, sdata)?.into() )
+            } )?;
+
+        attachments.extend( attachments2 );
+
+        Ok( ( bodies, embeddings, attachments) )
     }
 
     /// converts To into a mailbox by composing a display name if nessesary,
@@ -135,31 +125,33 @@ impl<T, C, CP, D> Compositor<T, C, CP, D>
             to_mailbox
         };
         let subject = Unstructured::from_input( sctx.subject )?;
-        data.see_from_mailbox( &from_mailbox );
-        data.see_to_mailbox( &to_mailbox );
+        //TODO implement some replacement
+//        data.see_from_mailbox( &from_mailbox );
+//        data.see_to_mailbox( &to_mailbox );
         Ok( ( subject, from_mailbox, to_mailbox ) )
     }
 
-    /// Preprocesses the data moving attachments out of it and replacing
-    /// embeddings with a ContentID created for them
-    /// returns the extracted embeddings and attchments
-    pub fn preprocess_data( &self, data: &mut D ) -> Result<(Embeddings, Attachments)> {
-        preprocess_data( &self.context, data )
-    }
+
+
 
     /// maps all alternate bodies (templates) to
     /// 1. a single list of attachments as they are not body specific
     /// 2. a list of Resource+Embedding pair representing the different (sub-) bodies
     pub fn preprocess_templates( &self, templates: Vec<Template> )
-        -> (Vec<BodyWithEmbeddings>, Attachments)
+        -> Result<(Vec<BodyWithEmbeddings>, Attachments)>
     {
         let mut bodies = Vec::new();
         let mut attachments = Vec::new();
         for template in templates {
-            bodies.push( (template.body, template.embeddings) );
+            let mut with_cid = Vec::with_capacity( template.embeddings.len() );
+            for embedding in template.embeddings.into_iter() {
+                with_cid.push( embedding.with_cid_assured( &self.context )? )
+            }
+
+            bodies.push( (template.body, with_cid) );
             attachments.extend( template.attachments );
         }
-        (bodies, attachments)
+        Ok( (bodies, attachments) )
     }
 
 
@@ -167,7 +159,7 @@ impl<T, C, CP, D> Compositor<T, C, CP, D>
     /// mail headers like `From`,`To`, etc. to create a new mail
     pub fn build_mail( &self,
                        bodies: Vec<BodyWithEmbeddings>,
-                       embeddings: Embeddings,
+                       embeddings: Vec<EmbeddingWithCID>,
                        attachments: Attachments,
                        core_headers: Vec<Header>
     ) -> Result<Mail> {
@@ -198,7 +190,7 @@ pub trait BuilderExt {
     fn create_alternate_bodies_with_embeddings(
         &self,
         bodies: Vec<BodyWithEmbeddings>,
-        embeddings: Embeddings,
+        embeddings: Vec<EmbeddingWithCID>,
         header: Vec<Header>
     ) -> Result<Mail>;
 
@@ -224,7 +216,7 @@ pub trait BuilderExt {
     fn create_body_with_embeddings<FN>(
         &self,
         sub_body: FN,
-        embeddings: Embeddings,
+        embeddings: Vec<EmbeddingWithCID>,
         headers: Vec<Header>
     ) -> Result<Mail> where FN: FnOnce( &Self ) -> Result<Mail>;
 
@@ -261,7 +253,7 @@ impl<E: BuilderContext> BuilderExt for Builder<E> {
     fn create_alternate_bodies_with_embeddings(
         &self,
         bodies: Vec<BodyWithEmbeddings>,
-        embeddings: Embeddings,
+        embeddings: Vec<EmbeddingWithCID>,
         headers: Vec<Header>
     ) -> Result<Mail> {
         match embeddings.len() {
@@ -300,7 +292,7 @@ impl<E: BuilderContext> BuilderExt for Builder<E> {
     fn create_body_with_embeddings<FN>(
         &self,
         sub_body: FN,
-        embeddings: Embeddings,
+        embeddings: Vec<EmbeddingWithCID>,
         headers: Vec<Header>
     ) -> Result<Mail> where FN: FnOnce( &Self ) -> Result<Mail>
     {
@@ -315,7 +307,7 @@ impl<E: BuilderContext> BuilderExt for Builder<E> {
 
         builder = builder.add_body( sub_body )?;
         for embedding in embeddings {
-            let EmbeddingInMail { content_id, resource } = embedding;
+            let ( content_id, resource ) = embedding.into();
             builder = builder.add_body( |b|
                 b.create_body_from_resource( resource , vec![
                     Header::ContentID( content_id ),
@@ -330,7 +322,7 @@ impl<E: BuilderContext> BuilderExt for Builder<E> {
     fn create_with_attachments<FN>(
         &self,
         body: FN,
-        attachments: Vec<AttachmentInMail>,
+        attachments: Attachments,
         headers: Vec<Header>
     )  -> Result<Mail>
         where FN: FnOnce( &Self ) -> Result<Mail>
@@ -341,7 +333,7 @@ impl<E: BuilderContext> BuilderExt for Builder<E> {
 
         for attachment in attachments {
             builder = builder.add_body( |b| b.create_body_from_resource(
-                attachment,
+                attachment.into(),
                 vec![
                     Header::ContentDisposition( Disposition::attachment() )
                 ]
