@@ -22,9 +22,6 @@ use super::mime::MultipartMime;
 use super::resource::Resource;
 use super::{ MailPart, Mail, Headers };
 
-#[cfg(test)]
-mod test_utils;
-
 use super::context::*;
 
 pub struct Builder<E: BuilderContext>(pub E);
