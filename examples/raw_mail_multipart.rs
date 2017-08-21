@@ -2,7 +2,7 @@ extern crate mail_codec;
 extern crate futures;
 extern crate mime;
 
-use futures::{ future, Future, IntoFuture };
+use futures::{ future, Future };
 
 use mail_codec::error::*;
 

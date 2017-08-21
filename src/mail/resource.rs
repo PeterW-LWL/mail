@@ -134,6 +134,7 @@ impl Resource {
             ctx_ref: ctx
         }
     }
+
     pub fn poll_encoding_completion<C>( &mut self, ctx: &C ) -> Poll<(), Error>
         where C: BuilderContext
     {
