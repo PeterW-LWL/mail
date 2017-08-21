@@ -4,15 +4,23 @@ use std::result::{ Result as StdResult };
 use serde::{ self, Serialize, Serializer };
 
 use error::*;
-use components::MessageID;
+use components::ContentID;
 use mail::resource::Resource;
 use mail_composition::ContentIdGen;
 
+pub type Embeddings = Vec<Embedding>;
+pub type Attachments = Vec<Attachment>;
 
 #[derive(Debug)]
 pub struct Embedding {
     resource: Resource,
-    content_id: RefCell<Option<MessageID>>
+    content_id: RefCell<Option<ContentID>>
+}
+
+#[derive(Debug)]
+pub struct EmbeddingWithCID {
+    resource: Resource,
+    content_id: ContentID
 }
 
 #[derive(Debug)]
@@ -25,7 +33,7 @@ impl Embedding {
         Embedding { resource, content_id: RefCell::new( None ) }
     }
 
-    pub fn with_content_id( resource: Resource, content_id: MessageID ) -> Self {
+    pub fn with_content_id( resource: Resource, content_id: ContentID ) -> Self {
         Embedding {
             resource: resource,
             content_id: RefCell::new( Some( content_id ) )
@@ -40,7 +48,7 @@ impl Embedding {
         &mut self.resource
     }
 
-    pub fn content_id( &self ) -> Option<Ref<MessageID>> {
+    pub fn content_id( &self ) -> Option<Ref<ContentID>> {
         let borrow = self.content_id.borrow();
         if borrow.is_some() {
             Some( Ref::map( borrow, |opt_content_id| {
@@ -51,7 +59,7 @@ impl Embedding {
         }
     }
 
-    pub fn set_content_id( &mut self, cid: MessageID ) {
+    pub fn set_content_id( &mut self, cid: ContentID ) {
         self.content_id = RefCell::new( Some( cid ) )
     }
 
@@ -59,10 +67,24 @@ impl Embedding {
         self.content_id.borrow().is_some()
     }
 
+    pub fn with_cid_assured<CIDGen: ContentIdGen + ?Sized>(
+        self,
+        cid_gen: &CIDGen
+    ) -> Result<EmbeddingWithCID> {
+        let Embedding { resource, content_id } = self;
+        let content_id =
+            if let Some( cid ) = content_id.into_inner() {
+                cid
+            } else {
+                cid_gen.new_content_id()?
+            };
+        Ok( EmbeddingWithCID { resource, content_id } )
+    }
+
     fn assure_content_id<CIDGen: ContentIdGen + ?Sized>(
         &self,
         cid_gen: &CIDGen
-    ) -> Result<MessageID> {
+    ) -> Result<ContentID> {
 
         let mut cid = self.content_id.borrow_mut();
         Ok( if cid.is_some() {
@@ -75,6 +97,18 @@ impl Embedding {
         } )
     }
 }
+
+impl EmbeddingWithCID {
+    pub fn new( resource: Resource, content_id: ContentID ) -> Self {
+        EmbeddingWithCID { resource, content_id }
+    }
+
+    //FIXME: impl getter/settter etc.
+    pub fn resource( &self ) -> &Resource {
+        &self.resource
+    }
+}
+
 
 
 impl Attachment {
@@ -100,12 +134,12 @@ impl Serialize for Embedding {
         EXTRACTION_DUMP.with( |dump: &RefCell<ExtractionDump>| {
             let mut dump = dump.borrow_mut();
             match self.assure_content_id( &*dump.cid_gen ) {
-                Ok( cid ) => {
-                    let ser_res = serializer.serialize_str( cid.as_str() );
+                Ok( content_id ) => {
+                    let ser_res = serializer.serialize_str( content_id.as_str() );
                     if ser_res.is_ok() {
                         // Resource is (now) meant to be shared, and cloning is sheap (Arc inc)
                         let resource = self.resource().clone();
-                        dump.embeddings.push( (cid, resource) );
+                        dump.embeddings.push( EmbeddingWithCID { resource, content_id } )
                     }
                     ser_res
                 },
@@ -113,6 +147,28 @@ impl Serialize for Embedding {
                     Err( serde::ser::Error::custom( err ) )
                 }
             }
+        } )
+    }
+}
+
+impl Serialize for EmbeddingWithCID {
+    fn serialize<S>(&self, serializer: S) -> StdResult<S::Ok, S::Error> where S: Serializer {
+        if !EXTRACTION_DUMP.is_set() {
+            return Err( serde::ser::Error::custom(
+                "can only serialize an Attachment in when wrapped with serialize_and_extract" ) );
+        }
+        EXTRACTION_DUMP.with( |dump: &RefCell<ExtractionDump>| {
+            let mut dump = dump.borrow_mut();
+
+            let ser_res = serializer.serialize_str( self.content_id.as_str() );
+            if ser_res.is_ok() {
+                // Resource is (now) meant to be shared, and cloning is sheap (Arc inc)
+                let resource = self.resource().clone();
+                dump.embeddings.push( EmbeddingWithCID {
+                    resource, content_id: self.content_id.clone()
+                } );
+            }
+            ser_res
         } )
     }
 }
@@ -129,7 +185,7 @@ impl Serialize for Attachment {
             let ser_res = serializer.serialize_none();
             if ser_res.is_ok() {
                 let resource = self.resource.clone();
-                dump.attachments.push( resource );
+                dump.attachments.push( Attachment::new( resource ) );
             }
             ser_res
         })
@@ -148,10 +204,16 @@ impl Into<Resource> for Attachment {
     }
 }
 
+impl Into<(ContentID, Resource)> for EmbeddingWithCID {
+    fn into( self ) -> (ContentID, Resource) {
+        (self.content_id, self.resource)
+    }
+}
+
 
 struct ExtractionDump {
-    embeddings: Vec<(MessageID, Resource)>,
-    attachments: Vec<Resource>,
+    embeddings: Vec<EmbeddingWithCID>,
+    attachments: Attachments,
     //BLOCKED(unsized_thread_locals): use ContentIdGen instead in another thread_local when possible
     cid_gen: Box<ContentIdGen>
 }
@@ -164,6 +226,12 @@ pub struct SerializeOnly<T: Serialize> {
     data: T
 }
 
+impl<T: Serialize> SerializeOnly<T> {
+    pub fn new( data: T ) -> Self {
+        SerializeOnly { data }
+    }
+}
+
 ///
 /// use this to get access to Embedding/Attachment Resources while serializing
 /// structs containing the Embedding/Attachment types. This also includes the
@@ -174,8 +242,21 @@ pub struct SerializeOnly<T: Serialize> {
 /// engine without having to explicitly implement a trait allowing interation of all
 /// (even transistive) contained Embeddings/Attachments
 ///
-pub fn with_resource_sidechanel<FN, R>( cid_gen: Box<ContentIdGen>, func: FN ) -> R
-    where FN: FnOnce() -> R
+/// # Returns
+///
+/// returns a 3-tuple of the result of the function passed in (`func`) a vector
+/// of Embeedings (as content id, Resource pairs) and a vector of attachments
+/// ( as Resource's )
+///
+/// # Note
+/// this function is meant for internal use of mail composition "algorithm"
+/// the reason why it is public is so that other/custom composition code can use it, too.
+///
+pub fn with_resource_sidechanel<FN, R, E>(
+    cid_gen: Box<ContentIdGen>,
+    func: FN
+) -> StdResult<( R, Vec<EmbeddingWithCID>, Vec<Attachment> ), E>
+    where FN: FnOnce() -> StdResult<R, E>
 {
     let dump: RefCell<ExtractionDump> = RefCell::new( ExtractionDump {
         cid_gen,
@@ -183,5 +264,12 @@ pub fn with_resource_sidechanel<FN, R>( cid_gen: Box<ContentIdGen>, func: FN ) -
         attachments: Default::default()
     } );
 
-    EXTRACTION_DUMP.set( &dump, func )
+    match EXTRACTION_DUMP.set( &dump, func ) {
+        Ok( result ) => {
+            let dump = dump.into_inner();
+            Ok( ( result, dump.embeddings, dump.attachments) )
+        },
+        Err( err ) => Err( err )
+    }
+
 }

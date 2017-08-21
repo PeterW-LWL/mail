@@ -5,9 +5,7 @@ use error::*;
 use components::MessageID;
 use data::FromInput;
 
-use mail_composition::context::{
-    ContentIdGen
-};
+use mail_composition::ContentIdGen;
 
 #[derive( Debug, Clone, Hash, Eq, PartialEq )]
 pub struct RandomContentId {

@@ -7,7 +7,7 @@ use futures_cpupool::{ CpuPool, Builder };
 
 use error::*;
 use mail::{ FileLoader, RunElsewhere, CompositeBuilderContext };
-use mail_composition::context::ContentIdGen;
+use mail_composition::ContentIdGen;
 use components::MessageID;
 
 use super::VFSFileLoader;
