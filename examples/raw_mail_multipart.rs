@@ -2,7 +2,7 @@ extern crate mail_codec;
 extern crate futures;
 extern crate mime;
 
-use futures::{ future, Future, IntoFuture };
+use futures::{ future, Future };
 
 use mail_codec::error::*;
 
@@ -23,7 +23,7 @@ use mail_codec::mail::mime::MultipartMime;
 
 fn get_some_resource() -> Resource {
     let data: Vec<u8> = "abcd↓efg".as_bytes().to_vec();
-    Resource::Future(
+    Resource::from_future(
         future::ok( FileBuffer::new( mime::TEXT_PLAIN, data ) ).boxed()
     )
 }
@@ -38,7 +38,7 @@ fn _main() -> Result<()> {
     let builder_ctx = SimpleBuilderContext::default();
 
 
-    let mail = Builder(builder_ctx).multipart(
+    let mail = Builder( builder_ctx.clone() ).multipart(
             MultipartMime::new( "multipart/related; boundary=\"=_abc\"".parse().unwrap() )? )
         .set_header(Header::Subject( Unstructured::from_input( "that ↓ will be encoded ")? ) )?
         .add_body( |bb| bb.singlepart( get_some_resource() ).build() )?
@@ -47,7 +47,7 @@ fn _main() -> Result<()> {
 
 
 
-    let encodable_mail = mail.into_future().wait().unwrap();
+    let encodable_mail = mail.into_future( &builder_ctx ).wait().unwrap();
     encodable_mail.encode( &mut encoder )?;
 
     let as_buff: Vec<u8> = encoder.into();

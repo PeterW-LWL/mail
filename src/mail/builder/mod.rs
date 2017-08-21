@@ -15,22 +15,14 @@
 use ascii::AsciiString;
 
 use error::*;
-use types::buffer;
 use utils::is_multipart_mime;
 use headers::Header;
-use codec::transfer_encoding::TransferEncodedFileBuffer;
-
-use futures::Future;
 
 use super::mime::MultipartMime;
 use super::resource::Resource;
-use super::{ MailPart, Mail, Headers, Body };
+use super::{ MailPart, Mail, Headers };
 
-#[cfg(test)]
-mod test_utils;
-
-mod context;
-pub use self::context::*;
+use super::context::*;
 
 pub struct Builder<E: BuilderContext>(pub E);
 
@@ -142,35 +134,8 @@ impl<E: BuilderContext> SinglepartBuilder<E> {
     }
 
     pub fn build( self ) -> Result<Mail> {
-        use self::Resource::*;
 
-        let body: Body = match self.body {
-            FileBuffer( buffer ) => {
-                self.inner.ctx.execute_fn(
-                    move || TransferEncodedFileBuffer::encode_buffer( buffer, None )
-                ).into()
-            },
-            Future( future ) => {
-                let ctx = self.inner.ctx.clone();
-                future.and_then( move |buffer|
-                    ctx.execute_fn(
-                        move || TransferEncodedFileBuffer::encode_buffer( buffer, None )
-                    )
-                ).boxed().into()
-            },
-            File { mime, path, alternate_name } => {
-                let _ = alternate_name;
-                self.inner.ctx.execute(
-                    self.inner.ctx.load_file( &*path ).and_then( |data| {
-                        //TODO add file meta, replacing name with alternate_name (if it is some)
-                        let buffer = buffer::FileBuffer::new( mime.into(), data );
-                        TransferEncodedFileBuffer::encode_buffer( buffer, None )
-                    })
-                ).into()
-            }
-        };
-
-        self.inner.build( MailPart::SingleBody { body } )
+        self.inner.build( MailPart::SingleBody { body: self.body } )
     }
 }
 

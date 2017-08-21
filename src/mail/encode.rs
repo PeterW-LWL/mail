@@ -8,16 +8,22 @@ use ascii::IntoAsciiString;
 /// if the body is not yet resolved use `Body::poll_body` or `IntoFuture`
 /// on `Mail` to prevent this from happening
 ///
-pub fn encode_mail<E>( mail: &Mail, top: bool, encoder: &mut E ) -> Result<()>
+#[inline(always)]
+pub fn encode_mail<E>( mail: &EncodableMail, top: bool, encoder: &mut E ) -> Result<()>
     where E: MailEncoder
 {
+    _encode_mail( &mail.0, top, encoder )
+}
 
-    encode_headers( mail, top, encoder )?;
+fn _encode_mail<E>( mail: &Mail, top: bool, encoder: &mut E ) -> Result<()>
+    where E: MailEncoder
+{
+    encode_headers( &mail, top, encoder )?;
 
     //the empty line between the headers and the body
     encoder.write_new_line();
 
-    encode_mail_part( mail, encoder )?;
+    encode_mail_part( &mail, encoder )?;
 
     Ok( () )
 }
@@ -27,10 +33,10 @@ pub fn encode_mail<E>( mail: &Mail, top: bool, encoder: &mut E ) -> Result<()>
 /// if the body is not yet resolved use `Body::poll_body` or `IntoFuture`
 /// on `Mail` to prevent this from happening
 ///
-pub fn encode_headers<E>(mail: &Mail, top: bool, encoder:  &mut E ) -> Result<()>
+fn encode_headers<E>(mail: &Mail, top: bool, encoder:  &mut E ) -> Result<()>
     where E: MailEncoder
 {
-    let special_headers = find_special_headers( mail );
+    let special_headers = find_special_headers( mail )?;
     let iter = special_headers
         .iter()
         .chain( mail.headers.values() );
@@ -62,12 +68,13 @@ pub fn encode_headers<E>(mail: &Mail, top: bool, encoder:  &mut E ) -> Result<()
 /// if the body is not yet resolved use `Body::poll_body` or `IntoFuture`
 /// on `Mail` to prevent this from happening
 ///
-pub fn find_special_headers( mail: &Mail ) -> Vec<Header> {
+fn find_special_headers( mail: &Mail ) -> Result<Vec<Header>> {
     let mut headers = vec![];
     //we need: ContentType, ContentTransferEncoding, and ??
     match mail.body {
         MailPart::SingleBody { ref body } => {
-            let file_buffer = body.file_buffer_ref().expect( "the body to be resolved" );
+            let file_buffer = body.get_if_encoded()?
+                .expect( "encoded mail, should only contain already transferencoded resources" );
             headers.push(
                 Header::ContentType( file_buffer.content_type().clone() ) );
             headers.push(
@@ -79,7 +86,7 @@ pub fn find_special_headers( mail: &Mail ) -> Vec<Header> {
         //TODO bail if there is a ContentTransferEncoding in a multipart body!
         _ => {}
     }
-    headers
+    Ok( headers )
 }
 
 ///
@@ -87,17 +94,17 @@ pub fn find_special_headers( mail: &Mail ) -> Vec<Header> {
 /// if the body is not yet resolved use `Body::poll_body` or `IntoFuture`
 /// on `Mail` to prevent this from happening
 ///
-pub fn encode_mail_part<E>(mail: &Mail, encoder:  &mut E ) -> Result<()>
+fn encode_mail_part<E>(mail: &Mail, encoder:  &mut E ) -> Result<()>
     where E: MailEncoder
 {
     use super::MailPart::*;
     match mail.body {
         SingleBody { ref body } => {
-            if let Some( file_buffer ) = body.file_buffer_ref() {
-                encoder.write_body( file_buffer );
+            if let Some( file_buffer ) = body.get_if_encoded()? {
+                encoder.write_body( &*file_buffer );
                 encoder.write_new_line();
             } else {
-                bail!( "unresolved body" )
+                bail!( "encoded mail, should only contain already transferencoded resources" )
             }
         },
         MultipleBodies { ref hidden_text, ref bodies } => {
@@ -130,7 +137,7 @@ pub fn encode_mail_part<E>(mail: &Mail, encoder:  &mut E ) -> Result<()>
                 encoder.write_str( &*boundary );
                 encoder.write_new_line();
 
-                encode_mail( mail, false, encoder )?;
+                _encode_mail( mail, false, encoder )?;
             }
 
             if bodies.len() > 0 {
