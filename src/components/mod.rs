@@ -19,6 +19,8 @@ pub use self::unstructured::Unstructured;
 mod message_id;
 pub use self::message_id::{ MessageID, MessageIDList };
 
+pub type ContentID = MessageID;
+pub type ContentIDList = MessageIDList;
 
 
 mod cfws;
