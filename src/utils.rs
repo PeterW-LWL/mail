@@ -27,22 +27,6 @@ pub fn timeout( s: u32, ms: u32 ) -> oneshot::Receiver<()> {
 }
 
 
-
-
-//trait PushIfSome<T> {
-//    fn push_if_some( &mut self, val: Option<T> );
-//}
-//
-//impl<T> PushIfSome<T> for Vec<T> {
-//    #[inline]
-//    fn push_if_some( &mut self, val: Option<T> ) {
-//        if let Some( val ) = val {
-//            self.push( val );
-//        }
-//    }
-//}
-
-
 //modified, origin is:
 // https://github.com/rust-lang/rust/blob/2fbba5bdbadeef403a64e9e1568cdad225cbcec1/src/liballoc/string.rs
 pub fn insert_bytes(vec: &mut Vec<u8> , idx: usize, bytes: &[u8]) {
