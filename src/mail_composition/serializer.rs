@@ -136,7 +136,17 @@ impl Serialize for Attachment {
     }
 }
 
+impl Into<Resource> for Embedding {
+    fn into( self ) -> Resource {
+        self.resource
+    }
+}
 
+impl Into<Resource> for Attachment {
+    fn into( self ) -> Resource {
+        self.resource
+    }
+}
 
 
 struct ExtractionDump {
