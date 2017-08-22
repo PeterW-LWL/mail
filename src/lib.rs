@@ -49,4 +49,18 @@ pub mod default_impl;
 
 
 
+pub mod template_engine_prelude {
+    pub type StdError = ::std::error::Error;
+    pub type StdResult<R,E> = ::std::result::Result<R,E>;
+    pub use serde::Serialize;
 
+    pub use types::Vec1;
+    pub use mail::{
+        Resource
+    };
+    pub use composition::{
+        Template, TemplateEngine,
+        Context,
+        Attachment, Embedding
+    };
+ }

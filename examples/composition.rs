@@ -7,13 +7,9 @@ extern crate serde_json;
 #[macro_use]
 extern crate serde_derive;
 
-use std::result::{ Result as StdResult };
-
 use futures::Future;
+use template_engine::Teng;
 
-use serde::Serialize;
-
-use mail_codec::types::Vec1;
 use mail_codec::error::*;
 use mail_codec::grammar::MailType;
 use mail_codec::components::{
@@ -29,10 +25,7 @@ use mail_codec::mail::{
     Resource,
 };
 use mail_codec::composition::{
-    TemplateEngine,
-    Template,
     Compositor,
-    Context,
     NameComposer,
     MailSendContext,
     Embedding, Attachment
@@ -143,55 +136,53 @@ fn create_composer( ctx: &SimpleContext ) -> Composer {
 
 
 
-//TODO make a prelude alla:
-// template_engine_prelude {
-//      TemplateEngine, Template, StdError, StdResult, Serialize, Context
-//      Vec1
-// }
-/// Example template engine which turns everything into a json blob
-struct Teng;
+mod template_engine {
+    use serde_json;
+    use mail_codec::template_engine_prelude::*;
 
-impl Teng {
+    /// Example template engine which turns everything into a json blob
+    pub struct Teng;
 
-    pub fn new() -> Self {
-        Teng
-    }
-}
-
-impl TemplateEngine for Teng {
-    type TemplateId = &'static str;
-    type Error = serde_json::Error;
-
-    fn templates<D: Serialize, C: Context>(
-        &self,
-        _ctx: &C,
-        _id: Self::TemplateId,
-        data: D
-    ) -> StdResult< Vec1<Template>, Self::Error > {
-        // Note: we can use `_ctx` to if we really need to, e.g. to generate ContentID's,
-        // through notice, that we can always use Embedding without a content ID
-        // and the compositor will handle that part for us.
-        // FIXME make it so that TemplateEngine can, but does not has to, know about the type of
-        // context, to e.g. access configutations etc.
-
-        // Note: while this example ignores `_id` a template engine normally determines which
-        //  template(s) to use through the id
-        
-        let stringified = serde_json::to_string_pretty( &data )?.replace( "\n", "\r\n" );
-        let text = format!( concat!(
-            "This is the data the template engine gets in JSON:\r\n",
-            "\r\n{}\r\n\r\n",
-            "Note that the value for avatar is a ContentID,\r\n",
-            " e.g. in a HTML body cid:theid can be used to refer to it\r\n",
-            "Note that the value for signature is null because signature is\r\n",
-            " an Attachment and as such there is no reason represent it in\r\n",
-            " the data, use an embedding if you want to refere to it/inline it\r\n"
-        ), stringified );
-        Ok( Vec1::new( Template {
-            body: Resource::from_text( text ),
-            embeddings: Vec::new(),
-            attachments: Vec::new(),
-        }) )
+    impl Teng {
+        pub fn new() -> Self {
+            Teng
+        }
     }
 
+    impl TemplateEngine for Teng {
+        type TemplateId = &'static str;
+        type Error = serde_json::Error;
+
+        fn templates<D: Serialize, C: Context>(
+            &self,
+            _ctx: &C,
+            _id: Self::TemplateId,
+            data: D
+        ) -> StdResult<Vec1<Template>, Self::Error> {
+            // Note: we can use `_ctx` to if we really need to, e.g. to generate ContentID's,
+            // through notice, that we can always use Embedding without a content ID
+            // and the compositor will handle that part for us.
+            // FIXME make it so that TemplateEngine can, but does not has to, know about the type of
+            // context, to e.g. access configutations etc.
+
+            // Note: while this example ignores `_id` a template engine normally determines which
+            //  template(s) to use through the id
+
+            let stringified = serde_json::to_string_pretty(&data)?.replace("\n", "\r\n");
+            let text = format!(concat!(
+                "This is the data the template engine gets in JSON:\r\n",
+                "\r\n{}\r\n\r\n",
+                "Note that the value for avatar is a ContentID,\r\n",
+                " e.g. in a HTML body cid:theid can be used to refer to it\r\n",
+                "Note that the value for signature is null because signature is\r\n",
+                " an Attachment and as such there is no reason represent it in\r\n",
+                " the data, use an embedding if you want to refere to it/inline it\r\n"
+            ), stringified);
+            Ok(Vec1::new(Template {
+                body: Resource::from_text(text),
+                embeddings: Vec::new(),
+                attachments: Vec::new(),
+            }))
+        }
+    }
 }
