@@ -31,10 +31,9 @@ extern crate futures_cpupool;
 #[macro_use]
 mod macros;
 
-mod utils;
-pub mod error;
 #[macro_use]
-pub mod types;
+pub mod utils;
+pub mod error;
 pub mod grammar;
 #[cfg_attr(test, macro_use)]
 pub mod codec;
@@ -63,8 +62,8 @@ pub mod mail_builder_prelude {
 
 
 pub mod resource_prelude {
-    pub use types::FileBuffer;
-    pub use types::FileMeta;
+    pub use utils::FileBuffer;
+    pub use utils::FileMeta;
     pub use mail::{ Resource, ResourceSpec };
     pub use composition::{ Embedding, Attachment, EmbeddingWithCID };
 }
@@ -94,7 +93,7 @@ pub mod template_engine_prelude {
     pub type StdResult<R,E> = ::std::result::Result<R,E>;
     pub use serde::Serialize;
 
-    pub use types::Vec1;
+    pub use utils::Vec1;
     pub use mail::{
         Resource
     };

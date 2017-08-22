@@ -3,7 +3,7 @@ use ascii::AsciiStr;
 use error::*;
 use codec::{ MailEncoder, MailEncodable };
 
-pub use types::DateTime;
+pub use utils::DateTime;
 
 impl MailEncodable for DateTime {
     fn encode<E>( &self, encoder:  &mut E ) -> Result<()> where E: MailEncoder {

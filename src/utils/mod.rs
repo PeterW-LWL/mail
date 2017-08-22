@@ -1,4 +1,3 @@
-
 #[cfg(test)]
 use futures::sync::oneshot;
 #[cfg(test)]
@@ -9,13 +8,29 @@ use std::thread;
 use mime::Mime;
 use mime::MULTIPART;
 
+
+
+mod buffer;
+pub use self::buffer::FileBuffer;
+
+mod date_time;
+pub use self::date_time::DateTime;
+
+mod file_meta;
+pub use self::file_meta::FileMeta;
+
+#[macro_use]
+mod vec1;
+pub use self::vec1::Vec1;
+
+
 pub fn is_multipart_mime( mime: &Mime ) -> bool {
     mime.type_() == MULTIPART
 }
 
 
 #[cfg(test)]
-pub fn timeout( s: u32, ms: u32 ) -> oneshot::Receiver<()> {
+pub(crate) fn timeout( s: u32, ms: u32 ) -> oneshot::Receiver<()> {
     let (timeout_trigger, timeout) = oneshot::channel::<()>();
 
     thread::spawn( move || {
@@ -29,7 +44,7 @@ pub fn timeout( s: u32, ms: u32 ) -> oneshot::Receiver<()> {
 
 //modified, origin is:
 // https://github.com/rust-lang/rust/blob/2fbba5bdbadeef403a64e9e1568cdad225cbcec1/src/liballoc/string.rs
-pub fn insert_bytes(vec: &mut Vec<u8> , idx: usize, bytes: &[u8]) {
+pub(crate) fn insert_bytes(vec: &mut Vec<u8> , idx: usize, bytes: &[u8]) {
     use std::ptr;
     let len = vec.len();
     let amount = bytes.len();

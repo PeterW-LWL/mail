@@ -2,7 +2,7 @@ use ascii::AsciiChar;
 
 use error::*;
 use codec::{ MailEncoder, MailEncodable };
-use types::Vec1;
+use utils::Vec1;
 
 use super::Phrase;
 

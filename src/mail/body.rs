@@ -147,7 +147,7 @@ impl From<TransferEncodedFileBuffer> for Body {
 mod test {
     use components::TransferEncoding;
     use mime::TEXT_PLAIN;
-    use types::buffer::FileBuffer;
+    use utils::buffer::FileBuffer;
     use futures::{ self, Future };
 
 

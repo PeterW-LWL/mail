@@ -5,7 +5,7 @@ use ascii::AsciiChar;
 
 use error::*;
 
-use types::Vec1;
+use utils::Vec1;
 
 use grammar::encoded_word::{ is_encoded_word, EncodedWordContext };
 use super::input::Input;

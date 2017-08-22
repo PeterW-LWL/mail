@@ -6,7 +6,7 @@ use ascii::{ AsciiChar, AsciiStr };
 use error::*;
 use codec::{ MailEncodable, MailEncoder };
 use grammar::{is_ctl, is_tspecial };
-use types::FileMeta;
+use utils::FileMeta;
 
 
 
