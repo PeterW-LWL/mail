@@ -5,21 +5,8 @@ extern crate mime;
 
 use futures::{ future, Future };
 
-use mail_codec::error::*;
-
+use mail_codec::mail_builder_prelude::*;
 use mail_codec::resource_prelude::*;
-
-use mail_codec::grammar::MailType;
-use mail_codec::codec::{
-    MailEncodable,
-    MailEncoderImpl
-};
-use mail_codec::data::FromInput;
-use mail_codec::headers::Header;
-use mail_codec::components::*;
-use mail_codec::mail::{
-    Builder
-};
 
 use mail_codec::default_impl::SimpleBuilderContext;
 

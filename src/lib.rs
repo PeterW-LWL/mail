@@ -47,6 +47,21 @@ pub mod composition;
 #[cfg(feature="default_impl_any")]
 pub mod default_impl;
 
+pub mod mail_builder_prelude {
+    pub use error::*;
+    pub use grammar::MailType;
+    pub use codec::{
+        MailEncodable,
+        MailEncoderImpl
+    };
+    pub use data::FromInput;
+    pub use headers::Header;
+    pub use components::*;
+    pub use mail::Builder;
+    pub use mail::mime::MultipartMime;
+}
+
+
 pub mod resource_prelude {
     pub use types::FileBuffer;
     pub use types::FileMeta;
