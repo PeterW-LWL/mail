@@ -99,7 +99,10 @@ impl<T, C, CP, D> Compositor<T, C, CP, D>
                 // but this would break the whole Embedding/Attachment extraction )
                 let sdata = SerializeOnly::new( data );
                 self.preprocess_templates(
-                    self.template_engine.templates( &self.context, template_id, sdata)?.into() )
+                    self.template_engine
+                        .templates( &self.context, template_id, sdata)
+                        .chain_err( || "failure in template engine" )?
+                        .into() )
             } )?;
 
         attachments.extend( attachments2 );
