@@ -6,7 +6,7 @@ use serde::{ self, Serialize, Serializer };
 use error::*;
 use components::ContentID;
 use mail::Resource;
-use mail_composition::ContentIdGen;
+use composition::ContentIdGen;
 
 pub type Embeddings = Vec<Embedding>;
 pub type Attachments = Vec<Attachment>;

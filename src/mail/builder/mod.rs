@@ -22,31 +22,28 @@ use super::mime::MultipartMime;
 use super::resource::Resource;
 use super::{ MailPart, Mail, Headers };
 
-use super::context::*;
 
-pub struct Builder<E: BuilderContext>(pub E);
+pub struct Builder;
 
-struct BuilderShared<E: BuilderContext> {
-    ctx: E,
+struct BuilderShared {
     headers: Headers
 }
 
-pub struct SinglepartBuilder<E: BuilderContext> {
-    inner: BuilderShared<E>,
+pub struct SinglepartBuilder {
+    inner: BuilderShared,
     body: Resource
 }
 
-pub struct MultipartBuilder<E: BuilderContext> {
-    inner: BuilderShared<E>,
+pub struct MultipartBuilder {
+    inner: BuilderShared,
     hidden_text: Option<AsciiString>,
     bodies: Vec<Mail>
 }
 
-impl<E: BuilderContext> BuilderShared<E> {
+impl BuilderShared {
 
-    fn new( ctx: E ) -> Self {
+    fn new() -> Self {
         BuilderShared {
-            ctx,
             headers: Headers::new(),
         }
     }
@@ -61,7 +58,7 @@ impl<E: BuilderContext> BuilderShared<E> {
     /// non-mutltipart mail
     ///
     /// NOTE: do NOT add other error cases
-    fn set_header( &mut self, header: Header, is_multipart: bool ) -> Result<Option<Header>> {
+    fn header( &mut self, header: Header, is_multipart: bool ) -> Result<Option<Header>> {
         use headers::Header::*;
         //move checks for single/multipart from mail_composition here
         match &header {
@@ -80,11 +77,11 @@ impl<E: BuilderContext> BuilderShared<E> {
         Ok( self.headers.insert( name, header ) )
     }
 
-    fn set_headers<IT>( &mut self, iter: IT, is_multipart: bool ) -> Result<()>
+    fn headers<IT>( &mut self, iter: IT, is_multipart: bool ) -> Result<()>
         where IT: IntoIterator<Item=Header>
     {
         for header in iter.into_iter() {
-            self.set_header( header, is_multipart )?;
+            self.header( header, is_multipart )?;
         }
         Ok( () )
     }
@@ -97,38 +94,38 @@ impl<E: BuilderContext> BuilderShared<E> {
     }
 }
 
-impl<E: BuilderContext> Builder<E> {
+impl Builder {
 
-    pub fn multipart( &self,  m: MultipartMime ) -> MultipartBuilder<E> {
+    pub fn multipart( m: MultipartMime ) -> MultipartBuilder {
         let res = MultipartBuilder {
-            inner: BuilderShared::new( self.0.clone() ),
+            inner: BuilderShared::new(),
             hidden_text: None,
             bodies: Vec::new(),
         };
 
         //UNWRAP_SAFETY: it can only fail with illegal headers, but this header can not be illegal
-        res.set_header( Header::ContentType( m.into() ) ).unwrap()
+        res.header( Header::ContentType( m.into() ) ).unwrap()
     }
 
-    pub fn singlepart( &self, r: Resource ) -> SinglepartBuilder<E> {
+    pub fn singlepart( r: Resource ) -> SinglepartBuilder {
         SinglepartBuilder {
-            inner: BuilderShared::new( self.0.clone() ),
+            inner: BuilderShared::new(),
             body: r,
         }
     }
 
 }
 
-impl<E: BuilderContext> SinglepartBuilder<E> {
-    pub fn set_header( mut self, header: Header ) -> Result<Self> {
-        self.inner.set_header( header, false )?;
+impl SinglepartBuilder {
+    pub fn header( mut self, header: Header ) -> Result<Self> {
+        self.inner.header( header, false )?;
         Ok( self )
     }
 
-    pub fn set_headers<IT>( mut self, iter: IT ) -> Result<Self>
+    pub fn headers<IT>( mut self, iter: IT ) -> Result<Self>
         where IT: IntoIterator<Item=Header>
     {
-        self.inner.set_headers( iter, false )?;
+        self.inner.headers( iter, false )?;
         Ok( self )
 
     }
@@ -139,18 +136,17 @@ impl<E: BuilderContext> SinglepartBuilder<E> {
     }
 }
 
-impl<E: BuilderContext> MultipartBuilder<E> {
-    pub fn add_body<FN>( mut self, body_fn: FN ) -> Result<Self>
-        where FN: FnOnce( &Builder<E> ) -> Result<Mail>
-    {
-        self.bodies.push( body_fn( &Builder( self.inner.ctx.clone() ) )? );
+impl MultipartBuilder {
+
+    pub fn body( mut self, body: Mail ) -> Result<Self> {
+        self.bodies.push( body );
         Ok( self )
     }
 
-    pub fn set_headers<IT>( mut self, iter: IT ) -> Result<Self>
+    pub fn headers<IT>( mut self, iter: IT ) -> Result<Self>
         where IT: IntoIterator<Item=Header>
     {
-        self.inner.set_headers( iter, true )?;
+        self.inner.headers( iter, true )?;
         Ok( self )
 
     }
@@ -160,8 +156,8 @@ impl<E: BuilderContext> MultipartBuilder<E> {
     ///
     /// A error is returned if the header is incompatible with this builder,
     /// i.e. if a ContentType header is set with a non-multipart content type
-    pub fn set_header( mut self, header: Header ) -> Result<Self> {
-        self.inner.set_header( header, true )?;
+    pub fn header( mut self, header: Header ) -> Result<Self> {
+        self.inner.header( header, true )?;
         Ok( self )
     }
 

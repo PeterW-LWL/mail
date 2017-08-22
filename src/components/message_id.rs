@@ -4,7 +4,7 @@ use ascii::AsciiChar;
 use nom::IResult;
 
 use error::*;
-use types::Vec1;
+use utils::Vec1;
 use codec::{ MailEncoder, MailEncodable };
 
 use data::{ FromInput, Input, SimpleItem };

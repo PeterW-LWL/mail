@@ -1,5 +1,5 @@
 
-use mail_composition::NameComposer;
+use composition::NameComposer;
 
 
 #[derive(Debug, Clone, Copy)]

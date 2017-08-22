@@ -1,12 +1,9 @@
 use std::ops::Deref;
 
-use futures::future::BoxFuture;
 use mime::{ Mime, TEXT, CHARSET };
 
-use error::Error;
-use super::FileMeta;
+use super::file_meta::FileMeta;
 
-pub type FileBufferFuture = BoxFuture<FileBuffer, Error>;
 
 // WHEN_FEATURE(more_charsets)
 // for now this is just a vector,

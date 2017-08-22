@@ -5,21 +5,8 @@ extern crate mime;
 
 use futures::{ future, Future };
 
-use mail_codec::error::*;
-
-use mail_codec::types::buffer::FileBuffer;
-
-use mail_codec::grammar::MailType;
-use mail_codec::codec::{
-    MailEncodable,
-    MailEncoderImpl
-};
-use mail_codec::data::FromInput;
-use mail_codec::headers::Header;
-use mail_codec::components::*;
-use mail_codec::mail::{
-    Builder, Resource
-};
+use mail_codec::mail_builder_prelude::*;
+use mail_codec::resource_prelude::*;
 
 use mail_codec::default_impl::SimpleBuilderContext;
 
@@ -41,14 +28,14 @@ fn _main() -> Result<()> {
 
     let builder_ctx = SimpleBuilderContext::default();
 
-    let mail = Builder( builder_ctx.clone() ).singlepart( get_some_resource() )
-        .set_header(
+    let mail = Builder::singlepart( get_some_resource() )
+        .header(
             Header::Subject(
                 Unstructured::from_input( "that ↓ will be encoded ")? ) )?
-        .set_header(
+        .header(
             Header::MessageID( MessageID::from_input( "ran.a1232.13rwqf23.a@dom" )? )
         )?
-        .set_header(
+        .header(
             Header::From( MailboxList( vec1![
                 Mailbox {
                     display_name: Some( Phrase::from_input( "random dude" )? ),
@@ -60,7 +47,7 @@ fn _main() -> Result<()> {
                 }
             ]))
         )?
-        .set_header(
+        .header(
             Header::ReturnPath( Path( None ) )
         )?
         .build()?;

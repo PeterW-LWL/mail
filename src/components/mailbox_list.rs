@@ -4,7 +4,7 @@ use error::*;
 use ascii::AsciiChar;
 use codec::{MailEncoder, MailEncodable };
 
-use types::Vec1;
+use utils::Vec1;
 use super::Mailbox;
 
 

@@ -4,24 +4,10 @@ extern crate mime;
 
 use futures::{ future, Future };
 
-use mail_codec::error::*;
+use mail_codec::mail_builder_prelude::*;
+use mail_codec::resource_prelude::*;
 
-use mail_codec::types::buffer::FileBuffer;
-use mail_codec::mail::{
-    Builder, Resource
-};
 use mail_codec::default_impl::SimpleBuilderContext;
-use mail_codec::codec::{
-    MailEncodable,
-    MailEncoderImpl
-};
-
-use mail_codec::data::FromInput;
-use mail_codec::headers::Header;
-use mail_codec::components::Unstructured;
-use mail_codec::grammar::MailType;
-
-use mail_codec::mail::mime::MultipartMime;
 
 fn get_some_resource() -> Resource {
     let data: Vec<u8> = "abcd↓efg".as_bytes().to_vec();
@@ -39,12 +25,11 @@ fn _main() -> Result<()> {
 
     let builder_ctx = SimpleBuilderContext::default();
 
-
-    let mail = Builder( builder_ctx.clone() ).multipart(
+    let mail = Builder::multipart(
             MultipartMime::new( "multipart/related; boundary=\"=_abc\"".parse().unwrap() )? )
-        .set_header(Header::Subject( Unstructured::from_input( "that ↓ will be encoded ")? ) )?
-        .add_body( |bb| bb.singlepart( get_some_resource() ).build() )?
-        .add_body( |bb| bb.singlepart( get_some_resource() ).build() )?
+        .header(Header::Subject( Unstructured::from_input( "that ↓ will be encoded ")? ) )?
+        .body( Builder::singlepart( get_some_resource() ).build()? )?
+        .body( Builder::singlepart( get_some_resource() ).build()? )?
         .build()?;
 
 

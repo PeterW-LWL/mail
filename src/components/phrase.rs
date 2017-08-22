@@ -1,5 +1,5 @@
 use error::*;
-use types::Vec1;
+use utils::Vec1;
 use codec::{ MailEncodable, MailEncoder };
 use grammar::encoded_word::EncodedWordContext;
 
