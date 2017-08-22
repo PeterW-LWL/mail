@@ -129,11 +129,11 @@ mod template_engine {
         }
     }
 
-    impl TemplateEngine for Teng {
+    impl<C: Context> TemplateEngine<C> for Teng {
         type TemplateId = &'static str;
         type Error = serde_json::Error;
 
-        fn templates<D: Serialize, C: Context>(
+        fn templates<D: Serialize>(
             &self,
             _ctx: &C,
             _id: Self::TemplateId,

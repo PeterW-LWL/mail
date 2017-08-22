@@ -49,7 +49,7 @@ pub struct Compositor<T, C, CP, D> {
 
 
 impl<T, C, CP, D> Compositor<T, C, CP, D>
-    where T: TemplateEngine,
+    where T: TemplateEngine<C>,
           C: Context,
           CP: NameComposer<D>,
           D: Serialize
