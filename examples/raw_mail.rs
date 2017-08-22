@@ -41,7 +41,7 @@ fn _main() -> Result<()> {
 
     let builder_ctx = SimpleBuilderContext::default();
 
-    let mail = Builder.singlepart( get_some_resource() )
+    let mail = Builder::singlepart( get_some_resource() )
         .header(
             Header::Subject(
                 Unstructured::from_input( "that ↓ will be encoded ")? ) )?

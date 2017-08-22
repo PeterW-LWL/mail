@@ -96,7 +96,7 @@ impl BuilderShared {
 
 impl Builder {
 
-    pub fn multipart( &self,  m: MultipartMime ) -> MultipartBuilder {
+    pub fn multipart( m: MultipartMime ) -> MultipartBuilder {
         let res = MultipartBuilder {
             inner: BuilderShared::new(),
             hidden_text: None,
@@ -107,7 +107,7 @@ impl Builder {
         res.header( Header::ContentType( m.into() ) ).unwrap()
     }
 
-    pub fn singlepart( &self, r: Resource ) -> SinglepartBuilder {
+    pub fn singlepart( r: Resource ) -> SinglepartBuilder {
         SinglepartBuilder {
             inner: BuilderShared::new(),
             body: r,

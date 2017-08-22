@@ -39,12 +39,11 @@ fn _main() -> Result<()> {
 
     let builder_ctx = SimpleBuilderContext::default();
 
-    let builder = Builder;
-    let mail = builder.multipart(
+    let mail = Builder::multipart(
             MultipartMime::new( "multipart/related; boundary=\"=_abc\"".parse().unwrap() )? )
         .header(Header::Subject( Unstructured::from_input( "that ↓ will be encoded ")? ) )?
-        .body( builder.singlepart( get_some_resource() ).build()? )?
-        .body( builder.singlepart( get_some_resource() ).build()? )?
+        .body( Builder::singlepart( get_some_resource() ).build()? )?
+        .body( Builder::singlepart( get_some_resource() ).build()? )?
         .build()?;
 
 
