@@ -22,31 +22,28 @@ use super::mime::MultipartMime;
 use super::resource::Resource;
 use super::{ MailPart, Mail, Headers };
 
-use super::context::*;
 
-pub struct Builder<E: BuilderContext>(pub E);
+pub struct Builder;
 
-struct BuilderShared<E: BuilderContext> {
-    ctx: E,
+struct BuilderShared {
     headers: Headers
 }
 
-pub struct SinglepartBuilder<E: BuilderContext> {
-    inner: BuilderShared<E>,
+pub struct SinglepartBuilder {
+    inner: BuilderShared,
     body: Resource
 }
 
-pub struct MultipartBuilder<E: BuilderContext> {
-    inner: BuilderShared<E>,
+pub struct MultipartBuilder {
+    inner: BuilderShared,
     hidden_text: Option<AsciiString>,
     bodies: Vec<Mail>
 }
 
-impl<E: BuilderContext> BuilderShared<E> {
+impl BuilderShared {
 
-    fn new( ctx: E ) -> Self {
+    fn new() -> Self {
         BuilderShared {
-            ctx,
             headers: Headers::new(),
         }
     }
@@ -97,11 +94,11 @@ impl<E: BuilderContext> BuilderShared<E> {
     }
 }
 
-impl<E: BuilderContext> Builder<E> {
+impl Builder {
 
-    pub fn multipart( &self,  m: MultipartMime ) -> MultipartBuilder<E> {
+    pub fn multipart( &self,  m: MultipartMime ) -> MultipartBuilder {
         let res = MultipartBuilder {
-            inner: BuilderShared::new( self.0.clone() ),
+            inner: BuilderShared::new(),
             hidden_text: None,
             bodies: Vec::new(),
         };
@@ -110,16 +107,16 @@ impl<E: BuilderContext> Builder<E> {
         res.header( Header::ContentType( m.into() ) ).unwrap()
     }
 
-    pub fn singlepart( &self, r: Resource ) -> SinglepartBuilder<E> {
+    pub fn singlepart( &self, r: Resource ) -> SinglepartBuilder {
         SinglepartBuilder {
-            inner: BuilderShared::new( self.0.clone() ),
+            inner: BuilderShared::new(),
             body: r,
         }
     }
 
 }
 
-impl<E: BuilderContext> SinglepartBuilder<E> {
+impl SinglepartBuilder {
     pub fn header( mut self, header: Header ) -> Result<Self> {
         self.inner.header( header, false )?;
         Ok( self )
@@ -139,7 +136,7 @@ impl<E: BuilderContext> SinglepartBuilder<E> {
     }
 }
 
-impl<E: BuilderContext> MultipartBuilder<E> {
+impl MultipartBuilder {
 
     pub fn body( mut self, body: Mail ) -> Result<Self> {
         self.bodies.push( body );

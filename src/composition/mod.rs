@@ -19,7 +19,7 @@ use mail::mime::MultipartMime;
 use mail::{
     Resource,
     Mail,
-    Builder, BuilderContext
+    Builder
 };
 
 use data::FromInput;
@@ -56,10 +56,6 @@ impl<T, C, CP, D> Compositor<T, C, CP, D>
 {
     pub fn new( template_engine: T, context: C, name_composer: CP ) -> Self {
         Compositor { template_engine, context, name_composer, _d: PhantomData }
-    }
-
-    pub fn builder( &self ) -> Builder<C> {
-        Builder( self.context.clone() )
     }
 
     /// composes a mail based on the given template_id, data and send_context
@@ -166,7 +162,7 @@ impl<T, C, CP, D> Compositor<T, C, CP, D>
                        attachments: Attachments,
                        core_headers: Vec<Header>
     ) -> Result<Mail> {
-        let bb = self.builder();
+        let bb = Builder;
         let mail = match attachments.len() {
             0 => bb.create_alternate_bodies_with_embeddings(bodies, embeddings, core_headers )?,
             _n => bb.create_with_attachments(
@@ -227,7 +223,7 @@ pub trait BuilderExt {
 
 
 
-impl<E: BuilderContext> BuilderExt for Builder<E> {
+impl BuilderExt for Builder {
 
     fn create_alternate_bodies(
         &self,
