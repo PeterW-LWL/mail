@@ -28,7 +28,7 @@ use mail_codec::codec::{
 use mail_codec::mail::{
     Resource,
 };
-use mail_codec::mail_composition::{
+use mail_codec::composition::{
     TemplateEngine,
     Template,
     Compositor,

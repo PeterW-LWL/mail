@@ -42,7 +42,7 @@ pub mod data;
 pub mod components;
 pub mod headers;
 pub mod mail;
-pub mod mail_composition;
+pub mod composition;
 
 #[cfg(feature="default_impl_any")]
 pub mod default_impl;

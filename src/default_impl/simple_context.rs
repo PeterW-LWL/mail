@@ -7,7 +7,7 @@ use futures_cpupool::{ CpuPool, Builder };
 
 use error::*;
 use mail::{ FileLoader, RunElsewhere, CompositeBuilderContext };
-use mail_composition::ContentIdGen;
+use composition::ContentIdGen;
 use components::MessageID;
 
 use super::VFSFileLoader;
@@ -96,7 +96,7 @@ impl ContentIdGen for SimpleContext {
 #[cfg(test)]
 mod test {
     use mail::BuilderContext;
-    use mail_composition::Context;
+    use composition::Context;
 
     use super::SimpleContext;
 
