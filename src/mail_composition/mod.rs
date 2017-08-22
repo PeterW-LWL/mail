@@ -26,12 +26,12 @@ use data::FromInput;
 
 pub use self::context::*;
 pub use self::templates::*;
-pub use self::serializer::*;
+pub use self::resource::*;
 
 
 mod context;
 mod templates;
-mod serializer;
+mod resource;
 
 pub type BodyWithEmbeddings = (Resource, Vec<EmbeddingWithCID>);
 
