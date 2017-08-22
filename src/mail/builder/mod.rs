@@ -140,10 +140,9 @@ impl<E: BuilderContext> SinglepartBuilder<E> {
 }
 
 impl<E: BuilderContext> MultipartBuilder<E> {
-    pub fn body<FN>( mut self, body_fn: FN ) -> Result<Self>
-        where FN: FnOnce( &Builder<E> ) -> Result<Mail>
-    {
-        self.bodies.push( body_fn( &Builder( self.inner.ctx.clone() ) )? );
+
+    pub fn body( mut self, body: Mail ) -> Result<Self> {
+        self.bodies.push( body );
         Ok( self )
     }
 

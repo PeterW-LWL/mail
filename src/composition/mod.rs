@@ -170,7 +170,7 @@ impl<T, C, CP, D> Compositor<T, C, CP, D>
         let mail = match attachments.len() {
             0 => bb.create_alternate_bodies_with_embeddings(bodies, embeddings, core_headers )?,
             _n => bb.create_with_attachments(
-                |bb| bb.create_alternate_bodies_with_embeddings(bodies, embeddings, Vec::new() ),
+                bb.create_alternate_bodies_with_embeddings(bodies, embeddings, Vec::new() )?,
                 attachments,
                 core_headers
             )?
@@ -203,12 +203,12 @@ pub trait BuilderExt {
         headers: Vec<Header>
     ) -> Result<Mail>;
 
-    fn create_with_attachments<FN>(
+    fn create_with_attachments(
         &self,
-        body: FN,
+        body: Mail,
         attachments: Attachments,
         headers: Vec<Header>
-    ) -> Result<Mail> where FN: FnOnce( &Self ) -> Result<Mail>;
+    ) -> Result<Mail>;
 
     fn create_body_from_resource(
         &self,
@@ -216,12 +216,12 @@ pub trait BuilderExt {
         headers: Vec<Header>
     ) -> Result<Mail>;
 
-    fn create_body_with_embeddings<FN>(
+    fn create_body_with_embeddings(
         &self,
-        sub_body: FN,
+        sub_body: Mail,
         embeddings: Vec<EmbeddingWithCID>,
         headers: Vec<Header>
-    ) -> Result<Mail> where FN: FnOnce( &Self ) -> Result<Mail>;
+    ) -> Result<Mail>;
 
 }
 
@@ -247,7 +247,7 @@ impl<E: BuilderContext> BuilderExt for Builder<E> {
             .headers( headers )?;
 
         for body in bodies {
-            builder = builder.body( |bb| bb.create_mail_body( body, Vec::new() ) )?;
+            builder = builder.body( self.create_mail_body( body, Vec::new() )? )?;
         }
 
         builder.build()
@@ -265,7 +265,7 @@ impl<E: BuilderContext> BuilderExt for Builder<E> {
             },
             _n => {
                 self.create_body_with_embeddings(
-                    |bb| bb.create_alternate_bodies( bodies, Vec::new() ),
+                    self.create_alternate_bodies( bodies, Vec::new() )?,
                     embeddings,
                     headers
                 )
@@ -277,7 +277,7 @@ impl<E: BuilderContext> BuilderExt for Builder<E> {
         let (resource, embeddings) = body;
         if embeddings.len() > 0 {
             self.create_body_with_embeddings(
-                |bb| bb.create_body_from_resource( resource, Vec::new() ),
+                self.create_body_from_resource( resource, Vec::new() )?,
                 embeddings,
                 headers
             )
@@ -292,13 +292,13 @@ impl<E: BuilderContext> BuilderExt for Builder<E> {
             .build()
     }
 
-    fn create_body_with_embeddings<FN>(
+    fn create_body_with_embeddings(
         &self,
-        sub_body: FN,
+        sub_body: Mail,
         embeddings: Vec<EmbeddingWithCID>,
         headers: Vec<Header>
-    ) -> Result<Mail> where FN: FnOnce( &Self ) -> Result<Mail>
-    {
+    ) -> Result<Mail> {
+
         if embeddings.len() == 0 {
             bail!( "this function except at last one embedding" )
         }
@@ -311,36 +311,35 @@ impl<E: BuilderContext> BuilderExt for Builder<E> {
         builder = builder.body( sub_body )?;
         for embedding in embeddings {
             let ( content_id, resource ) = embedding.into();
-            builder = builder.body( |b|
-                b.create_body_from_resource( resource , vec![
+            builder = builder.body(
+                self.create_body_from_resource( resource , vec![
                     Header::ContentID( content_id ),
                     Header::ContentDisposition( Disposition::inline() )
-                ])
+                ])?
             )?;
         }
         builder.build()
     }
 
 
-    fn create_with_attachments<FN>(
+    fn create_with_attachments(
         &self,
-        body: FN,
+        body: Mail,
         attachments: Attachments,
         headers: Vec<Header>
-    )  -> Result<Mail>
-        where FN: FnOnce( &Self ) -> Result<Mail>
-    {
+    )  -> Result<Mail> {
+
         let mut builder = self.multipart( gen_multipart_mime( ascii_str!{ m i x e d } )? )
                           .headers( headers )?
                           .body( body )?;
 
         for attachment in attachments {
-            builder = builder.body( |b| b.create_body_from_resource(
+            builder = builder.body( self.create_body_from_resource(
                 attachment.into(),
                 vec![
                     Header::ContentDisposition( Disposition::attachment() )
                 ]
-            ))?;
+            )? )?;
         }
 
         builder.build()
