@@ -1,5 +1,6 @@
 
-pub mod buffer;
+mod buffer;
+pub use self::buffer::FileBuffer;
 
 mod date_time;
 pub use self::date_time::DateTime;

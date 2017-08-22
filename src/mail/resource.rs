@@ -16,7 +16,7 @@ use components::TransferEncoding;
 
 
 use mime::TEXT_PLAIN;
-use types::buffer::FileBuffer;
+use types::FileBuffer;
 use super::BuilderContext;
 
 

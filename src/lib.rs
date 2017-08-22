@@ -47,6 +47,12 @@ pub mod composition;
 #[cfg(feature="default_impl_any")]
 pub mod default_impl;
 
+pub mod resource_prelude {
+    pub use types::FileBuffer;
+    pub use types::FileMeta;
+    pub use mail::{ Resource, ResourceSpec };
+    pub use composition::{ Embedding, Attachment, EmbeddingWithCID };
+}
 
 pub mod composition_prelude {
     pub use error::*;

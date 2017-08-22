@@ -6,9 +6,9 @@ use futures::{ future, Future };
 
 use mail_codec::error::*;
 
-use mail_codec::types::buffer::FileBuffer;
+use mail_codec::resource_prelude::*;
 use mail_codec::mail::{
-    Builder, Resource
+    Builder
 };
 use mail_codec::default_impl::SimpleBuilderContext;
 use mail_codec::codec::{

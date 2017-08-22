@@ -5,7 +5,7 @@ use quoted_printable;
 
 
 use error::*;
-use types::buffer::FileBuffer;
+use types::FileBuffer;
 use components::TransferEncoding;
 
 

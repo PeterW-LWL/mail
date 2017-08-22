@@ -11,10 +11,8 @@ use futures::Future;
 use template_engine::Teng;
 
 use mail_codec::composition_prelude::*;
-use mail_codec::mail::Resource;
-use mail_codec::composition::{
-    Embedding, Attachment
-};
+use mail_codec::resource_prelude::*;
+
 use mail_codec::default_impl::SimpleContext;
 
 fn main() {
