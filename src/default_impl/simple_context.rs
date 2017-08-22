@@ -92,3 +92,25 @@ impl ContentIdGen for SimpleContext {
         self.0.content_id_gen.new_content_id()
     }
 }
+
+#[cfg(test)]
+mod test {
+    use mail::BuilderContext;
+    use mail_composition::Context;
+
+    use super::SimpleContext;
+
+    fn _assure_send<T: Send>() {}
+    fn _assure_sync<T: Sync>() {}
+    fn _assure_builder_ctx<T: BuilderContext>() {}
+    fn _assure_ctx<T: Context>() {}
+
+
+    #[test]
+    fn _assure_trait_impl() {
+        _assure_send::<SimpleContext>();
+        _assure_sync::<SimpleContext>();
+        _assure_builder_ctx::<SimpleContext>();
+        _assure_ctx::<SimpleContext>();
+    }
+}

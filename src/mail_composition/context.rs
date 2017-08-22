@@ -20,6 +20,8 @@ pub trait ContentIdGen {
 
 pub trait Context: BuilderContext + ContentIdGen + Send + Sync {}
 
+impl<T> Context for T where T: BuilderContext + ContentIdGen + Send + Sync {}
+
 impl<T: ContentIdGen> ContentIdGen for Arc<T> {
     fn new_content_id( &self ) -> Result<MessageID> {
         self.deref().new_content_id()
