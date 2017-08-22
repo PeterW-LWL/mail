@@ -198,9 +198,21 @@ impl Into<Resource> for Embedding {
     }
 }
 
+impl From<Resource> for Embedding {
+    fn from( r: Resource ) -> Self {
+        Embedding::new( r )
+    }
+}
+
 impl Into<Resource> for Attachment {
     fn into( self ) -> Resource {
         self.resource
+    }
+}
+
+impl From<Resource> for Attachment {
+    fn from( r: Resource ) -> Self {
+        Attachment::new( r )
     }
 }
 
