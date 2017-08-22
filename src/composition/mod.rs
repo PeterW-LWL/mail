@@ -244,10 +244,10 @@ impl<E: BuilderContext> BuilderExt for Builder<E> {
 
         let mut builder = self
             .multipart( gen_multipart_mime( ascii_str!{ a l t e r n a t e })? )
-            .set_headers( headers )?;
+            .headers( headers )?;
 
         for body in bodies {
-            builder = builder.add_body( |bb| bb.create_mail_body( body, Vec::new() ) )?;
+            builder = builder.body( |bb| bb.create_mail_body( body, Vec::new() ) )?;
         }
 
         builder.build()
@@ -288,7 +288,7 @@ impl<E: BuilderContext> BuilderExt for Builder<E> {
 
     fn create_body_from_resource( &self, resource: Resource, headers: Vec<Header> ) -> Result<Mail> {
         self.singlepart( resource )
-            .set_headers( headers )?
+            .headers( headers )?
             .build()
     }
 
@@ -305,13 +305,13 @@ impl<E: BuilderContext> BuilderExt for Builder<E> {
 
         let mut builder = self
             .multipart( gen_multipart_mime( ascii_str!{ r e l a t e d } )? )
-            .set_headers( headers )?;
+            .headers( headers )?;
 
 
-        builder = builder.add_body( sub_body )?;
+        builder = builder.body( sub_body )?;
         for embedding in embeddings {
             let ( content_id, resource ) = embedding.into();
-            builder = builder.add_body( |b|
+            builder = builder.body( |b|
                 b.create_body_from_resource( resource , vec![
                     Header::ContentID( content_id ),
                     Header::ContentDisposition( Disposition::inline() )
@@ -331,11 +331,11 @@ impl<E: BuilderContext> BuilderExt for Builder<E> {
         where FN: FnOnce( &Self ) -> Result<Mail>
     {
         let mut builder = self.multipart( gen_multipart_mime( ascii_str!{ m i x e d } )? )
-                          .set_headers( headers )?
-                          .add_body( body )?;
+                          .headers( headers )?
+                          .body( body )?;
 
         for attachment in attachments {
-            builder = builder.add_body( |b| b.create_body_from_resource(
+            builder = builder.body( |b| b.create_body_from_resource(
                 attachment.into(),
                 vec![
                     Header::ContentDisposition( Disposition::attachment() )

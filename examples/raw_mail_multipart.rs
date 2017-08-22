@@ -42,9 +42,9 @@ fn _main() -> Result<()> {
 
     let mail = Builder( builder_ctx.clone() ).multipart(
             MultipartMime::new( "multipart/related; boundary=\"=_abc\"".parse().unwrap() )? )
-        .set_header(Header::Subject( Unstructured::from_input( "that ↓ will be encoded ")? ) )?
-        .add_body( |bb| bb.singlepart( get_some_resource() ).build() )?
-        .add_body( |bb| bb.singlepart( get_some_resource() ).build() )?
+        .header(Header::Subject( Unstructured::from_input( "that ↓ will be encoded ")? ) )?
+        .body( |bb| bb.singlepart( get_some_resource() ).build() )?
+        .body( |bb| bb.singlepart( get_some_resource() ).build() )?
         .build()?;
 
 
