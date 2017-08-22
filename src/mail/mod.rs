@@ -10,14 +10,13 @@ use futures::{ Future, Async, Poll };
 use error::*;
 use utils::is_multipart_mime;
 use headers::Header;
-use self::resource::Resource;
 
 pub use self::builder::*;
 pub use self::context::*;
+pub use self::resource::*;
 
-
-pub mod resource;
 pub mod mime;
+mod resource;
 mod builder;
 mod encode;
 mod context;

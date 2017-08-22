@@ -2,7 +2,7 @@ use serde::Serialize;
 
 use error::*;
 use types::Vec1;
-use mail::resource::Resource;
+use mail::Resource;
 
 use super::context::Context;
 use super::serializer::{ Attachments, Embeddings };

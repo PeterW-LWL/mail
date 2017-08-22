@@ -63,6 +63,12 @@ pub struct Guard<'lock> {
 
 impl Resource {
 
+    pub fn from_text(text: String ) -> Self {
+        //UNWRAP_SAFE: this is a valid mime, if not this will be coucht by the tests
+        let mime: Mime = "text/plain;charset=utf8".parse().unwrap();
+        let buf = FileBuffer::new( mime, text.into_bytes() );
+        Resource::from_buffer( buf )
+    }
     #[inline]
     pub fn from_spec( spec: ResourceSpec ) -> Self {
         Self::new_inner( ResourceInner::Spec( spec ) )
@@ -268,6 +274,8 @@ impl<'a> Deref for Guard<'a> {
 //TODO make test require default impl
 #[cfg(test)]
 mod test {
+    use std::fmt::Debug;
+    use futures::Future;
     use futures::future::Either;
 
     use super::*;
@@ -276,6 +284,21 @@ mod test {
     use default_impl::VFSFileLoader;
 
     use utils::timeout;
+
+    fn resolve_resource<C: BuilderContext+Debug>( resource: &mut Resource, ctx: &C ) {
+        let res = resource
+            .as_future( ctx )
+            .select2( timeout( 1, 0 ) )
+            .wait()
+            .unwrap();
+
+        match res {
+            Either::A( .. ) => { },
+            Either::B( .. ) => {
+                panic!( "timeout! resource as future did never resolve to either Item/Error" )
+            }
+        }
+    }
 
     #[test]
     fn load_test() {
@@ -293,20 +316,7 @@ mod test {
 
         assert_eq!( false, resource.get_if_encoded().unwrap().is_some() );
 
-        {
-            let res = resource
-                .as_future( &ctx )
-                .select2( timeout( 1, 0 ) )
-                .wait()
-                .unwrap();
-
-            match res {
-                Either::A( .. ) => { },
-                Either::B( .. ) => {
-                    panic!( "timeout! resource as future did never resolve to either Item/Error" )
-                }
-            }
-        }
+        resolve_resource( &mut resource, &ctx );
 
         let res = resource.get_if_encoded().unwrap().unwrap();
         let enc_buf: &TransferEncodedFileBuffer = &*res;
@@ -314,6 +324,7 @@ mod test {
         
         assert_eq!( b"abc def!", data );
     }
+
 
     #[test]
     fn load_test_utf8() {
@@ -331,20 +342,7 @@ mod test {
 
         assert_eq!( false, resource.get_if_encoded().unwrap().is_some() );
 
-        {
-            let res = resource
-                .as_future( &ctx )
-                .select2( timeout( 1, 0 ) )
-                .wait()
-                .unwrap();
-
-            match res {
-                Either::A( .. ) => { },
-                Either::B( .. ) => {
-                    panic!( "timeout! resource as future did never resolve to either Item/Error" )
-                }
-            }
-        }
+        resolve_resource( &mut resource, &ctx );
 
         let res = resource.get_if_encoded().unwrap().unwrap();
         let enc_buf: &TransferEncodedFileBuffer = &*res;
@@ -363,6 +361,16 @@ mod test {
     #[test]
     fn test_sniff_mime() {
         unimplemented!();
+    }
+
+
+    #[test]
+    fn from_text_works() {
+        let mut resource = Resource::from_text( "orange juice".into() );
+        resolve_resource( &mut resource, &SimpleContext::new( "random".into() ) );
+        let res = resource.get_if_encoded().unwrap().unwrap();
+        let data: &[u8] = &*res;
+        assert_eq!( b"orange juice", data );
     }
 
 

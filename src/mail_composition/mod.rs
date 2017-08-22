@@ -16,8 +16,8 @@ use components::{
     Phrase
 };
 use mail::mime::MultipartMime;
-use mail::resource::Resource;
 use mail::{
+    Resource,
     Mail,
     Builder, BuilderContext
 };

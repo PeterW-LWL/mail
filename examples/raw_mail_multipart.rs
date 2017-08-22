@@ -7,12 +7,14 @@ use futures::{ future, Future };
 use mail_codec::error::*;
 
 use mail_codec::types::buffer::FileBuffer;
-use mail_codec::mail::Builder;
-use mail_codec::mail::resource::Resource;
+use mail_codec::mail::{
+    Builder, Resource
+};
 use mail_codec::default_impl::SimpleBuilderContext;
-use mail_codec::codec::MailEncodable;
-
-use mail_codec::codec::MailEncoderImpl;
+use mail_codec::codec::{
+    MailEncodable,
+    MailEncoderImpl
+};
 
 use mail_codec::data::FromInput;
 use mail_codec::headers::Header;
