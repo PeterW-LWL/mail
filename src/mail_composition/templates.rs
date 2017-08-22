@@ -1,6 +1,8 @@
+use std::result::{ Result as StdResult };
+use std::error::{ Error as StdError };
+
 use serde::Serialize;
 
-use error::*;
 use types::Vec1;
 use mail::Resource;
 
@@ -9,9 +11,10 @@ use super::serializer::{ Attachments, Embeddings };
 
 pub trait TemplateEngine {
     type TemplateId;
+    type Error: StdError + Send + 'static;
 
     fn templates<D: Serialize, C: Context>( &self,  ctx: &C, id: Self::TemplateId, data: D )
-                                -> Result< Vec1<Template> >;
+                                -> StdResult< Vec1<Template>, Self::Error >;
 }
 
 
