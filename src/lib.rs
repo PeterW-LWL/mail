@@ -48,6 +48,25 @@ pub mod composition;
 pub mod default_impl;
 
 
+pub mod composition_prelude {
+    pub use error::*;
+    pub use grammar::MailType;
+    pub use data::FromInput;
+    pub use components::{
+        Mailbox,
+        Email,
+        TransferEncoding
+    };
+    pub use codec::{
+        MailEncodable,
+        MailEncoderImpl
+    };
+    pub use composition::{
+        Compositor,
+        NameComposer,
+        MailSendContext,
+    };
+}
 
 pub mod template_engine_prelude {
     pub type StdError = ::std::error::Error;

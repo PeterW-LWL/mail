@@ -10,30 +10,12 @@ extern crate serde_derive;
 use futures::Future;
 use template_engine::Teng;
 
-use mail_codec::error::*;
-use mail_codec::grammar::MailType;
-use mail_codec::components::{
-    Email,
-    TransferEncoding
-};
-use mail_codec::data::FromInput;
-use mail_codec::codec::{
-    MailEncodable,
-    MailEncoderImpl
-};
-use mail_codec::mail::{
-    Resource,
-};
+use mail_codec::composition_prelude::*;
+use mail_codec::mail::Resource;
 use mail_codec::composition::{
-    Compositor,
-    NameComposer,
-    MailSendContext,
     Embedding, Attachment
 };
-
-use mail_codec::default_impl::{
-    SimpleContext
-};
+use mail_codec::default_impl::SimpleContext;
 
 fn main() {
     _main().unwrap();
