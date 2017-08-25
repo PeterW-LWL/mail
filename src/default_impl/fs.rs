@@ -1,8 +1,9 @@
 use std::path::{ PathBuf, Path };
 use std::fs::File;
 use std::io::Read;
+use std::borrow::Cow;
 
-use futures::future;
+use futures::{ Future, future };
 
 use error::*;
 use mail::FileLoader;
@@ -28,28 +29,37 @@ impl FSFileLoader {
 }
 
 
-impl FileLoader for FSFileLoader {
-    type FileFuture = future::FutureResult<Vec<u8>, Error>;
 
-    // will block, but this is within the expectancy of the interface
-    fn load_file( &self, path: &Path ) -> Self::FileFuture {
-        let pbuf;
-        let path = if path.is_absolute() {
-            path
-        } else {
-            pbuf = self.root.join( path );
-            &*pbuf
-        };
-        future::result( read_file( path ) )
-    }
-}
-
-fn read_file( path: &Path ) -> Result<Vec<u8>> {
+fn load_file_fn( path: Cow<'static, Path> ) -> Result<Vec<u8>> {
     let mut buf = Vec::new();
     let mut file  = File::open( path )?;
     file.read_to_end( &mut buf )?;
     Ok( buf )
 }
+
+
+impl FileLoader for FSFileLoader {
+    /// Future<Item=Vec<u8>, Error=Error>
+    type FileFuture = future::AndThen<
+        future::FutureResult<Cow<'static, Path>, Error>,
+        Result<Vec<u8>>,
+        fn(Cow<'static, Path>) -> Result<Vec<u8>> >;
+
+    // will block, but this is within the expectancy of the interface
+    fn load_file( &self, path: Cow<'static, Path> ) -> Self::FileFuture {
+        let path = if path.is_absolute() {
+            path
+        } else {
+            Cow::Owned( self.root.join( path ) )
+        };
+
+        //we use ok+and_then as we can write out the type in this case
+        //different to lazy, where we have a unnamable closure
+        future::ok( path )
+            .and_then( load_file_fn )
+    }
+}
+
 
 
 #[cfg(test)]
@@ -61,13 +71,14 @@ mod test {
     #[test]
     fn load_file_from_fs() {
         let fl =  FSFileLoader::new( current_dir().unwrap() );
-        let _ = assert_ok!( fl.load_file( Path::new( "./Cargo.toml" ) ).wait() );
+        let _ = assert_ok!( fl.load_file( Cow::Borrowed( &Path::new( "./Cargo.toml" ) ) ).wait() );
     }
 
     #[test]
     fn bad_load_file_from_fs() {
         let fl =  FSFileLoader::new( current_dir().unwrap() );
-        let res = fl.load_file( Path::new( "./src/this_is_definitly_not_a_file.notafile" ) )
+        let res = fl.load_file( Cow::Borrowed(
+            &Path::new( "./src/this_is_definitly_not_a_file.notafile" ) ) )
             .wait();
 
         assert_eq!( false, res.is_ok() );

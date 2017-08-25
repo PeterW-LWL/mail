@@ -1,6 +1,7 @@
 use std::path::{ PathBuf, Path };
 use std::collections::HashMap;
 use std::io;
+use std::borrow::Cow;
 
 use futures::future;
 
@@ -37,14 +38,14 @@ impl VFSFileLoader {
 impl FileLoader for VFSFileLoader {
     type FileFuture = future::FutureResult<Vec<u8>, Error>;
 
-    fn load_file( &self, path: &Path ) -> Self::FileFuture {
-        let pbuf;
+    /// as we dont have to do "any blocking work" for loading from VFS,
+    /// we can directly return a FutureResult
+    fn load_file( &self, path: Cow<'static, Path> ) -> Self::FileFuture {
         let path = if path.is_relative() {
-            pbuf = Path::new( "/" ).join( path );
-            &*pbuf
+            Cow::Owned( Path::new( "/" ).join( path ) )
         } else { path };
 
-        let result = if let Some( file ) = self.files.get( path ) {
+        let result = if let Some( file ) = self.files.get( path.as_ref() ) {
             Ok( file.clone() )
         } else {
             let msg = path.to_string_lossy().into_owned();
@@ -67,7 +68,7 @@ mod test {
     fn ok_if_registered() {
         let mut fl = VFSFileLoader::new();
         fl.register_file( "/my/resource.png", b"abcde".to_vec() ).unwrap();
-        let res = fl.load_file( &*PathBuf::from( "/my/resource.png" ) ).wait();
+        let res = fl.load_file( Cow::Owned( PathBuf::from( "/my/resource.png" ) ) ).wait();
         let buf = assert_ok!( res );
         assert_eq!(
             b"abcde".to_vec(),
@@ -79,7 +80,7 @@ mod test {
     fn err_if_not_registered() {
         let mut fl = VFSFileLoader::new();
         fl.register_file( "/my/resource.png", b"abcde".to_vec() ).unwrap();
-        let res = fl.load_file( &*PathBuf::from( "/not/my/resource.png" ) ).wait();
+        let res = fl.load_file( Cow::Owned( PathBuf::from( "/not/my/resource.png" ) ) ).wait();
         assert_eq!( false, res.is_ok() );
     }
 
@@ -87,7 +88,7 @@ mod test {
     fn handles_relative_paths_in_registry() {
         let mut fl = VFSFileLoader::new();
         fl.register_file( "./my/resource.png", b"abcde".to_vec() ).unwrap();
-        let res = fl.load_file( &*PathBuf::from( "/my/resource.png" ) ).wait();
+        let res = fl.load_file( Cow::Owned( PathBuf::from( "/my/resource.png" ) ) ).wait();
         let buf = assert_ok!( res );
         assert_eq!(
             b"abcde".to_vec(),
@@ -99,7 +100,7 @@ mod test {
     fn handles_relative_paths_in_usage() {
         let mut fl = VFSFileLoader::new();
         fl.register_file( "/my/resource.png", b"abcde".to_vec() ).unwrap();
-        let res = fl.load_file( &*PathBuf::from( "./my/resource.png" ) ).wait();
+        let res = fl.load_file( Cow::Borrowed( &Path::new( "./my/resource.png" ) ) ).wait();
         let buf = assert_ok!( res );
         assert_eq!(
             b"abcde".to_vec(),

@@ -1,6 +1,7 @@
 use std::sync::Arc;
 use std::fmt;
 use std::path::Path;
+use std::borrow::Cow;
 
 use futures::{ Future, BoxFuture };
 use futures_cpupool::{ CpuPool, Builder };
@@ -72,7 +73,7 @@ impl fmt::Debug for SimpleContextInner {
 
 impl FileLoader for SimpleContext {
     type FileFuture = <VFSFileLoader as FileLoader>::FileFuture;
-    fn load_file( &self, path: &Path ) -> Self::FileFuture {
+    fn load_file( &self, path: Cow<'static, Path> ) -> Self::FileFuture {
         self.0.builder_context.load_file( path )
     }
 }

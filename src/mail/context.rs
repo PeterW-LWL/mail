@@ -1,6 +1,7 @@
 use std::sync::Arc;
 use std::path::Path;
 use std::ops::Deref;
+use std::borrow::Cow;
 
 
 use futures::{ Future, IntoFuture };
@@ -11,17 +12,20 @@ use error::*;
 
 pub trait FileLoader {
     type FileFuture: Future<Item=Vec<u8>, Error=Error> + Send + 'static;
-    /// load file specified by path, wile it returns
-    /// a future it is not required to load the file
-    /// in the background, but it is required to load
-    /// it in context of polling this futures, e.g.
-    /// by using `futures::lazy`
-    fn load_file( &self, path: &Path ) -> Self::FileFuture;
+
+    /// returns a future which loads a file specified by path,
+    /// when polled. Which means this function is not excepted
+    /// to block.
+    ///
+    /// As the path needs to be moved into the Future which is
+    /// `'static` we pass in a `Cow<'static, Path>` instead of
+    /// a `&Path`.
+    fn load_file( &self, path: Cow<'static, Path> ) -> Self::FileFuture;
 }
 
 impl<F: FileLoader> FileLoader for Arc<F> {
     type FileFuture = F::FileFuture;
-    fn load_file( &self, path: &Path ) -> Self::FileFuture {
+    fn load_file( &self, path: Cow<'static, Path> ) -> Self::FileFuture {
         self.deref().load_file( path )
     }
 }
@@ -79,7 +83,7 @@ impl<FL: FileLoader, EW>  FileLoader for CompositeBuilderContext<FL, EW> {
     /// in the background, as such you should not relay
     /// on it beeing non-blocking, it might just load
     /// the file in place and return futures::ok
-    fn load_file( &self, path: &Path ) -> Self::FileFuture {
+    fn load_file( &self, path: Cow<'static, Path> ) -> Self::FileFuture {
         self.file_loader.load_file( path )
     }
 }

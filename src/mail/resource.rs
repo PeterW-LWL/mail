@@ -3,6 +3,7 @@ use std::fmt;
 use std::sync::{ Arc, RwLock, RwLockWriteGuard, RwLockReadGuard };
 use std::ops::Deref;
 use std::mem;
+use std::borrow::Cow;
 
 use mime::Mime;
 
@@ -176,12 +177,14 @@ impl Resource {
         loop {
             continue_with = match continue_with {
                 Spec(spec) => {
+                    let ResourceSpec { path, use_mime, use_name } = spec;
                     LoadingBuffer(
-                        ctx.execute( ctx.load_file( &*spec.path ).map( move |data| {
+                        ctx.execute( ctx.load_file( Cow::Owned( path ) ).map( move |data| {
                             //FIXME actually use use_name!
+                            let _ = use_name;
                             //if let spec.name => buf.file_meta_mut().file_name = Some( name )
                             //FIXME actually sniff mime is use_mime is none
-                            FileBuffer::new( spec.use_mime.unwrap(), data )
+                            FileBuffer::new( use_mime.unwrap(), data )
                         } ) )
                     )
                 },

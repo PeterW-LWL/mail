@@ -1,6 +1,7 @@
 use std::sync::Arc;
 use std::ops::Deref;
 use std::path::Path;
+use std::borrow::Cow;
 
 use futures::{ Future, BoxFuture };
 
@@ -39,7 +40,7 @@ pub struct ComposedContext<CIG, BC> {
 
 impl<CIG, BC: BuilderContext> FileLoader for ComposedContext<CIG, BC> {
     type FileFuture = <BC as FileLoader>::FileFuture;
-    fn load_file( &self, path: &Path ) -> Self::FileFuture {
+    fn load_file( &self, path: Cow<'static, Path> ) -> Self::FileFuture {
         self.builder_context.load_file( path )
     }
 }
