@@ -21,7 +21,7 @@ fn main() {
 
 fn _main() -> Result<()> {
     let context = SimpleContext::new( "content_id_postfix.is.this".into() );
-    let composer = create_composer( &context );
+    let composer = Compositor::new( Teng::new(), context.clone(), NComp );
 
     let data = Users {
         users: vec![
@@ -104,16 +104,6 @@ impl NameComposer<Users> for NComp {
         }
     }
 }
-
-type Composer = Compositor<Teng, SimpleContext, NComp, Users>;
-
-fn create_composer( ctx: &SimpleContext ) -> Composer {
-    //FIXME the Compositior is bound to the data type BUT ...
-    // 1. is that needed
-    // 2. how to make type inference work nicely with a new which DOES NOT LINK TO DATA
-    Compositor::new( Teng::new(), ctx.clone(), NComp )
-}
-
 
 
 mod template_engine {
