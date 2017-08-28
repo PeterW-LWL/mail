@@ -68,12 +68,11 @@ impl FromInput for Phrase {
 }
 
 
-impl MailEncodable for Phrase  {
+impl<E> MailEncodable<E> for Phrase where E: MailEncoder {
 
     //FEATURE_TODO(warn_on_bad_phrase): warn if the phrase contains chars it should not
     //  but can contain due to encoding, e.g. ascii CTL's
-    fn encode<E>( &self, encoder:  &mut E ) -> Result<()> where E: MailEncoder {
-
+    fn encode(&self, encoder: &mut E) -> Result<()> {
         for word in self.0.iter() {
             do_encode_word( &*word, encoder, Some( EncodedWordContext::Phrase ) )?;
         }

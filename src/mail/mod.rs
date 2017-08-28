@@ -178,10 +178,9 @@ impl Into<Mail> for EncodableMail {
     }
 }
 
-impl MailEncodable for EncodableMail {
-    fn encode<E>( &self, encoder:  &mut E ) -> Result<()>
-        where E: MailEncoder
-    {
+impl<E> MailEncodable<E> for EncodableMail where E: MailEncoder {
+
+    fn encode(&self, encoder: &mut E) -> Result<()> {
         // does not panic as a EncodableMail only is constructed from
         // a Mail which has all of it's bodies resolved, without failure
         encode::encode_mail( &self, true, encoder )

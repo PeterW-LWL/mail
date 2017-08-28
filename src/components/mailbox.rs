@@ -24,11 +24,9 @@ impl From<Email> for Mailbox {
 }
 
 
-impl MailEncodable for Mailbox {
+impl<E> MailEncodable<E> for Mailbox where E: MailEncoder {
 
-    fn encode<E>(&self, encoder: &mut E) -> Result<()>
-        where E: MailEncoder
-    {
+    fn encode(&self, encoder: &mut E) -> Result<()> {
         if let Some( display_name ) = self.display_name.as_ref() {
             display_name.encode( encoder )?;
             encoder.write_fws();

@@ -63,7 +63,7 @@ include!( concat!( env!( "OUT_DIR", ), "/mail_encodable_impl.rs.partial" ) );
 fn encode_header_helper<T, E>(
     name: &AsciiStr, encodable: &T, encoder: &mut E
 ) -> Result<()>
-    where T: MailEncodable, E: MailEncoder
+    where T: MailEncodable<E>, E: MailEncoder
 {
     encoder.write_str( name );
     encoder.write_char( AsciiChar::Colon );

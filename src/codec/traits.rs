@@ -1,3 +1,5 @@
+use std::any::Any;
+
 use ascii::{  AsciiStr, AsciiChar };
 
 use error::*;
@@ -65,8 +67,6 @@ pub trait MailEncoder {
     fn write_body( &mut self, body: &[u8]);
 }
 
-
-pub trait MailEncodable {
-    fn encode<E>( &self, encoder:  &mut E ) -> Result<()>
-        where E: MailEncoder;
+pub trait MailEncodable<E: MailEncoder>: Any  {
+    fn encode( &self, encoder:  &mut E ) -> Result<()>;
 }

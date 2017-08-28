@@ -33,11 +33,9 @@ pub enum CFWS {
 }
 
 
-impl MailEncodable for CFWS {
+impl<E> MailEncodable<E> for CFWS where E: MailEncoder {
 
-    fn encode<E>( &self, encoder:  &mut E ) -> Result<()>
-        where E: MailEncoder
-    {
+    fn encode(&self, encoder: &mut E) -> Result<()> {
         match *self {
             CFWS::SingleFws(ref _fws ) => {
                 encoder.write_fws();

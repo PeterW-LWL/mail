@@ -10,11 +10,9 @@ use codec::{ MailEncoder, MailEncodable };
 pub use mime::Mime;
 
 
-impl MailEncodable for mime::Mime {
+impl<E> MailEncodable<E> for mime::Mime where E: MailEncoder {
 
-    fn encode<E>( &self, encoder:  &mut E ) -> Result<()>
-        where E: MailEncoder
-    {
+    fn encode(&self, encoder: &mut E) -> Result<()> {
         let res = self.to_string();
         //TODO can mime be non ascii??, e.g. utf8 file names?
         encoder.write_str( AsciiStr::from_ascii( &*res ).unwrap() );

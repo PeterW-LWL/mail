@@ -32,9 +32,9 @@ impl TransferEncoding {
     }
 }
 
-impl MailEncodable for TransferEncoding {
-    fn encode<E>( &self, encoder:  &mut E ) -> Result<()>
-            where E: MailEncoder {
+impl<E> MailEncodable<E> for TransferEncoding where E: MailEncoder {
+
+    fn encode(&self, encoder: &mut E) -> Result<()> {
         encoder.write_str( self.name() );
         Ok( () )
     }

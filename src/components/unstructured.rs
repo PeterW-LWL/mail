@@ -22,8 +22,9 @@ impl FromInput for Unstructured {
 }
 
 
-impl MailEncodable for Unstructured {
-    fn encode<E>( &self, encoder:  &mut E ) -> Result<()> where E: MailEncoder {
+impl<E> MailEncodable<E> for Unstructured where E: MailEncoder {
+
+    fn encode(&self, encoder: &mut E) -> Result<()> {
         let text: &str = &*self.text;
         if text.len() == 0 {
             return Ok( () )

@@ -29,10 +29,9 @@ impl HeaderName {
 }
 
 
-impl MailEncodable for HeaderName {
-    fn encode<E>( &self, encoder:  &mut E ) -> Result<()>
-        where E: MailEncoder
-    {
+impl<E> MailEncodable<E> for HeaderName where E: MailEncoder {
+
+    fn encode(&self, encoder: &mut E) -> Result<()> {
         encoder.write_str( &*self.0 );
         Ok( () )
     }

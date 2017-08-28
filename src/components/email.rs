@@ -57,11 +57,9 @@ impl FromInput for Email {
     }
 }
 
-impl MailEncodable for Email {
+impl<E> MailEncodable<E> for Email where E: MailEncoder {
 
-    fn encode<E>( &self, encoder: &mut E ) -> Result<()>
-        where E: MailEncoder
-    {
+    fn encode( &self, encoder: &mut E ) -> Result<()> {
         self.local_part.encode( encoder )?;
         encoder.write_char( AsciiChar::At );
         self.domain.encode( encoder )?;
@@ -78,10 +76,9 @@ impl FromInput for LocalPart {
 
 }
 
-impl MailEncodable for LocalPart {
-    fn encode<E>( &self, encoder: &mut E ) -> Result<()>
-        where E: MailEncoder
-    {
+impl<E> MailEncodable<E> for LocalPart where E: MailEncoder {
+
+    fn encode(&self, encoder: &mut E) -> Result<()> {
         encoder.note_optional_fws();
 
         let input: &str = &*self.0;
@@ -184,10 +181,9 @@ impl Domain {
     }
 }
 
-impl MailEncodable for Domain {
-    fn encode<E>( &self, encoder: &mut E ) -> Result<()>
-        where E: MailEncoder
-    {
+impl<E> MailEncodable<E> for Domain where E: MailEncoder {
+
+    fn encode(&self, encoder: &mut E) -> Result<()> {
         encoder.note_optional_fws();
         match self.0 {
             SimpleItem::Ascii( ref ascii ) => {

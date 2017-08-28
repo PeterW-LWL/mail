@@ -11,10 +11,9 @@ use super::Phrase;
 pub struct PhraseList(pub Vec1<Phrase>);
 
 
-impl MailEncodable for PhraseList {
-    fn encode<E>( &self, encoder:  &mut E ) -> Result<()>
-        where E: MailEncoder
-    {
+impl<E> MailEncodable<E> for PhraseList where E: MailEncoder {
+
+    fn encode(&self, encoder: &mut E) -> Result<()> {
         sep_for!{ word in self.0.iter();
             sep {
                 //Note that we do not want to write FWS, as the following word might contains

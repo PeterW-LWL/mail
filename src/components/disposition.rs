@@ -94,10 +94,9 @@ macro_rules! encode_disposition_param {
 //TODO provide a gnneral way for encoding header parameter ...
 //  which follow the scheme: <mainvalue> *(";" <key>"="<value> )
 //  this are: ContentType and ContentDisposition for now
-impl MailEncodable for DispositionParameters {
-    fn encode<E>( &self, encoder:  &mut E ) -> Result<()>
-        where E: MailEncoder
-    {
+impl<E> MailEncodable<E> for DispositionParameters where E: MailEncoder {
+
+    fn encode(&self, encoder: &mut E) -> Result<()> {
         encode_disposition_param! {
             encoder,
             STR ( f i l e n a m e )  self.file_name;
@@ -110,10 +109,9 @@ impl MailEncodable for DispositionParameters {
     }
 }
 
-impl MailEncodable for Disposition {
-    fn encode<E>(&self, encoder: &mut E) -> Result<()>
-        where E: MailEncoder
-    {
+impl<E> MailEncodable<E> for Disposition where E: MailEncoder {
+
+    fn encode(&self, encoder: &mut E) -> Result<()> {
         use self::DispositionKind::*;
         match self.kind {
             Inline => {

@@ -18,16 +18,16 @@ impl MailboxList {
 }
 
 
-impl MailEncodable for OptMailboxList {
-    fn encode<E>( &self, encoder:  &mut E ) -> Result<()> where E: MailEncoder {
+impl<E> MailEncodable<E> for OptMailboxList where E: MailEncoder {
+
+    fn encode(&self, encoder: &mut E) -> Result<()> {
        encode_list( self.0.iter(), encoder )
     }
 }
 
-impl MailEncodable for MailboxList {
-    fn encode<E>( &self, encoder:  &mut E ) -> Result<()>
-        where E: MailEncoder
-    {
+impl<E> MailEncodable<E> for MailboxList where E: MailEncoder {
+
+    fn encode(&self, encoder: &mut E) -> Result<()> {
         encode_list( self.0.iter(), encoder )
     }
 }

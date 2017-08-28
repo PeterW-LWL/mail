@@ -38,8 +38,9 @@ impl FromInput for MessageID {
     }
 }
 
-impl MailEncodable for MessageID {
-    fn encode<E>( &self, encoder:  &mut E ) -> Result<()> where E: MailEncoder {
+impl<E> MailEncodable<E> for MessageID where E: MailEncoder {
+
+    fn encode(&self, encoder: &mut E) -> Result<()> {
         encoder.note_optional_fws();
         encoder.write_char( AsciiChar::LessThan );
         match self.message_id {
@@ -56,8 +57,9 @@ pub struct MessageIDList( pub Vec1<MessageID> );
 
 deref0!{ +mut MessageIDList => Vec1<MessageID> }
 
-impl MailEncodable for MessageIDList {
-    fn encode<E>( &self, encoder:  &mut E ) -> Result<()> where E: MailEncoder {
+impl<E> MailEncodable<E> for MessageIDList where E: MailEncoder {
+
+    fn encode(&self, encoder: &mut E) -> Result<()> {
         for msg_id in self.iter() {
             msg_id.encode( encoder )?;
         }

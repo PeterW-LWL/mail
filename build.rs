@@ -19,10 +19,10 @@ fn generate_html_header<P: AsRef<Path>>( spec: P ) -> Result<(), Error> {
 
     writeln!( &mut enum_output, "pub enum Header {{" )?;
     writeln!( &mut mail_encodable_impl, concat!(
-        "impl MailEncodable for Header {{\n",
-        "   fn encode<E>( &self, encoder:  &mut E ) -> Result<()> where E: MailEncoder {{\n",
-        "       use self::Header::*;\n",
-        "       match *self {{\n"
+        "impl<E> MailEncodable<E> for Header where E: MailEncoder {{\n",
+        "    fn encode( &self, encoder:  &mut E ) -> Result<()> {{\n",
+        "        use self::Header::*;\n",
+        "        match *self {{\n"
     ))?;
 
     writeln!( &mut decode_match_output, "{{ fn fn_impl(header_name: &str, data: &str) -> Result<Header> {{ match header_name {{" )?;
