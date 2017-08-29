@@ -129,20 +129,20 @@ fn encode_header_helper<T, E>(
 //   but then we can not have stringly types Headers... duh
 
 
-mod new_header {
-    use std::borrow::Cow;
+pub mod new_header {
     use std::any::{ Any, TypeId };
     use std::collections::{ HashMap as Map };
-    use std::collections::hash_map::Entry::*;
     use std::marker::PhantomData;
     use std::slice::{ Iter as SliceIter };
     use std::iter::Iterator;
+    
 
     use error::*;
     use grammar::is_ftext;
     use codec::{ MailEncoder, MailEncodable };
-    use ascii::{ AsciiStr, AsciiString };
+    use ascii::AsciiStr;
     pub use ascii::{ AsciiStr as _AsciiStr };
+
 
     //    def_headers! {
     //        test_name: validate_header_names,
@@ -183,7 +183,7 @@ mod new_header {
             const HEADER_NAMES: &[ &str ] = &[ $(
                 $hname
             ),+ ];
-
+            
             #[test]
             fn $tn() {
                 use $crate::codec::{ MailEncoder, MailEncodable, MailEncoderImpl };
@@ -194,32 +194,9 @@ mod new_header {
                     can_be_trait_object::<MailEncoderImpl, $scope::$component>( None );
                 )+
                 for name in HEADER_NAMES {
-                    let mut word_start = true;
-                    for char in name.chars() {
-                        match char {
-                            'a'...'z' => {
-                                if word_start {
-                                    panic!("invalide header name {}", name);
-                                }
-                            }
-                            'A'...'z' => {
-                                if !word_start {
-                                    panic!("invalide header name {}", name);
-                                }
-                                word_start = false;
-                            }
-                            '0'...'9' => {
-                                if word_start {
-                                    panic!("invalide header name {}", name);
-                                }
-                            }
-                            '-' => {
-                                if word_start {
-                                    panic!("invalide header name {}", name);
-                                }
-                                word_start = true
-                            }
-                        }
+                    let res = HeaderName::validate_name( AsciiStr::from_ascii(name).unwrap() );
+                    if res.is_err() {
+                        panic!( "invalid header name: {:?} ({:?})", name, res.unwrap_err() );
                     }
                 }
             }
@@ -249,23 +226,23 @@ mod new_header {
         1 To,                      unsafe { "To"            },  MailboxList,
         1 Cc,                      unsafe { "Cc"            },  MailboxList,
         1 Bcc,                     unsafe { "Bcc"           },  MailboxList,
-        1 MessageID,               unsafe { "Message-ID"    },  MessageID,
+        1 MessageID,               unsafe { "Message-Id"    },  MessageID,
         1 InReplyTo,               unsafe { "In-Reply-To"   },  MessageIDList,
         1 References,              unsafe { "References"    },  MessageIDList,
         1 Subject,                 unsafe { "Subject"       },  Unstructured,
-        1 Comments,                unsafe { "Comments"      },  Unstructured,
-        1 Keywords,                unsafe { "Keywords"      },  PhraseList,
+        + Comments,                unsafe { "Comments"      },  Unstructured,
+        + Keywords,                unsafe { "Keywords"      },  PhraseList,
         + ResentDate,              unsafe { "Resent-Date"   },  DateTime,
         + ResentFrom,              unsafe { "Resent-From"   },  MailboxList,
         + ResentSender,            unsafe { "Resent-Sender" },  Mailbox,
         + ResentTo,                unsafe { "Resent-Sender" },  MailboxList,
         + ResentCc,                unsafe { "Resent-Cc"     },  MailboxList,
         + ResentBcc,               unsafe { "Resent-Bcc"    },  OptMailboxList,
-        + ResentMsgID,             unsafe { "Resent-Msg-ID" },  MessageID,
+        + ResentMsgID,             unsafe { "Resent-Msg-Id" },  MessageID,
         + ReturnPath,              unsafe { "Return-Path"   },  Path,
         + Received,                unsafe { "Received"      },  ReceivedToken,
         //RFC 2045:
-        1 ContentID,               unsafe { "Content-ID"                }, ContentID,
+        1 ContentID,               unsafe { "Content-Id"                }, ContentID,
         1 ContentTransferEncoding, unsafe { "Content-Transfer-Encoding" }, TransferEncoding,
         1 ContentDescription,      unsafe { "Content-Description"       }, Unstructured,
         //RFC 2183:
@@ -290,12 +267,25 @@ mod new_header {
         }
     }
 
+    ///
+    /// Note: Normally you will never have the need to create a HeaderName instance by
+    /// yourselve (except maybe for testing). At last as long as you use `def_header!`
+    /// for defining custom Headers, which is highly recommendet
+    ///
     #[derive(Debug, Clone, Eq, PartialEq, Hash)]
     pub struct HeaderName {
         name: &'static AsciiStr
     }
 
     impl HeaderName {
+        ///
+        /// Be aware, that this libary only accepts header names with a letter case,
+        /// that any first character of an alphanumeric part of a header name has to
+        /// be uppercase and all other lowercase. E.g. `Message-Id` is accepted but
+        /// `Message-ID` is rejected, even through both are _semantically_ the same.
+        /// This frees us from doing eith case insensitive comparsion/hash wrt. hash map
+        /// lookups, or converting all names to upper/lower case.
+        /// 
         pub fn new( name: &'static AsciiStr ) -> Result<Self> {
             HeaderName::validate_name( name )?;
             Ok( HeaderName { name } )
@@ -310,12 +300,43 @@ mod new_header {
     impl HeaderName {
 
         /// validates if the header name is valid
+        ///
+        /// by only allowing names in "snake case" no case 
+        /// insensitive comparsion or case conversion is needed
+        /// for header names
         fn validate_name( name: &AsciiStr ) -> Result<()> {
-            if name.as_str().chars().all( is_ftext ) {
-                Ok(())
-            } else {
-                bail!( "invalide header name" )
+            let mut begin_of_word = true;
+            for ch in name.as_str().chars() {
+                if !is_ftext( ch ) {
+                    bail!( "invalide header name" )
+                }
+                match ch {
+                    'a'...'z' => {
+                        if begin_of_word {
+                            bail!( "the case of header names is restricted to the shema used in RFC 5322: {}", name );
+                        }                       
+                    },
+                    'A'...'Z' => {
+                        if begin_of_word {
+                            begin_of_word = false;
+                        } else {
+                            bail!( "the case of header names is restricted to the shema used in RFC 5322: {}", name );
+                        }
+                    },
+                    '0'...'9' => {
+                        begin_of_word = false;
+                    },
+                    ch => {
+                        if ch < '!' || ch > '~' || ch == ':' {
+                            bail!( "invalide character for header field name in {:?}", name )
+                        }
+                        begin_of_word = true;
+                    }
+
+                }
+
             }
+            Ok( () )
         }
     }
 
@@ -338,7 +359,7 @@ mod new_header {
     }
 
     ///FIXME this does not really need to be static
-    impl<E: MailEncoder + 'static> HeaderMap<E> {
+    impl<E: MailEncoder> HeaderMap<E> {
 
         pub fn new() -> Self {
             HeaderMap { headers: Map::new() }
@@ -438,7 +459,6 @@ mod new_header {
         type Item = Result<&'a H::Component>;
 
         fn next(&mut self) -> Option<Self::Item> {
-            use std::any::Any;
             let tobj_item = self.state.first
                 .take()
                 .or_else( || {
@@ -470,6 +490,55 @@ mod new_header {
 //        .header(Subject, "this is awesom" )
 //        .header(From, "my@place" )
 
+    #[cfg(test)]
+    mod test {
+        use super::*;
+
+
+        #[test]
+        fn valide_header_names() {
+            let valid_cases = &[
+                "Date",
+                "Some-Header",
+                "33",
+                "Some34",
+                // even trough they seem wrong the email standard only states
+                // header field names have to be at last one char and can
+                // only consist of printable US-ACII chars without :
+                // meaning e.g. "<3" is as valide as "3*4=12"
+                "-33-",
+                "---",
+                "<3+Who-Cares&44",
+                "(3*4=12)^[{~}]"
+            ];
+            for case in valid_cases.iter() {
+                assert_ok!( HeaderName::validate_name( AsciiStr::from_ascii( case ).unwrap() ) );
+            }
+        }
+
+        #[test]
+        fn invalide_header_names() {
+            // we only alow "snake case" like names to not have to do
+            // case insensitive comparsion in hashmap lookups
+            let invalid_cases = &[
+                "ID",
+                "DaD",
+                "ans",
+                "all-lower-calse",
+                "ALL-UPPER-CASE",
+                "",
+                "a:b",
+                ":",
+                "-:-",
+                "Message Id",
+                "Message\tId",
+                "Null\0Msg"
+            ];
+            for case in invalid_cases.iter() {
+                assert_err!( HeaderName::validate_name( AsciiStr::from_ascii( case ).unwrap() ), case );
+            }
+        }
+    }
 
 
 }
