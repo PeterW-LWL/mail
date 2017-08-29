@@ -17,7 +17,7 @@ impl MailType {
     }
 }
 
-/// ftext as defined by RFC 5234
+/// ftext as defined by RFC 5322
 ///
 /// which is: printable US-ASCII characters not includign `:`
 ///  => 0x21-0x39 / 0x3B-0x7E
