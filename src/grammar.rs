@@ -16,6 +16,18 @@ impl MailType {
         }
     }
 }
+
+/// ftext as defined by RFC 5234
+///
+/// which is: printable US-ASCII characters not includign `:`
+///  => 0x21-0x39 / 0x3B-0x7E
+///  => '!'...'9' / ';'...'~'
+///  => <0x7F && != 0x3A
+#[inline(always)]
+pub fn is_ftext( ch: char ) -> bool {
+    (ch as u32) < 127 && ch != ':'
+}
+
 ///WS as defined by RFC 5234
 #[inline(always)]
 pub fn is_ws( ch: char ) -> bool {
