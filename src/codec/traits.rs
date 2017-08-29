@@ -1,4 +1,4 @@
-use std::any::Any;
+use std::any::{ Any, TypeId };
 
 use ascii::{  AsciiStr, AsciiChar };
 
@@ -67,6 +67,11 @@ pub trait MailEncoder {
     fn write_body( &mut self, body: &[u8]);
 }
 
-pub trait MailEncodable<E: MailEncoder>: Any  {
+pub trait MailEncodable<E: MailEncoder>: Any {
     fn encode( &self, encoder:  &mut E ) -> Result<()>;
+
+    #[doc(hidden)]
+    fn type_id( &self ) -> TypeId {
+        TypeId::of::<Self>()
+    }
 }
