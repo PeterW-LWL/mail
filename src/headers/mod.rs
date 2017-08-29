@@ -224,7 +224,7 @@ mod new_header {
                 }
             }
         );
-        (_PRIV_boolify *) => ({ true });
+        (_PRIV_boolify +) => ({ true });
         (_PRIV_boolify 1) => ({ false });
     }
 
@@ -255,15 +255,15 @@ mod new_header {
         1 Subject,                 unsafe { "Subject"       },  Unstructured,
         1 Comments,                unsafe { "Comments"      },  Unstructured,
         1 Keywords,                unsafe { "Keywords"      },  PhraseList,
-        * ResentDate,              unsafe { "Resent-Date"   },  DateTime,
-        * ResentFrom,              unsafe { "Resent-From"   },  MailboxList,
-        * ResentSender,            unsafe { "Resent-Sender" },  Mailbox,
-        * ResentTo,                unsafe { "Resent-Sender" },  MailboxList,
-        * ResentCc,                unsafe { "Resent-Cc"     },  MailboxList,
-        * ResentBcc,               unsafe { "Resent-Bcc"    },  OptMailboxList,
-        * ResentMsgID,             unsafe { "Resent-Msg-ID" },  MessageID,
-        * ReturnPath,              unsafe { "Return-Path"   },  Path,
-        * Received,                unsafe { "Received"      },  ReceivedToken,
+        + ResentDate,              unsafe { "Resent-Date"   },  DateTime,
+        + ResentFrom,              unsafe { "Resent-From"   },  MailboxList,
+        + ResentSender,            unsafe { "Resent-Sender" },  Mailbox,
+        + ResentTo,                unsafe { "Resent-Sender" },  MailboxList,
+        + ResentCc,                unsafe { "Resent-Cc"     },  MailboxList,
+        + ResentBcc,               unsafe { "Resent-Bcc"    },  OptMailboxList,
+        + ResentMsgID,             unsafe { "Resent-Msg-ID" },  MessageID,
+        + ReturnPath,              unsafe { "Return-Path"   },  Path,
+        + Received,                unsafe { "Received"      },  ReceivedToken,
         //RFC 2045:
         1 ContentID,               unsafe { "Content-ID"                }, ContentID,
         1 ContentTransferEncoding, unsafe { "Content-Transfer-Encoding" }, TransferEncoding,
