@@ -1,4 +1,4 @@
-use std::any::{ TypeId, Any };
+use std::any::TypeId;
 use std::mem;
 
 #[cfg(test)]
@@ -8,8 +8,8 @@ use std::time::Duration;
 #[cfg(test)]
 use std::thread;
 
-use mime::{ self, Mime, MULTIPART };
-use error::{Error, ErrorKind};
+use mime::{ Mime, MULTIPART };
+use error::Error;
 
 mod buffer;
 pub use self::buffer::FileBuffer;

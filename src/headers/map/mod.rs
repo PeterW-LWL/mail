@@ -2,24 +2,14 @@ use std::any::{ Any, TypeId };
 use std::collections::{ HashMap as Map };
 use std::marker::PhantomData;
 use std::slice::{ Iter as SliceIter };
-use std::collections::hash_map::{
-    Iter as MapIter,
-    IterMut as MapIterMut,
-    IntoIter as MapIntoIter,
-    Entry
-};
-use std::iter::{ Iterator, Extend };
+use std::iter::Iterator;
 
-use ascii::AsciiStr;
 pub use ascii::{ AsciiStr as _AsciiStr };
 
 use utils::HeaderTryInto;
 use error::*;
-use grammar::is_ftext;
 use codec::{ MailEncoder, MailEncodable };
-use components::{ Mime };
 
-use super::default_header::{ ContentType, ContentTransferEncoding };
 use super::{ HeaderName, Header, SingularHeaderMarker };
 
 mod into_iter;
@@ -247,7 +237,7 @@ macro_rules! headers {
 mod test {
     use codec::MailEncoderImpl;
     use components::{
-        Mime, Unstructured, Mailbox,
+        Mime, Unstructured,
         MailboxList
     };
     use headers::{
@@ -255,7 +245,7 @@ mod test {
     };
     use super::*;
 
-    fn typed(v: &HeaderMap<MailEncoderImpl>) {}
+    fn typed(_v: &HeaderMap<MailEncoderImpl>) {}
 
     #[test]
     fn headers_macro() {

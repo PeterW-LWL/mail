@@ -3,7 +3,6 @@ use ascii::AsciiChar;
 use error::*;
 use grammar::is_vchar;
 use grammar::encoded_word::EncodedWordContext;
-use utils::HeaderTryFrom;
 use codec::{ MailEncoder, MailEncodable };
 use data::{ FromInput, Encoding, EncodedWord };
 

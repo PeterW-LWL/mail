@@ -1,15 +1,11 @@
-//FIXME use FnvHashMap
-use std::collections::HashMap;
-use std::collections::hash_map::{ Iter as MapIter };
-use std::borrow::Cow;
 use std::ops::Deref;
 
 use codec::{ MailEncoder, MailEncodable };
-use ascii::{ AsciiString, AsciiStr, AsciiChar };
+use ascii::{ AsciiString, AsciiChar };
 use futures::{ Future, Async, Poll };
 
 use error::*;
-use utils::{ is_multipart_mime, HeaderTryInto };
+use utils::HeaderTryInto;
 use headers::{ Header, HeaderMap };
 
 use self::builder::{
@@ -81,13 +77,13 @@ impl<E> Mail<E>
     {
         let comp = comp.try_into()?;
         check_header::<H, _>( &comp, self.body.is_multipart() )?;
-        self.headers.insert( header, comp );
+        self.headers.insert( header, comp )?;
         Ok( () )
     }
 
     pub fn set_headers( &mut self, headers: HeaderMap<E> ) -> Result<()> {
         check_multiple_headers( &headers, self.body.is_multipart() )?;
-        self.headers.extend( headers );
+        self.headers.extend( headers )?;
         Ok( () )
     }
 

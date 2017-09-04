@@ -1,14 +1,3 @@
-use ::std;
-use std::slice::{ IterMut as SliceIterMut };
-
-use codec::{ MailEncoder, MailEncodable };
-use headers::HeaderName;
-use utils::unbox_mut;
-
-use std::collections::{ hash_map as map };
-
-use super::HeaderMap;
-use super::HeaderBodies;
 
 macro_rules! iter_impl{
     (_MK MUT $t:ty) => (

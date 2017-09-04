@@ -9,9 +9,6 @@
 //          .build()
 //
 //
-/// TODO set_** in builder to just **
-use std::any::Any;
-
 use ascii::AsciiString;
 
 use utils::uneraser_ref;

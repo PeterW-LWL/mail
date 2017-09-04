@@ -1,12 +1,10 @@
 use std;
-use std::vec::{ IntoIter as VecIntoIter };
-use std::iter::IntoIterator;
+use std::collections::hash_map::{ IntoIter as MapIntoIter };
 
 use codec::{ MailEncoder, MailEncodable };
 use headers::HeaderName;
 
 
-use super::MapIntoIter;
 use super::HeaderBodies;
 use super::HeaderMap;
 

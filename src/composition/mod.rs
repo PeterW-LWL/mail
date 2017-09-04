@@ -7,7 +7,7 @@ use ascii::AsciiStr;
 
 use error::*;
 use headers::{
-    Header, HeaderMap,
+    HeaderMap,
     From, To,
     Subject, Date,
     ContentId,
@@ -18,7 +18,7 @@ use codec::MailEncoder;
 use components::{
     Disposition,
     Unstructured,
-    Mailbox, MailboxList,
+    Mailbox,
     Phrase, DateTime
 };
 use mail::mime::MultipartMime;

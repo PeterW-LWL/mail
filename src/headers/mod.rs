@@ -1,15 +1,9 @@
-use std::any::{ Any, TypeId };
-use std::collections::{ HashMap as Map };
-use std::marker::PhantomData;
-use std::slice::{ Iter as SliceIter };
-use std::iter::Iterator;
-
 use ascii::AsciiStr;
 pub use ascii::{  AsciiStr as _AsciiStr };
 
 use error::*;
 use grammar::is_ftext;
-use codec::{ MailEncoder, MailEncodable };
+
 
 
 mod default_header;

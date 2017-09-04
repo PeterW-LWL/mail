@@ -1,7 +1,6 @@
 use ascii::{ AsciiChar };
 
 use error::*;
-use utils::HeaderTryFrom;
 use codec::{ MailEncoder, MailEncodable };
 use codec::utf8_to_ascii::puny_code_domain;
 
