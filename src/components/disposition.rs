@@ -4,9 +4,9 @@ use std::ascii::AsciiExt;
 use ascii::{ AsciiChar, AsciiStr };
 
 use error::*;
-use codec::{ MailEncodable, MailEncoder };
 use grammar::{is_ctl, is_tspecial };
-use utils::FileMeta;
+use codec::{ MailEncodable, MailEncoder };
+use utils::{ FileMeta, HeaderTryFrom };
 
 
 
@@ -23,6 +23,7 @@ struct DispositionParameters(FileMeta);
 pub enum DispositionKind {
     Inline, Attachment
 }
+
 
 impl Disposition {
 
@@ -50,6 +51,22 @@ impl Disposition {
         &mut self.file_meta
     }
 
+}
+
+/// This try from is for usability only, it is
+/// generally recommendet to use Disposition::inline()/::attachment()
+/// as it is type safe / compiler time checked, while this one
+/// isn't
+impl<'a> HeaderTryFrom<&'a str> for Disposition {
+    fn try_from(text: &'a str) -> Result<Self> {
+        if text.eq_ignore_ascii_case( "Inline" ) {
+            Ok( Disposition::inline() )
+        } else if text.eq_ignore_ascii_case( "Attachment" ) {
+            Ok( Disposition::attachment() )
+        } else {
+            bail!( "content disposition can either be Inline or Attachment nothing else" )
+        }
+    }
 }
 
 macro_rules! encode_disposition_param {
@@ -184,5 +201,14 @@ mod test {
     ]}
 
     //TODO: (1 allow FWS or so in parameters) (2 utf8 file names)
+
+    #[test]
+    fn test_from_str() {
+        assert_ok!( Disposition::try_from( "Inline" ) );
+        assert_ok!( Disposition::try_from( "InLine" ) );
+        assert_ok!( Disposition::try_from( "Attachment" ) );
+
+        assert_err!( Disposition::try_from( "In line") );
+    }
 
 }
