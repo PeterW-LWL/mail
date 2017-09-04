@@ -34,9 +34,6 @@ pub struct LocalPart( Input );
 pub struct Domain( SimpleItem );
 
 
-
-
-
 impl FromInput for Email {
 
     fn from_input<I: Into<Input>>( email: I ) -> Result<Self> {

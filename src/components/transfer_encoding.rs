@@ -1,6 +1,7 @@
+use std::ops::Deref;
+
 use ascii::{ AsciiString, AsciiStr };
 
-use std::ops::Deref;
 use error::*;
 use codec::{ MailEncoder, MailEncodable };
 
