@@ -2,16 +2,24 @@
 use std::collections::HashMap;
 use std::collections::hash_map::{ Iter as MapIter };
 use std::borrow::Cow;
+use std::ops::Deref;
 
 use codec::{ MailEncoder, MailEncodable };
 use ascii::{ AsciiString, AsciiStr, AsciiChar };
 use futures::{ Future, Async, Poll };
 
 use error::*;
-use utils::is_multipart_mime;
-use headers::Header;
+use utils::{ is_multipart_mime, HeaderTryInto };
+use headers::{ Header, HeaderMap };
 
-pub use self::builder::*;
+use self::builder::{
+    check_header,
+    check_multiple_headers,
+};
+
+pub use self::builder::{
+    Builder, MultipartBuilder, SinglepartBuilder
+};
 pub use self::context::*;
 pub use self::resource::*;
 
@@ -22,37 +30,37 @@ mod encode;
 mod context;
 
 
-type Headers = HashMap<Cow<'static, AsciiStr>, Header>;
-type HeadersIter<'a> = MapIter<'a, Cow<'static, AsciiStr>, Header>;
 
-pub struct Mail {
+pub struct Mail<E: MailEncoder> {
     //NOTE: by using some OwnedOrStaticRef AsciiStr we can probably safe a lot of
     // unnecessary allocations
-    headers: Headers,
-    body: MailPart,
+    headers: HeaderMap<E>,
+    body: MailPart<E>,
 }
 
 
-pub enum MailPart {
+pub enum MailPart<E: MailEncoder> {
     SingleBody {
         body: Resource
     },
     MultipleBodies {
-        bodies: Vec<Mail>,
+        bodies: Vec<Mail<E>>,
         hidden_text: AsciiString
     }
 }
 
 /// a future returning an EncodableMail once all futures contained in the wrapped Mail are resolved
-pub struct MailFuture<'a, T: 'a> {
-    mail: Option<Mail>,
+pub struct MailFuture<'a, T: 'a, E: MailEncoder> {
+    mail: Option<Mail<E>>,
     ctx: &'a T
 }
 
 /// a mail with all contained futures resolved, so that it can be encoded
-pub struct EncodableMail( Mail );
+pub struct EncodableMail<E: MailEncoder>( Mail<E> );
 
-impl Mail {
+impl<E> Mail<E>
+    where E: MailEncoder
+{
 
 
     /// adds a new header,
@@ -66,34 +74,32 @@ impl Mail {
     /// if a Content-Type header is set, which conflicts with the body, mainly if
     /// you set a multipart content type on a non-multipart body or the other way around
     ///
-    pub fn set_header( &mut self, header: Header ) -> Result<Option<Header>> {
-        use headers::Header::*;
-
-        match &header {
-            &ContentType( ref mime ) => {
-                if self.body.is_multipart() != is_multipart_mime( mime ) {
-                    return Err( ErrorKind::ContentTypeAndBodyIncompatible.into() )
-                }
-            },
-            &ContentTransferEncoding( ref _encoding ) => {
-                //TODO warn as this is most likly leading to unexpected results
-            },
-            _ => {}
-        }
-
-        Ok( self.headers.insert( header.name().into(), header ) )
-
+    pub fn set_header<H, C>( &mut self, header: H, comp: C) -> Result<()>
+        where H: Header,
+              H::Component: MailEncodable<E>,
+              C: HeaderTryInto<H::Component>
+    {
+        let comp = comp.try_into()?;
+        check_header::<H, _>( &comp, self.body.is_multipart() )?;
+        self.headers.insert( header, comp );
+        Ok( () )
     }
 
-    pub fn headers<'a>( &'a self ) -> HeadersIter<'a> {
-        self.headers.iter()
+    pub fn set_headers( &mut self, headers: HeaderMap<E> ) -> Result<()> {
+        check_multiple_headers( &headers, self.body.is_multipart() )?;
+        self.headers.extend( headers );
+        Ok( () )
     }
 
-    pub fn body( &self ) -> &MailPart {
+    pub fn headers( &self ) -> &HeaderMap<E> {
+        &self.headers
+    }
+
+    pub fn body( &self ) -> &MailPart<E> {
         &self.body
     }
 
-    pub fn into_future<'a, C: BuilderContext>( self, ctx: &'a C ) -> MailFuture<'a, C> {
+    pub fn into_future<'a, C: BuilderContext>( self, ctx: &'a C ) -> MailFuture<'a, C, E> {
         MailFuture {
             ctx,
             mail: Some( self )
@@ -122,7 +128,9 @@ impl Mail {
 
 
 
-impl MailPart {
+impl<E> MailPart<E>
+    where E: MailEncoder
+{
 
     pub fn is_multipart( &self ) -> bool {
         use self::MailPart::*;
@@ -134,8 +142,11 @@ impl MailPart {
 }
 
 
-impl<'a, T> Future for MailFuture<'a, T> where T: BuilderContext {
-    type Item = EncodableMail;
+impl<'a, E, T> Future for MailFuture<'a, T, E>
+    where T: BuilderContext,
+          E: MailEncoder
+{
+    type Item = EncodableMail<E>;
     type Error = Error;
 
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
@@ -170,15 +181,26 @@ impl<'a, T> Future for MailFuture<'a, T> where T: BuilderContext {
 }
 
 
-deref0!{ -mut EncodableMail => Mail }
+impl<E> Deref for EncodableMail<E>
+    where E: MailEncoder
+{
+    type Target = Mail<E>;
+    fn deref( &self ) -> &Self::Target {
+        &self.0
+    }
+}
 
-impl Into<Mail> for EncodableMail {
-    fn into( self ) -> Mail {
+impl<E> Into<Mail<E>> for EncodableMail<E>
+    where E: MailEncoder
+{
+    fn into( self ) -> Mail<E> {
         self.0
     }
 }
 
-impl<E> MailEncodable<E> for EncodableMail where E: MailEncoder {
+impl<'a, E> MailEncodable<E> for EncodableMail<E>
+    where E: MailEncoder
+{
 
     fn encode(&self, encoder: &mut E) -> Result<()> {
         // does not panic as a EncodableMail only is constructed from

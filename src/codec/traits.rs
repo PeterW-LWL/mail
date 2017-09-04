@@ -41,7 +41,7 @@ pub trait EncodedWordWriter {
     }
 }
 
-pub trait MailEncoder {
+pub trait MailEncoder: 'static {
     fn mail_type( &self ) -> MailType;
 
     fn write_new_line( &mut self );

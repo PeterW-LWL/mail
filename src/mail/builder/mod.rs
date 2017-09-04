@@ -10,41 +10,48 @@
 //
 //
 /// TODO set_** in builder to just **
-
+use std::any::Any;
 
 use ascii::AsciiString;
 
+use utils::uneraser_ref;
 use error::*;
-use utils::is_multipart_mime;
-use headers::Header;
+use codec::{ MailEncoder, MailEncodable };
+use utils::{ is_multipart_mime, HeaderTryInto };
+use headers::{
+    HeaderMap, Header,
+    ContentType,
+    ContentTransferEncoding
+};
+use components::Mime;
 
 use super::mime::MultipartMime;
 use super::resource::Resource;
-use super::{ MailPart, Mail, Headers };
+use super::{ MailPart, Mail };
 
 
 pub struct Builder;
 
-struct BuilderShared {
-    headers: Headers
+struct BuilderShared<E: MailEncoder> {
+    headers: HeaderMap<E>
 }
 
-pub struct SinglepartBuilder {
-    inner: BuilderShared,
+pub struct SinglepartBuilder<E: MailEncoder> {
+    inner: BuilderShared<E>,
     body: Resource
 }
 
-pub struct MultipartBuilder {
-    inner: BuilderShared,
+pub struct MultipartBuilder<E: MailEncoder> {
+    inner: BuilderShared<E>,
     hidden_text: Option<AsciiString>,
-    bodies: Vec<Mail>
+    bodies: Vec<Mail<E>>
 }
 
-impl BuilderShared {
+impl<E> BuilderShared<E> where E: MailEncoder {
 
     fn new() -> Self {
         BuilderShared {
-            headers: Headers::new(),
+            headers: HeaderMap::new()
         }
     }
 
@@ -58,35 +65,26 @@ impl BuilderShared {
     /// non-mutltipart mail
     ///
     /// NOTE: do NOT add other error cases
-    fn header( &mut self, header: Header, is_multipart: bool ) -> Result<Option<Header>> {
-        use headers::Header::*;
-        //move checks for single/multipart from mail_composition here
-        match &header {
-            //FIXME check if forbidding setting ContentType/ContentTransferEncoding headers
-            // is preferable, especially if is_multipart == false
-            &ContentType( ref mime ) => {
-                if is_multipart != is_multipart_mime( mime ) {
-                    return Err( ErrorKind::ContentTypeAndBodyIncompatible.into() )
-                }
-            },
-            _ => {}
-        }
-
-        let name = header.name().into();
-
-        Ok( self.headers.insert( name, header ) )
+    fn header<H>(
+        &mut self,
+        header: H,
+        hbody: H::Component,
+        is_multipart: bool
+    ) -> Result<()>
+        where H: Header,
+              H::Component: MailEncodable<E>
+    {
+        check_header::<H, _>(&hbody, is_multipart)?;
+        self.headers.insert( header, hbody )
     }
 
-    fn headers<IT>( &mut self, iter: IT, is_multipart: bool ) -> Result<()>
-        where IT: IntoIterator<Item=Header>
-    {
-        for header in iter.into_iter() {
-            self.header( header, is_multipart )?;
-        }
+    fn headers( &mut self, headers: HeaderMap<E>, is_multipart: bool ) -> Result<()> {
+        check_multiple_headers( &headers, is_multipart )?;
+        self.headers.extend( headers )?;
         Ok( () )
     }
 
-    fn build( self, body: MailPart ) -> Result<Mail> {
+    fn build( self, body: MailPart<E> ) -> Result<Mail<E>> {
         Ok( Mail {
             headers: self.headers,
             body: body,
@@ -94,20 +92,65 @@ impl BuilderShared {
     }
 }
 
+pub fn check_multiple_headers<E>( headers: &HeaderMap<E> , is_multipart: bool) -> Result<()>
+    where E: MailEncoder
+{
+    if let Some( .. ) = headers.get_single::<ContentTransferEncoding>()? {
+        bail!( concat!(
+            "setting content transfer encoding through a header is not supported,",
+            "use Ressource::set_preferred_encoding on the body instead"
+        ) );
+    }
+    if let Some( mime ) = headers.get_single::<ContentType>()? {
+        if is_multipart != is_multipart_mime( mime ) {
+            return Err( ErrorKind::ContentTypeAndBodyIncompatible.into() )
+        }
+    }
+    Ok( () )
+}
+
+pub fn check_header<H, E>(
+    hbody: &H::Component,
+    is_multipart: bool
+) -> Result<()>
+    where E: MailEncoder,
+          H: Header,
+          H::Component: MailEncodable<E>
+{
+    match H::name().as_str() {
+        "Content-Type" => {
+            let mime: &Mime = uneraser_ref(hbody)
+                .ok_or_else( || "custom Content-Type headers are not supported" )?;
+            if is_multipart != is_multipart_mime( mime ) {
+                return Err( ErrorKind::ContentTypeAndBodyIncompatible.into() )
+            }
+        },
+        "Content-Transfer-Encoding" => {
+            bail!( concat!(
+                "setting content transfer encoding through a header is not supported,",
+                "use Ressource::set_preferred_encoding on the body instead"
+            ) );
+        }
+        _ => {}
+    }
+    Ok( () )
+}
+
 impl Builder {
 
-    pub fn multipart( m: MultipartMime ) -> MultipartBuilder {
+    pub fn multipart<E: MailEncoder>( mime: MultipartMime ) -> MultipartBuilder<E> {
         let res = MultipartBuilder {
             inner: BuilderShared::new(),
             hidden_text: None,
             bodies: Vec::new(),
         };
 
-        //UNWRAP_SAFETY: it can only fail with illegal headers, but this header can not be illegal
-        res.header( Header::ContentType( m.into() ) ).unwrap()
+        //UNWRAP_SAFETY: it can only fail with illegal headers,
+        // but this header can not be illegal
+        res.header( ContentType, mime ).unwrap()
     }
 
-    pub fn singlepart( r: Resource ) -> SinglepartBuilder {
+    pub fn singlepart<E: MailEncoder>( r: Resource ) -> SinglepartBuilder<E> {
         SinglepartBuilder {
             inner: BuilderShared::new(),
             body: r,
@@ -116,52 +159,69 @@ impl Builder {
 
 }
 
-impl SinglepartBuilder {
-    pub fn header( mut self, header: Header ) -> Result<Self> {
-        self.inner.header( header, false )?;
-        Ok( self )
-    }
+impl<E> SinglepartBuilder<E>
+    where E: MailEncoder
+{
 
-    pub fn headers<IT>( mut self, iter: IT ) -> Result<Self>
-        where IT: IntoIterator<Item=Header>
+    pub fn header<H, C>(
+        &mut self,
+        header: H,
+        hbody: C
+    ) -> Result<()>
+        where H: Header,
+              H::Component: MailEncodable<E>,
+              C: HeaderTryInto<H::Component>
     {
-        self.inner.headers( iter, false )?;
-        Ok( self )
-
+        let comp = hbody.try_into()?;
+        self.inner.header( header, comp, false )
     }
 
-    pub fn build( self ) -> Result<Mail> {
+    pub fn headers( mut self, headers: HeaderMap<E> ) -> Result<Self> {
+        self.inner.headers( headers, false )?;
+        Ok( self )
+    }
+
+    pub fn build( self ) -> Result<Mail<E>> {
 
         self.inner.build( MailPart::SingleBody { body: self.body } )
     }
 }
 
-impl MultipartBuilder {
+impl<E> MultipartBuilder<E>
+    where E: MailEncoder
+{
 
-    pub fn body( mut self, body: Mail ) -> Result<Self> {
-        self.bodies.push( body );
-        Ok( self )
-    }
-
-    pub fn headers<IT>( mut self, iter: IT ) -> Result<Self>
-        where IT: IntoIterator<Item=Header>
-    {
-        self.inner.headers( iter, true )?;
-        Ok( self )
-
-    }
 
     ///
     /// # Error
     ///
     /// A error is returned if the header is incompatible with this builder,
     /// i.e. if a ContentType header is set with a non-multipart content type
-    pub fn header( mut self, header: Header ) -> Result<Self> {
-        self.inner.header( header, true )?;
+    pub fn header<H, C>(
+        mut self,
+        header: H,
+        hbody: C
+    ) -> Result<Self>
+        where H: Header,
+              H::Component: MailEncodable<E>,
+              C: HeaderTryInto<H::Component>
+    {
+        let comp = hbody.try_into()?;
+        self.inner.header( header, comp, true )?;
         Ok( self )
     }
 
-    pub fn build( self ) -> Result<Mail> {
+    pub fn headers( mut self, headers: HeaderMap<E> ) -> Result<Self> {
+        self.inner.headers( headers, true )?;
+        Ok( self )
+    }
+
+    pub fn body( mut self, body: Mail<E> ) -> Result<Self> {
+        self.bodies.push( body );
+        Ok( self )
+    }
+
+    pub fn build( self ) -> Result<Mail<E>> {
         if self.bodies.len() == 0 {
             Err( ErrorKind::NeedAtLastOneBodyInMultipartMail.into() )
         } else {
@@ -172,3 +232,8 @@ impl MultipartBuilder {
         }
     }
 }
+
+//TODO test
+// - can not misset Content-Type
+// - can not set Content-Transfer-Encoding (done through ressource)
+// - above tests but wrt. set_headers/headers

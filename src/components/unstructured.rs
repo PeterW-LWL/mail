@@ -3,6 +3,7 @@ use ascii::AsciiChar;
 use error::*;
 use grammar::is_vchar;
 use grammar::encoded_word::EncodedWordContext;
+use utils::HeaderTryFrom;
 use codec::{ MailEncoder, MailEncodable };
 use data::{ FromInput, Encoding, EncodedWord };
 
@@ -14,6 +15,7 @@ pub struct Unstructured {
     //FEATUR_TODO(non_utf8_input): split into parts each possibke having their own encoding
     text: Input,
 }
+
 
 impl FromInput for Unstructured {
     fn from_input<I: Into<Input>>( text: I ) -> Result<Self> {

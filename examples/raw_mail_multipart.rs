@@ -27,7 +27,7 @@ fn _main() -> Result<()> {
 
     let mail = Builder::multipart(
             MultipartMime::new( "multipart/related; boundary=\"=_abc\"".parse().unwrap() )? )
-        .header(Header::Subject( Unstructured::from_input( "that ↓ will be encoded ")? ) )?
+        .header( Subject, "that ↓ will be encoded " )?
         .body( Builder::singlepart( get_some_resource() ).build()? )?
         .body( Builder::singlepart( get_some_resource() ).build()? )?
         .build()?;

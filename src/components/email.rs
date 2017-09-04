@@ -1,6 +1,7 @@
 use ascii::{ AsciiChar };
 
 use error::*;
+use utils::HeaderTryFrom;
 use codec::{ MailEncoder, MailEncodable };
 use codec::utf8_to_ascii::puny_code_domain;
 
@@ -32,6 +33,9 @@ pub struct LocalPart( Input );
 
 #[derive(Debug,  Clone, Hash, PartialEq, Eq)]
 pub struct Domain( SimpleItem );
+
+
+
 
 
 impl FromInput for Email {

@@ -5,9 +5,19 @@ use mime;
 use ascii::AsciiStr;
 
 use error::*;
+use utils::HeaderTryFrom;
 use codec::{ MailEncoder, MailEncodable };
 
 pub use mime::Mime;
+
+// as we are in the same package as the definition of HeaderTryFrom
+// this is possible even with orphan rules
+impl<'a> HeaderTryFrom<&'a str> for mime::Mime {
+    fn try_from(val: &'a str) -> Result<Self> {
+        val.parse()
+            .map_err( |ferr| ErrorKind::ParsingMime( ferr ).into() )
+    }
+}
 
 
 impl<E> MailEncodable<E> for mime::Mime where E: MailEncoder {

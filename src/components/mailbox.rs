@@ -1,6 +1,7 @@
 use ascii::AsciiChar;
 
 use error::*;
+use utils::{HeaderTryFrom, HeaderTryInto};
 use codec::{ MailEncodable, MailEncoder };
 
 use super::Phrase;
@@ -20,6 +21,22 @@ impl From<Email> for Mailbox {
             email,
             display_name: None,
         }
+    }
+}
+
+impl HeaderTryFrom<Email> for Mailbox {
+    fn try_from(email: Email) -> Result<Self> {
+        Ok( Mailbox::from( email ) )
+    }
+}
+
+impl<P, E> HeaderTryFrom<(P, E)> for Mailbox
+    where P: HeaderTryInto<Phrase>, E: HeaderTryInto<Email>
+{
+    fn try_from( pair: (P, E) ) -> Result<Self> {
+        let display_name = Some( pair.0.try_into()? );
+        let email = pair.1.try_into()?;
+        Ok( Mailbox { display_name, email } )
     }
 }
 

@@ -100,6 +100,10 @@ impl Resource {
         self.preferred_encoding = Some( tenc )
     }
 
+    pub fn get_preffered_encoding( &self ) -> Option<&TransferEncoding> {
+        self.preferred_encoding.as_ref()
+    }
+
     fn new_inner( r: ResourceInner ) -> Self {
         Resource {
             inner: Arc::new( RwLock::new( r ) ),

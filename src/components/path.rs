@@ -1,6 +1,7 @@
 use ascii::AsciiChar;
 
 use error::*;
+use utils::{HeaderTryFrom, HeaderTryInto};
 use codec::{ MailEncoder, MailEncodable };
 use super::Email;
 
@@ -8,6 +9,19 @@ use super::Email;
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]
 pub struct Path(pub Option<Email>);
 
+impl HeaderTryFrom<Option<Email>> for Path {
+    fn try_from(opt_mail: Option<Email>) -> Result<Self> {
+        Ok( Path( opt_mail ) )
+    }
+}
+
+impl<T> HeaderTryFrom<T> for Path
+    where T: HeaderTryInto<Email>
+{
+    fn try_from(opt_mail: T) -> Result<Self> {
+        Ok( Path( Some( opt_mail.try_into()? ) ) )
+    }
+}
 
 impl<E> MailEncodable<E> for Path where E: MailEncoder {
 
