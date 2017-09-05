@@ -13,7 +13,7 @@ pub use self::default_header::*;
 
 #[macro_use]
 mod map;
-pub use self::map::{ HeaderMap, HeaderMultiBodyIter };
+pub use self::map::{HeaderMap, TypedMultiBodyIter, UntypedMultiBodyIter};
 
 
 

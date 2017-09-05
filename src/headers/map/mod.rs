@@ -67,17 +67,22 @@ impl<E: MailEncoder> HeaderMap<E> {
 
     }
 
-    pub fn get<H>( &self ) -> Option<HeaderMultiBodyIter<E, H>>
-        where H: Header, H::Component: MailEncodable<E>
-    {
-        if let Some( body ) = self.headers.get( &H::name() ) {
-            Some( HeaderMultiBodyIter::new(
+    pub fn get_untyped( &self, name: HeaderName ) -> Option<UntypedMultiBodyIter<E>> {
+        if let Some( body ) = self.headers.get( &name ) {
+            Some( UntypedMultiBodyIter::new(
                 &*body.first,
                 body.other.as_ref().map( |o| o.iter() )
             ) )
         } else {
             None
         }
+    }
+
+    pub fn get<H>( &self ) -> Option<TypedMultiBodyIter<E, H>>
+        where H: Header, H::Component: MailEncodable<E>
+    {
+        self.get_untyped( H::name() )
+            .map( |untyped| untyped.with_typing() )
     }
 
     // we can't have a public `std::iter::Extend` as insertion
@@ -167,42 +172,63 @@ impl<E: MailEncoder> HeaderMap<E> {
 }
 
 
-
-pub struct HeaderMultiBodyIter<'a, E: 'a, H> {
+pub struct UntypedMultiBodyIter<'a, E: 'a> {
     first: Option<&'a MailEncodable<E>>,
     other: Option<SliceIter<'a, Box<MailEncodable<E>>>>,
-    _header_type: PhantomData<H>
 }
 
-impl<'a, E, H> HeaderMultiBodyIter<'a, E, H>
-    where E: MailEncoder, H: Header, H::Component: MailEncodable<E>
+impl<'a, E> UntypedMultiBodyIter<'a, E>
+    where E: MailEncoder
 {
     fn new(
         first: &'a MailEncodable<E>,
         other: Option<SliceIter<'a, Box<MailEncodable<E>>>>
     ) -> Self {
-        HeaderMultiBodyIter {
+        UntypedMultiBodyIter {
             first: Some(first),
             other: other,
+        }
+    }
+
+    fn with_typing<H>(self) -> TypedMultiBodyIter<'a, E, H>
+        where H: Header, H::Component: MailEncodable<E>
+    {
+        TypedMultiBodyIter {
+            untyped_iter: self,
             _header_type: PhantomData
         }
     }
 }
 
-
-impl<'a, E, H> Iterator for HeaderMultiBodyIter<'a, E, H>
-    where E: MailEncoder, H: Header, H::Component: MailEncodable<E>
+impl<'a, E> Iterator for UntypedMultiBodyIter<'a, E>
+    where E: MailEncoder
 {
-    type Item = Result<&'a H::Component>;
+    type Item = &'a MailEncodable<E>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let tobj_item = self.first
+        self.first
             .take()
             .or_else( || {
                 self.other.as_mut()
                     .and_then( |other| other.next() )
                     .map( |val| &**val )
-            });
+            })
+    }
+}
+
+
+pub struct TypedMultiBodyIter<'a, E: 'a, H> {
+    untyped_iter: UntypedMultiBodyIter<'a, E>,
+    _header_type: PhantomData<H>
+}
+
+impl<'a, E, H> Iterator for TypedMultiBodyIter<'a, E, H>
+    where E: MailEncoder, H: Header, H::Component: MailEncodable<E>
+{
+    type Item = Result<&'a H::Component>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let tobj_item = self.untyped_iter.next();
         tobj_item.map( |tobj| {
             downcast_ref::<E, H::Component>( tobj )
                 .ok_or_else( ||->Error {
