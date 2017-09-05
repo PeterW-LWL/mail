@@ -24,9 +24,30 @@ impl From<Email> for Mailbox {
     }
 }
 
-impl HeaderTryFrom<Email> for Mailbox {
-    fn try_from(email: Email) -> Result<Self> {
-        Ok( Mailbox::from( email ) )
+impl From<(Option<Phrase>, Email)> for Mailbox {
+    fn from( pair: (Option<Phrase>, Email) ) -> Self {
+        let (display_name, email) = pair;
+        Mailbox { display_name, email }
+    }
+}
+
+impl<E> HeaderTryFrom<E> for Mailbox
+    where E: HeaderTryInto<Email>
+{
+    fn try_from(email: E) -> Result<Self> {
+        Ok( Mailbox::from( email.try_into()? ) )
+    }
+}
+
+impl<P, E> HeaderTryFrom<(Option<P>, E)> for Mailbox
+    where P: HeaderTryInto<Phrase>, E: HeaderTryInto<Email>
+{
+    fn try_from( pair: (Option<P>, E) ) -> Result<Self> {
+        let display_name = if let Some( dn )= pair.0 {
+            Some( dn.try_into()? )
+        } else { None };
+        let email = pair.1.try_into()?;
+        Ok( Mailbox { display_name, email } )
     }
 }
 

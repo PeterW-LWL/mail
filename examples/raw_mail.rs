@@ -33,8 +33,9 @@ fn _main() -> Result<()> {
         MessageId: "ran.a1232.13rwqf23.a@dom",
         From: [
             ("random dude", "this@is.es"),
-            ("another person", "abc@def.geh")
+            ("another person", "abc@def.geh"),
         ],
+        To: "target@here.it.goes",
         ReturnPath: None
     }?;
     let mail = Builder::singlepart( get_some_resource() )
