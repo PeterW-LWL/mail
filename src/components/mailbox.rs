@@ -7,6 +7,8 @@ use codec::{ MailEncodable, MailEncoder };
 use super::Phrase;
 use super::Email;
 
+pub struct NoDisplayName;
+
 #[derive(Debug, Hash, Eq, PartialEq, Clone)]
 pub struct Mailbox {
     pub display_name: Option<Phrase>,
@@ -39,6 +41,14 @@ impl<E> HeaderTryFrom<E> for Mailbox
     }
 }
 
+impl<E> HeaderTryFrom<(NoDisplayName, E)> for Mailbox
+    where E: HeaderTryInto<Email>
+{
+    fn try_from( pair: (NoDisplayName, E) ) -> Result<Self> {
+        let email = pair.1.try_into()?;
+        Ok( Mailbox { display_name: None, email } )
+    }
+}
 impl<P, E> HeaderTryFrom<(Option<P>, E)> for Mailbox
     where P: HeaderTryInto<Phrase>, E: HeaderTryInto<Email>
 {

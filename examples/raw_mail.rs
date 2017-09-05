@@ -27,6 +27,7 @@ fn _main() -> Result<()> {
     let mut encoder = MailEncoderImpl::new( MailType::Ascii );
 
     let builder_ctx = SimpleBuilderContext::default();
+    let opt_name: Option<&'static str> = None;
     let headers = headers! {
         //FIXME actually use a more realistic header setup
         Subject: "that ↓ will be encoded ",
@@ -35,7 +36,16 @@ fn _main() -> Result<()> {
             ("random dude", "this@is.es"),
             ("another person", "abc@def.geh"),
         ],
-        To: "target@here.it.goes",
+        To: (
+            "target@here.it.goes",
+            ("some", "thing@nice"),
+            ( opt_name, "a@b"),
+            ( Some("Uh"), "ee@b"),
+            // just writing None wont work due to type inference
+            // so either do not use the tuple form or use
+            // the NoDisplayName helper
+            ( NoDisplayName, "cc@b")
+        ),
         ReturnPath: None
     }?;
     let mail = Builder::singlepart( get_some_resource() )

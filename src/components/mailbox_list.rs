@@ -18,11 +18,6 @@ impl MailboxList {
 }
 
 
-impl HeaderTryFrom<Mailbox> for OptMailboxList {
-    fn try_from( mbox: Mailbox ) -> Result<Self> {
-        Ok( OptMailboxList( vec![ mbox ] ) )
-    }
-}
 
 impl<E> MailEncodable<E> for OptMailboxList where E: MailEncoder {
 
@@ -31,14 +26,20 @@ impl<E> MailEncodable<E> for OptMailboxList where E: MailEncoder {
     }
 }
 
-impl<T> HeaderTryFrom<T> for MailboxList
-    where T: HeaderTryInto<Mailbox>
-{
-    fn try_from( mbox: T ) -> Result<Self> {
-        let mbox = mbox.try_into()?;
-        Ok( MailboxList( Vec1::new( mbox ) ) )
-    }
-}
+//impl HeaderTryFrom<Mailbox> for OptMailboxList {
+//    fn try_from( mbox: Mailbox ) -> Result<Self> {
+//        Ok( OptMailboxList( vec![ mbox ] ) )
+//    }
+//}
+
+//impl<T> HeaderTryFrom<T> for MailboxList
+//    where T: HeaderTryInto<Mailbox>
+//{
+//    fn try_from( mbox: T ) -> Result<Self> {
+//        let mbox = mbox.try_into()?;
+//        Ok( MailboxList( Vec1::new( mbox ) ) )
+//    }
+//}
 
 //TODO-RUST-RFC: allow conflicting wildcard implementations if priority is specified
 // if done then we can implement it for IntoIterator instead of Vec and slice
@@ -105,6 +106,102 @@ impl_header_try_from_array! {
     10 11 12 13 14 15 16 17 18 19
     20 21 22 23 24 25 26 27 28 29
     30 31 32
+}
+
+//TODO also implement for phrase list
+macro_rules! impl_header_try_from_tuple {
+    (_MBoxList []) => (
+        compiler_error!("mailbox list needs at last one element")
+    );
+    (_MBoxList [ $($vs:ident),* ]) => (
+        impl< $($vs),* > HeaderTryFrom<( $($vs,)* )> for MailboxList
+            where $($vs: HeaderTryInto<Mailbox>),*
+        {
+            #[allow(non_snake_case)]
+            fn try_from( ($($vs,)*): ($($vs,)*) ) -> Result<Self> {
+                // we use the type names as variable names,
+                // not nice but it works
+                //let ($($vs),*) = src;
+                let mut out = Vec::new();
+                $(
+                    let $vs = $vs.try_into()?;
+                    out.push($vs);
+                )*
+                Ok( MailboxList(
+                    //UNWRAP_SAFE: len 0 is not implemented with the macro
+                    $crate::utils::Vec1::from_vec(out).unwrap()
+                ) )
+            }
+        }
+    );
+    (_OptMBoxList [$($vs:ident),*]) => (
+        impl< $($vs),* > HeaderTryFrom<( $($vs,)* )> for OptMailboxList
+            where $($vs: HeaderTryInto<Mailbox>),*
+        {
+            #[allow(non_snake_case)]
+            fn try_from( ($($vs,)*): ($($vs,)*) ) -> Result<Self> {
+                // we use the type names as variable names,
+                // not nice but it works
+                //let ($($vs),*) = src;
+                let mut out = Vec::new();
+                $(
+                    let $vs = $vs.try_into()?;
+                    out.push($vs);
+                )*
+                Ok( OptMailboxList( out ) )
+            }
+        }
+    );
+    ($([$($vs:ident),*]),*) => ($(
+        impl_header_try_from_tuple!{ _MBoxList [$($vs),*] }
+        impl_header_try_from_tuple!{ _OptMBoxList [$($vs),*] }
+    )*);
+}
+
+impl_header_try_from_tuple! {
+    [A0],
+    [A0, A1],
+    [A0, A1, A2],
+    [A0, A1, A2, A3],
+    [A0, A1, A2, A3, A4],
+    [A0, A1, A2, A3, A4, A5],
+    [A0, A1, A2, A3, A4, A5, A6],
+    [A0, A1, A2, A3, A4, A5, A6, A7],
+    [A0, A1, A2, A3, A4, A5, A6, A7, A8],
+    [A0, A1, A2, A3, A4, A5, A6, A7, A8, A9],
+    [A0, A1, A2, A3, A4, A5, A6, A7, A8, A9, A10],
+    [A0, A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11],
+    [A0, A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12],
+    [A0, A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, A13],
+    [A0, A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, A13, A14],
+    [A0, A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, A13, A14, A15],
+    [A0, A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, A13, A14, A15, A16],
+    [A0, A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, A13, A14, A15, A16, A17],
+    [A0, A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, A13, A14, A15, A16, A17, A18],
+    [A0, A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, A13, A14, A15, A16, A17, A18, A19],
+    [A0, A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, A13, A14, A15, A16, A17, A18, A19, A20],
+    [A0, A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, A13, A14, A15, A16, A17, A18, A19, A20,
+        A21],
+    [A0, A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, A13, A14, A15, A16, A17, A18, A19, A20,
+        A21, A22],
+    [A0, A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, A13, A14, A15, A16, A17, A18, A19, A20,
+        A21, A22, A23],
+    [A0, A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, A13, A14, A15, A16, A17, A18, A19, A20,
+        A21, A22, A23, A24],
+    [A0, A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, A13, A14, A15, A16, A17, A18, A19, A20,
+        A21, A22, A23, A24, A25],
+    [A0, A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, A13, A14, A15, A16, A17, A18, A19, A20,
+        A21, A22, A23, A24, A25, A26],
+    [A0, A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, A13, A14, A15, A16, A17, A18, A19, A20,
+        A21, A22, A23, A24, A25, A26, A27],
+    [A0, A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, A13, A14, A15, A16, A17, A18, A19, A20,
+        A21, A22, A23, A24, A25, A26, A27, A28],
+    [A0, A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, A13, A14, A15, A16, A17, A18, A19, A20,
+        A21, A22, A23, A24, A25, A26, A27, A28, A29],
+    [A0, A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, A13, A14, A15, A16, A17, A18, A19, A20,
+        A21, A22, A23, A24, A25, A26, A27, A28, A29, A30],
+    [A0, A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, A13, A14, A15, A16, A17, A18, A19, A20,
+        A21, A22, A23, A24, A25, A26, A27, A28, A29, A30, A31]
 }
 
 impl<T> HeaderTryFrom<Vec<T>> for OptMailboxList

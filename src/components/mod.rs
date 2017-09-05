@@ -6,7 +6,7 @@ mod email;
 pub use self::email::{ Email, Domain, LocalPart };
 
 mod mailbox;
-pub use self::mailbox::Mailbox;
+pub use self::mailbox::{Mailbox, NoDisplayName};
 
 mod mailbox_list;
 pub use self::mailbox_list::{MailboxList, OptMailboxList };

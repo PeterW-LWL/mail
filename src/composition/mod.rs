@@ -82,8 +82,8 @@ impl<T, C, CP, D> Compositor<T, C, CP, D>
             Date: DateTime::now(),
             //NOTE: if we support multiple mailboxes in From we have to
             // ensure Sender is used _iff_ there is more than one from
-            From: from_mailbox,
-            To: to_mailbox,
+            From: (from_mailbox,),
+            To: (to_mailbox,),
             Subject: subject
         }?;
 
