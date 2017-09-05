@@ -57,7 +57,6 @@ fn _main() -> Result<()> {
 
     let as_buff: Vec<u8> = encoder.into();
 
-    //FIXME newline, between header and body
     println!( "{}", String::from_utf8_lossy( &*as_buff ) );
 
     Ok( () )
