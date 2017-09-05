@@ -5,16 +5,24 @@ use mime;
 use ascii::AsciiStr;
 
 use error::*;
+use utils::HeaderTryFrom;
 use codec::{ MailEncoder, MailEncodable };
 
 pub use mime::Mime;
 
+// as we are in the same package as the definition of HeaderTryFrom
+// this is possible even with orphan rules
+impl<'a> HeaderTryFrom<&'a str> for mime::Mime {
+    fn try_from(val: &'a str) -> Result<Self> {
+        val.parse()
+            .map_err( |ferr| ErrorKind::ParsingMime( ferr ).into() )
+    }
+}
 
-impl MailEncodable for mime::Mime {
 
-    fn encode<E>( &self, encoder:  &mut E ) -> Result<()>
-        where E: MailEncoder
-    {
+impl<E> MailEncodable<E> for mime::Mime where E: MailEncoder {
+
+    fn encode(&self, encoder: &mut E) -> Result<()> {
         let res = self.to_string();
         //TODO can mime be non ascii??, e.g. utf8 file names?
         encoder.write_str( AsciiStr::from_ascii( &*res ).unwrap() );

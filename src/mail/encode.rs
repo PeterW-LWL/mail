@@ -1,7 +1,12 @@
 use super::*;
 use mime::BOUNDARY;
 use ascii::IntoAsciiString;
+use headers::HeaderName;
 
+use headers::{
+    ContentType,
+    ContentTransferEncoding
+};
 
 ///
 /// # Panics
@@ -9,13 +14,13 @@ use ascii::IntoAsciiString;
 /// on `Mail` to prevent this from happening
 ///
 #[inline(always)]
-pub fn encode_mail<E>( mail: &EncodableMail, top: bool, encoder: &mut E ) -> Result<()>
+pub fn encode_mail<E>( mail: &EncodableMail<E>, top: bool, encoder: &mut E ) -> Result<()>
     where E: MailEncoder
 {
     _encode_mail( &mail.0, top, encoder )
 }
 
-fn _encode_mail<E>( mail: &Mail, top: bool, encoder: &mut E ) -> Result<()>
+fn _encode_mail<E>( mail: &Mail<E>, top: bool, encoder: &mut E ) -> Result<()>
     where E: MailEncoder
 {
     encode_headers( &mail, top, encoder )?;
@@ -33,60 +38,79 @@ fn _encode_mail<E>( mail: &Mail, top: bool, encoder: &mut E ) -> Result<()>
 /// if the body is not yet resolved use `Body::poll_body` or `IntoFuture`
 /// on `Mail` to prevent this from happening
 ///
-fn encode_headers<E>(mail: &Mail, top: bool, encoder:  &mut E ) -> Result<()>
+fn encode_headers<E>(mail: &Mail<E>, top: bool, encoder:  &mut E ) -> Result<()>
     where E: MailEncoder
 {
-    let special_headers = find_special_headers( mail )?;
-    let iter = special_headers
-        .iter()
-        .chain( mail.headers.values() );
 
     if top {
         encoder.write_str( ascii_str!{ M I M E Minus V e r s i o n Colon Space _1 Dot _0 } );
         encoder.write_new_line();
     }
 
-    for header in iter {
-        let ignored_header = !top &&
-            !(header.name().as_str().starts_with("Content-")
-                || header.name().as_str().starts_with("X-") );
+    //TODO we have to special handle some headers which
+    // _should_ be at the beginning mainly `Trace` and `Resend-*`
 
-        if ignored_header {
+    // also the Resend's are grouped in blocks ...
+    // ... so I have to have some sored of grouping/ordering hint
+    // ... also this is NOT a static property as you have to know
+    //     which belong together
+    // ... what can be part of the type is wether or not there
+    //     might be an ordering
+    // ... we also want to be able to access the information about
+    //     if it needs special ordering without VCalls
+    // ... we could have a wrapper type `WithOrdering(T, OrderInfo)`
+    //     but we can not implicity add it
+    // ... there information wether or not ther is/might be a ordering
+    //     can be stored in the body so no VCall for it
 
-            //TODO warn!
-        }
-
-        header.encode( encoder )?;
-        encoder.write_new_line();
-    }
-    Ok( () )
-}
-
-//FEATURE_TODO(use_impl_trait): return impl Iterator or similar
-///
-/// # Panics
-/// if the body is not yet resolved use `Body::poll_body` or `IntoFuture`
-/// on `Mail` to prevent this from happening
-///
-fn find_special_headers( mail: &Mail ) -> Result<Vec<Header>> {
-    let mut headers = vec![];
-    //we need: ContentType, ContentTransferEncoding, and ??
+    let header_override;
     match mail.body {
         MailPart::SingleBody { ref body } => {
             let file_buffer = body.get_if_encoded()?
                 .expect( "encoded mail, should only contain already transferencoded resources" );
-            headers.push(
-                Header::ContentType( file_buffer.content_type().clone() ) );
-            headers.push(
-                Header::ContentTransferEncoding( file_buffer.transfer_encoding().clone() ) );
+
+            // handle Content-Type/Transfer-Encoding <-> Resource link
+            encode_header( encoder,
+                           ContentType::name(), file_buffer.content_type() )?;
+            encode_header( encoder,
+                           ContentTransferEncoding::name(), file_buffer.transfer_encoding() )?;
+
+            header_override = true;
         },
-        //TODO are there more special headers? (Such which are derived from the body, etc.)
-        // yes if there are file_meta we want to replace any ContentDisposition header with
-        // our version containing file meta
-        //TODO bail if there is a ContentTransferEncoding in a multipart body!
-        _ => {}
+        _ => {
+            header_override = false;
+        }
     }
-    Ok( headers )
+
+
+    for (name, hbody) in mail.headers.iter() {
+        let name_as_str = name.as_str();
+        let ignored_header = !top &&
+            !(name_as_str.starts_with("Content-")
+                || name_as_str.starts_with("X-") );
+
+        if ignored_header {
+            //TODO warn!
+        }
+        if header_override && ( &name == "Content-Type" || &name == "Content-Transfer-Encoding" ) {
+            //TODO warn!? header will be overriden (but possible with same value)
+            continue
+        }
+
+        encode_header( encoder, name, hbody)?;
+    }
+    Ok( () )
+}
+
+fn encode_header<E>( encoder: &mut E, name: HeaderName, component: &MailEncodable<E>) -> Result<()>
+    where E: MailEncoder
+{
+    encoder.write_str( name.as_ascii_str() );
+    encoder.write_char( AsciiChar::Colon );
+    encoder.write_fws();
+    component.encode( encoder )?;
+    encoder.write_new_line();
+    Ok( () )
 }
 
 ///
@@ -94,7 +118,7 @@ fn find_special_headers( mail: &Mail ) -> Result<Vec<Header>> {
 /// if the body is not yet resolved use `Body::poll_body` or `IntoFuture`
 /// on `Mail` to prevent this from happening
 ///
-fn encode_mail_part<E>(mail: &Mail, encoder:  &mut E ) -> Result<()>
+fn encode_mail_part<E>(mail: &Mail<E>, encoder:  &mut E ) -> Result<()>
     where E: MailEncoder
 {
     use super::MailPart::*;
@@ -113,17 +137,10 @@ fn encode_mail_part<E>(mail: &Mail, encoder:  &mut E ) -> Result<()>
             }
             let boundary: String = {
                 //FIXME there has to be a better way
-                if let Some( header ) = mail.headers.get(
-                    ascii_str!( C o n t e n t Minus T y p e )
-                ) {
-                    match header {
-                        &Header::ContentType( ref mime ) => {
-                            mime.get_param(BOUNDARY)
-                                .ok_or_else( ||-> Error { "boundary gone missing".into() } )?
-                                .to_string()
-                        }
-                        _ => bail!( "Content-Type header corrupted" )
-                    }
+                if let Some( mime ) = mail.headers.get_single::<ContentType>()? {
+                    mime.get_param(BOUNDARY)
+                        .ok_or_else( ||-> Error { "boundary gone missing".into() } )?
+                        .to_string()
                 } else {
                     bail!( "Content-Type header gone missing" );
                 }

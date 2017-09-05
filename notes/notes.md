@@ -250,9 +250,22 @@ into a valide representation, in worst case we could add a `not_encodable`
 field to some structs.
 
 # TODO
-check if some parts are empty and error if encode is calde on them
+check if some parts are empty and error if encode is called on them
 e.g. empty domain
 
+make sure trace and resend fields are:
+
+1. encoded in order (MUST)
+2. encoded as blocks (MUST?)
+3. encoded before other fields (SHOULD)
+
+as people may come up with their own trace like fileds,
+rule 1 and 2 should appy to all fields
+
+
+make sure trace,resent-* are multi fields
+
+add a RawUnstructured not doing any encoding, but only validity checking
 
 # Postponded
 

@@ -9,8 +9,6 @@ extern crate futures;
 extern crate serde;
 extern crate base64;
 extern crate rand;
-//#[macro_use]
-//extern crate lazy_static;
 
 #[macro_use]
 extern crate serde_derive;
@@ -39,6 +37,7 @@ pub mod grammar;
 pub mod codec;
 pub mod data;
 pub mod components;
+#[macro_use]
 pub mod headers;
 pub mod mail;
 pub mod composition;
@@ -54,7 +53,7 @@ pub mod mail_builder_prelude {
         MailEncoderImpl
     };
     pub use data::FromInput;
-    pub use headers::Header;
+    pub use headers::*;
     pub use components::*;
     pub use mail::Builder;
     pub use mail::mime::MultipartMime;

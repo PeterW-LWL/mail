@@ -6,14 +6,20 @@ use rand::Rng;
 use ascii::AsciiStr;
 
 use error::*;
-use headers::Header;
-use headers::Header::*;
+use headers::{
+    HeaderMap,
+    From, To,
+    Subject, Date,
+    ContentId,
+    ContentDisposition
+};
+use codec::MailEncoder;
 
 use components::{
     Disposition,
     Unstructured,
-    Mailbox, MailboxList,
-    Phrase
+    Mailbox,
+    Phrase, DateTime
 };
 use mail::mime::MultipartMime;
 use mail::{
@@ -59,23 +65,27 @@ impl<T, C, CP, D> Compositor<T, C, CP, D>
     }
 
     /// composes a mail based on the given template_id, data and send_context
-    pub fn compose_mail( &self,
+    pub fn compose_mail<E>( &self,
                          send_context: MailSendContext,
                          template_id: T::TemplateId,
                          data: D,
-    ) -> Result<Mail> {
+    ) -> Result<Mail<E>>
+        where E: MailEncoder
+    {
 
         let mut data = data;
         //compose display name => create Address with display name;
         let ( subject, from_mailbox, to_mailbox ) =
             self.preprocess_send_context( send_context, &mut data )?;
 
-        let core_headers = vec![
-            From( MailboxList::from_single( from_mailbox ) ),
-            To( MailboxList::from_single( to_mailbox ) ),
-            Subject( subject )
-            //TODO: what else? MessageId? Signature? ... or is it added by relay
-        ];
+        let core_headers = headers! {
+            Date: DateTime::now(),
+            //NOTE: if we support multiple mailboxes in From we have to
+            // ensure Sender is used _iff_ there is more than one from
+            From: (from_mailbox,),
+            To: (to_mailbox,),
+            Subject: subject
+        }?;
 
         let (bodies, embeddings, attachments) = self.use_template_engine( template_id, data )?;
 
@@ -156,18 +166,21 @@ impl<T, C, CP, D> Compositor<T, C, CP, D>
 
     /// uses the results of preprocessing data and templates, as well as a list of
     /// mail headers like `From`,`To`, etc. to create a new mail
-    pub fn build_mail( &self,
+    pub fn build_mail<E>( &self,
                        bodies: Vec<BodyWithEmbeddings>,
                        embeddings: Vec<EmbeddingWithCID>,
                        attachments: Attachments,
-                       core_headers: Vec<Header>
-    ) -> Result<Mail> {
+                       core_headers: HeaderMap<E>
+    ) -> Result<Mail<E>>
+        where E: MailEncoder
+    {
         let mail = match attachments.len() {
-            0 => Builder::create_alternate_bodies_with_embeddings(bodies, embeddings, core_headers )?,
+            0 => Builder::create_alternate_bodies_with_embeddings(
+                bodies, embeddings, Some(core_headers) )?,
             _n => Builder::create_with_attachments(
-                Builder::create_alternate_bodies_with_embeddings(bodies, embeddings, Vec::new() )?,
+                Builder::create_alternate_bodies_with_embeddings(bodies, embeddings, None )?,
                 attachments,
-                core_headers
+                Some( core_headers )
             )?
         };
         Ok( mail )
@@ -179,38 +192,44 @@ impl<T, C, CP, D> Compositor<T, C, CP, D>
 
 pub trait BuilderExt {
 
-    fn create_alternate_bodies(
+    fn create_alternate_bodies<E, HM>(
         bodies: Vec<BodyWithEmbeddings>,
-        header: Vec<Header>
-    ) -> Result<Mail>;
+        header: HM
+    ) -> Result<Mail<E>>
+        where E: MailEncoder, HM: Into<Option<HeaderMap<E>>>;
 
-    fn create_alternate_bodies_with_embeddings(
+    fn create_alternate_bodies_with_embeddings<E, HM>(
         bodies: Vec<BodyWithEmbeddings>,
         embeddings: Vec<EmbeddingWithCID>,
-        header: Vec<Header>
-    ) -> Result<Mail>;
+        header: HM
+    ) -> Result<Mail<E>>
+        where E: MailEncoder, HM: Into<Option<HeaderMap<E>>>;
 
-    fn create_mail_body(
+    fn create_mail_body<E, HM>(
         body: BodyWithEmbeddings,
-        headers: Vec<Header>
-    ) -> Result<Mail>;
+        headers: HM
+    ) -> Result<Mail<E>>
+        where E: MailEncoder, HM: Into<Option<HeaderMap<E>>>;
 
-    fn create_with_attachments(
-        body: Mail,
+    fn create_with_attachments<E, HM>(
+        body: Mail<E>,
         attachments: Attachments,
-        headers: Vec<Header>
-    ) -> Result<Mail>;
+        headers: HM
+    ) -> Result<Mail<E>>
+        where E: MailEncoder, HM: Into<Option<HeaderMap<E>>>;
 
-    fn create_body_from_resource(
+    fn create_body_from_resource<E, HM>(
         resource: Resource,
-        headers: Vec<Header>
-    ) -> Result<Mail>;
+        headers: HM
+    ) -> Result<Mail<E>>
+        where E: MailEncoder, HM: Into<Option<HeaderMap<E>>>;
 
-    fn create_body_with_embeddings(
-        sub_body: Mail,
+    fn create_body_with_embeddings<E, HM>(
+        sub_body: Mail<E>,
         embeddings: Vec<EmbeddingWithCID>,
-        headers: Vec<Header>
-    ) -> Result<Mail>;
+        headers: HM
+    ) -> Result<Mail<E>>
+        where E: MailEncoder, HM: Into<Option<HeaderMap<E>>>;
 
 }
 
@@ -218,10 +237,12 @@ pub trait BuilderExt {
 
 impl BuilderExt for Builder {
 
-    fn create_alternate_bodies(
+    fn create_alternate_bodies<E, HM>(
         bodies: Vec<BodyWithEmbeddings>,
-        headers: Vec<Header>
-    ) -> Result<Mail> {
+        headers: HM
+    ) -> Result<Mail<E>>
+        where E: MailEncoder, HM: Into<Option<HeaderMap<E>>>
+    {
         let mut bodies = bodies;
 
         match bodies.len() {
@@ -231,28 +252,33 @@ impl BuilderExt for Builder {
         }
 
         let mut builder = Builder
-            ::multipart( gen_multipart_mime( ascii_str!{ a l t e r n a t e })? )
-            .headers( headers )?;
+            ::multipart( gen_multipart_mime( ascii_str!{ a l t e r n a t e })? );
+
+        if let Some(headers) = headers.into() {
+            builder = builder.headers( headers )?;
+        }
 
         for body in bodies {
-            builder = builder.body( Self::create_mail_body( body, Vec::new() )? )?;
+            builder = builder.body( Self::create_mail_body( body, None )? )?;
         }
 
         builder.build()
     }
 
-    fn create_alternate_bodies_with_embeddings(
+    fn create_alternate_bodies_with_embeddings<E, HM>(
         bodies: Vec<BodyWithEmbeddings>,
         embeddings: Vec<EmbeddingWithCID>,
-        headers: Vec<Header>
-    ) -> Result<Mail> {
+        headers: HM
+    ) -> Result<Mail<E>>
+        where E: MailEncoder, HM: Into<Option<HeaderMap<E>>>
+    {
         match embeddings.len() {
             0 => {
                 Self::create_alternate_bodies( bodies, headers )
             },
             _n => {
                 Self::create_body_with_embeddings(
-                    Self::create_alternate_bodies( bodies, Vec::new() )?,
+                    Self::create_alternate_bodies( bodies, None )?,
                     embeddings,
                     headers
                 )
@@ -260,11 +286,16 @@ impl BuilderExt for Builder {
         }
     }
 
-    fn create_mail_body( body: BodyWithEmbeddings, headers: Vec<Header> ) -> Result<Mail> {
+    fn create_mail_body<E, HM>(
+        body: BodyWithEmbeddings,
+        headers: HM
+    ) -> Result<Mail<E>>
+        where E: MailEncoder, HM: Into<Option<HeaderMap<E>>>
+    {
         let (resource, embeddings) = body;
         if embeddings.len() > 0 {
             Self::create_body_with_embeddings(
-                Self::create_body_from_resource( resource, Vec::new() )?,
+                Self::create_body_from_resource( resource, None )?,
                 embeddings,
                 headers
             )
@@ -273,57 +304,75 @@ impl BuilderExt for Builder {
         }
     }
 
-    fn create_body_from_resource(  resource: Resource, headers: Vec<Header> ) -> Result<Mail> {
-        Builder::singlepart( resource )
-            .headers( headers )?
-            .build()
+    fn create_body_from_resource<E, HM>(
+        resource: Resource,
+        headers: HM
+    ) -> Result<Mail<E>>
+        where E: MailEncoder, HM: Into<Option<HeaderMap<E>>>
+    {
+        let mut builder = Builder::singlepart( resource );
+        if let Some( headers ) = headers.into() {
+            builder = builder.headers( headers )?;
+        }
+        builder.build()
     }
 
-    fn create_body_with_embeddings(
-        sub_body: Mail,
+    fn create_body_with_embeddings<E, HM>(
+        sub_body: Mail<E>,
         embeddings: Vec<EmbeddingWithCID>,
-        headers: Vec<Header>
-    ) -> Result<Mail> {
+        headers: HM
+    ) -> Result<Mail<E>>
+        where E: MailEncoder, HM: Into<Option<HeaderMap<E>>>
+    {
 
         if embeddings.len() == 0 {
             bail!( "this function except at last one embedding" )
         }
 
         let mut builder = Builder
-            ::multipart( gen_multipart_mime( ascii_str!{ r e l a t e d } )? )
-            .headers( headers )?;
+            ::multipart( gen_multipart_mime( ascii_str!{ r e l a t e d } )? );
+
+        if let Some( headers ) = headers.into() {
+            builder = builder.headers( headers )?;
+        }
 
 
         builder = builder.body( sub_body )?;
         for embedding in embeddings {
             let ( content_id, resource ) = embedding.into();
             builder = builder.body(
-                Self::create_body_from_resource( resource , vec![
-                    Header::ContentID( content_id ),
-                    Header::ContentDisposition( Disposition::inline() )
-                ])?
+                Self::create_body_from_resource( resource , headers! {
+                    ContentId: content_id,
+                    ContentDisposition: Disposition::inline()
+                }? )?
             )?;
         }
         builder.build()
     }
 
 
-    fn create_with_attachments(
-        body: Mail,
+    fn create_with_attachments<E, HM>(
+        body: Mail<E>,
         attachments: Attachments,
-        headers: Vec<Header>
-    )  -> Result<Mail> {
+        headers: HM
+    )  -> Result<Mail<E>>
+        where E: MailEncoder, HM: Into<Option<HeaderMap<E>>>
+    {
 
-        let mut builder = Builder::multipart( gen_multipart_mime( ascii_str!{ m i x e d } )? )
-                          .headers( headers )?
-                          .body( body )?;
+        let mut builder = Builder::multipart( gen_multipart_mime( ascii_str!{ m i x e d } )? );
+
+        if let Some( headers ) = headers.into() {
+            builder = builder.headers( headers )?;
+        }
+
+        builder = builder.body( body )?;
 
         for attachment in attachments {
             builder = builder.body( Self::create_body_from_resource(
                 attachment.into(),
-                vec![
-                    Header::ContentDisposition( Disposition::attachment() )
-                ]
+                headers! {
+                    ContentDisposition: Disposition::attachment()
+                }?
             )? )?;
         }
 

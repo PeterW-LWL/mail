@@ -1,6 +1,5 @@
 [package]
-authors = ["Philipp korber <p.korber@1aim.com>"]
-build = "./build.rs"
+authors = ["Philipp Korber <p.korber@1aim.com>"]
 categories = []
 description = "TODO"
 keywords = ["mail", "codec", "mime", "smtp"]
@@ -22,7 +21,6 @@ base64 = "0.6.0"
 chrono = "0.4.0"
 error-chain = "0.10.0"
 futures = "0.1.14"
-lazy_static = "0.2.8"
 mime = "0.3.2"
 nom = "3.1.0"
 owning_ref = "0.3.3"

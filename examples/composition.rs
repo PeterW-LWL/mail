@@ -1,4 +1,3 @@
-#[macro_use(sep_for)]
 extern crate mail_codec;
 extern crate futures;
 extern crate mime;
@@ -13,7 +12,7 @@ use template_engine::Teng;
 use mail_codec::composition_prelude::*;
 use mail_codec::resource_prelude::*;
 
-use mail_codec::default_impl::SimpleContext;
+use mail_codec::default_impl::{ SimpleContext, NoNameComposer};
 
 fn main() {
     _main().unwrap();
@@ -21,19 +20,19 @@ fn main() {
 
 fn _main() -> Result<()> {
     let context = SimpleContext::new( "content_id_postfix.is.this".into() );
-    let composer = Compositor::new( Teng::new(), context.clone(), NComp );
+    let composer = Compositor::new( Teng::new(), context.clone(), NoNameComposer );
 
-    let data = Users {
-        users: vec![
-            User {
-                name: "Goblin the First".into(),
-                avatar: fake_avatar(0),
-                signature: Resource::from_text( "wha'da signatur?".into() ).into(),
+    let data = Resorts {
+        listing: vec![
+            Resort {
+                name: "The Naping Lake".into(),
+                image: fake_avatar(0),
+                portfolio: Resource::from_text( "da naps'de weg".into() ).into(),
             },
-            User {
-                name: "Spider Dog".into(),
-                avatar: fake_avatar(1),
-                signature: Resource::from_text( "wau\r\nwau wau\r\nwau".into() ).into(),
+            Resort {
+                name: "Snoring Dog Tower".into(),
+                image: fake_avatar(1),
+                portfolio: Resource::from_text( "Our Motto: wau\r\nwau wau\r\nwau".into() ).into(),
             }
         ]
     };
@@ -76,33 +75,15 @@ fn fake_avatar(nr: u32) -> Embedding {
 }
 
 #[derive(Serialize)]
-struct Users {
-    users: Vec<User>
+struct Resorts {
+    listing: Vec<Resort>
 }
 
 #[derive(Serialize)]
-struct User {
+struct Resort {
     name: String,
-    avatar: Embedding,
-    signature: Attachment
-}
-
-
-struct NComp;
-
-impl NameComposer<Users> for NComp {
-    fn compose_name( &self, data: &Users ) -> Option<String> {
-        let mut name = String::new();
-        sep_for!{ user in data.users.iter();
-            sep { name += " who is also known as " };
-            name += &*user.name
-        }
-        if name.len() > 0 {
-            Some( name )
-        } else {
-            None
-        }
-    }
+    image: Embedding,
+    portfolio: Attachment
 }
 
 

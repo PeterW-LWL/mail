@@ -1,10 +1,13 @@
 use ascii::AsciiChar;
 
 use error::*;
+use utils::{HeaderTryFrom, HeaderTryInto};
 use codec::{ MailEncodable, MailEncoder };
 
 use super::Phrase;
 use super::Email;
+
+pub struct NoDisplayName;
 
 #[derive(Debug, Hash, Eq, PartialEq, Clone)]
 pub struct Mailbox {
@@ -23,12 +26,55 @@ impl From<Email> for Mailbox {
     }
 }
 
+impl From<(Option<Phrase>, Email)> for Mailbox {
+    fn from( pair: (Option<Phrase>, Email) ) -> Self {
+        let (display_name, email) = pair;
+        Mailbox { display_name, email }
+    }
+}
 
-impl MailEncodable for Mailbox {
+impl<E> HeaderTryFrom<E> for Mailbox
+    where E: HeaderTryInto<Email>
+{
+    fn try_from(email: E) -> Result<Self> {
+        Ok( Mailbox::from( email.try_into()? ) )
+    }
+}
 
-    fn encode<E>(&self, encoder: &mut E) -> Result<()>
-        where E: MailEncoder
-    {
+impl<E> HeaderTryFrom<(NoDisplayName, E)> for Mailbox
+    where E: HeaderTryInto<Email>
+{
+    fn try_from( pair: (NoDisplayName, E) ) -> Result<Self> {
+        let email = pair.1.try_into()?;
+        Ok( Mailbox { display_name: None, email } )
+    }
+}
+impl<P, E> HeaderTryFrom<(Option<P>, E)> for Mailbox
+    where P: HeaderTryInto<Phrase>, E: HeaderTryInto<Email>
+{
+    fn try_from( pair: (Option<P>, E) ) -> Result<Self> {
+        let display_name = if let Some( dn )= pair.0 {
+            Some( dn.try_into()? )
+        } else { None };
+        let email = pair.1.try_into()?;
+        Ok( Mailbox { display_name, email } )
+    }
+}
+
+impl<P, E> HeaderTryFrom<(P, E)> for Mailbox
+    where P: HeaderTryInto<Phrase>, E: HeaderTryInto<Email>
+{
+    fn try_from( pair: (P, E) ) -> Result<Self> {
+        let display_name = Some( pair.0.try_into()? );
+        let email = pair.1.try_into()?;
+        Ok( Mailbox { display_name, email } )
+    }
+}
+
+
+impl<E> MailEncodable<E> for Mailbox where E: MailEncoder {
+
+    fn encode(&self, encoder: &mut E) -> Result<()> {
         if let Some( display_name ) = self.display_name.as_ref() {
             display_name.encode( encoder )?;
             encoder.write_fws();

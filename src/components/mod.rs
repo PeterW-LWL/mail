@@ -6,7 +6,7 @@ mod email;
 pub use self::email::{ Email, Domain, LocalPart };
 
 mod mailbox;
-pub use self::mailbox::Mailbox;
+pub use self::mailbox::{Mailbox, NoDisplayName};
 
 mod mailbox_list;
 pub use self::mailbox_list::{MailboxList, OptMailboxList };
@@ -25,9 +25,6 @@ pub type ContentIDList = MessageIDList;
 
 mod cfws;
 pub use self::cfws::{ CFWS, FWS };
-
-mod header_name;
-pub use self::header_name::HeaderName;
 
 mod date_time;
 pub use self::date_time::DateTime;

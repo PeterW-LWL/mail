@@ -3,7 +3,7 @@ use std::ops::Deref;
 use mime::{ Mime, BOUNDARY };
 
 use error::*;
-use utils::is_multipart_mime;
+use utils::{ is_multipart_mime, HeaderTryInto };
 
 
 #[derive(Debug)]
@@ -16,6 +16,12 @@ impl SinglepartMime {
         } else {
             Err( ErrorKind::NotSinglepartMime( mime ).into() )
         }
+    }
+}
+
+impl HeaderTryInto<Mime> for SinglepartMime {
+    fn try_into(self) -> Result<Mime> {
+        Ok( self.0 )
     }
 }
 
@@ -46,6 +52,12 @@ impl MultipartMime {
             Err( ErrorKind::NotMultipartMime( mime ).into() )
         }
 
+    }
+}
+
+impl HeaderTryInto<Mime> for MultipartMime {
+    fn try_into(self) -> Result<Mime> {
+        Ok( self.0 )
     }
 }
 

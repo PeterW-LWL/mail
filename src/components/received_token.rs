@@ -13,10 +13,9 @@ pub enum ReceivedToken {
     Domain( Domain )
 }
 
-impl MailEncodable for ReceivedToken {
-    fn encode<E>( &self, encoder:  &mut E ) -> Result<()>
-        where E: MailEncoder
-    {
+impl<E> MailEncodable<E> for ReceivedToken where E: MailEncoder {
+
+    fn encode(&self, encoder: &mut E) -> Result<()> {
         use self::ReceivedToken::*;
         match *self {
             Word( ref word ) => {

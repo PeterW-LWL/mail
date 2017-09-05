@@ -5,8 +5,9 @@ use codec::{ MailEncoder, MailEncodable };
 
 pub use utils::DateTime;
 
-impl MailEncodable for DateTime {
-    fn encode<E>( &self, encoder:  &mut E ) -> Result<()> where E: MailEncoder {
+impl<E> MailEncodable<E> for DateTime where E: MailEncoder {
+
+    fn encode(&self, encoder: &mut E) -> Result<()> {
         let as_str = self.to_rfc2822();
         let ascii = unsafe { AsciiStr::from_ascii_unchecked( &*as_str ) };
         encoder.write_str( ascii );

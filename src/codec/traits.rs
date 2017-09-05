@@ -1,3 +1,5 @@
+use std::any::{ Any, TypeId };
+
 use ascii::{  AsciiStr, AsciiChar };
 
 use error::*;
@@ -39,7 +41,7 @@ pub trait EncodedWordWriter {
     }
 }
 
-pub trait MailEncoder {
+pub trait MailEncoder: 'static {
     fn mail_type( &self ) -> MailType;
 
     fn write_new_line( &mut self );
@@ -65,8 +67,11 @@ pub trait MailEncoder {
     fn write_body( &mut self, body: &[u8]);
 }
 
+pub trait MailEncodable<E: MailEncoder>: Any {
+    fn encode( &self, encoder:  &mut E ) -> Result<()>;
 
-pub trait MailEncodable {
-    fn encode<E>( &self, encoder:  &mut E ) -> Result<()>
-        where E: MailEncoder;
+    #[doc(hidden)]
+    fn type_id( &self ) -> TypeId {
+        TypeId::of::<Self>()
+    }
 }

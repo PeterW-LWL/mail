@@ -27,29 +27,29 @@ fn _main() -> Result<()> {
     let mut encoder = MailEncoderImpl::new( MailType::Ascii );
 
     let builder_ctx = SimpleBuilderContext::default();
-
+    let opt_name: Option<&'static str> = None;
+    let headers = headers! {
+        //FIXME actually use a more realistic header setup
+        Subject: "that ↓ will be encoded ",
+        MessageId: "ran.a1232.13rwqf23.a@dom",
+        From: [
+            ("random dude", "this@is.es"),
+            ("another person", "abc@def.geh"),
+        ],
+        To: (
+            "target@here.it.goes",
+            ("some", "thing@nice"),
+            ( opt_name, "a@b"),
+            ( Some("Uh"), "ee@b"),
+            // just writing None wont work due to type inference
+            // so either do not use the tuple form or use
+            // the NoDisplayName helper
+            ( NoDisplayName, "cc@b")
+        ),
+        ReturnPath: None
+    }?;
     let mail = Builder::singlepart( get_some_resource() )
-        .header(
-            Header::Subject(
-                Unstructured::from_input( "that ↓ will be encoded ")? ) )?
-        .header(
-            Header::MessageID( MessageID::from_input( "ran.a1232.13rwqf23.a@dom" )? )
-        )?
-        .header(
-            Header::From( MailboxList( vec1![
-                Mailbox {
-                    display_name: Some( Phrase::from_input( "random dude" )? ),
-                    email: Email::from_input( "this@is.es" )?
-                },
-                Mailbox {
-                    display_name: Some( Phrase::from_input( "random dude" )? ),
-                    email: Email::from_input( "this@is.es" )?
-                }
-            ]))
-        )?
-        .header(
-            Header::ReturnPath( Path( None ) )
-        )?
+        .headers( headers )?
         .build()?;
 
     let encodable_mail = mail.into_future( &builder_ctx ).wait().unwrap();

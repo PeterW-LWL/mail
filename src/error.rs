@@ -1,6 +1,7 @@
 use std::io;
 
 use mime::Mime;
+use mime::FromStrError as MimeParsingErr;
 use base64;
 use quoted_printable;
 
@@ -17,6 +18,11 @@ error_chain! {
 
     errors {
 
+        //mime_error does not impl (std)Error so no chaining possible
+        ParsingMime( mime_error: MimeParsingErr ) {
+            description( "parsing mime failed" )
+            display( "parsing mime failed ({:?})", mime_error )
+        }
         /// Certain components might not be encodable under some circumstances.
         /// E.g. they might have non-ascii values and are not encodable into ascii
         ///
