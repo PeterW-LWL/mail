@@ -7,8 +7,9 @@ use codec::{MailEncoder, MailEncodable };
 use utils::{ Vec1, HeaderTryFrom, HeaderTryInto};
 use super::Mailbox;
 
-
+#[derive(Debug)]
 pub struct OptMailboxList( pub Vec<Mailbox> );
+#[derive(Debug)]
 pub struct MailboxList( pub Vec1<Mailbox> );
 
 impl MailboxList {

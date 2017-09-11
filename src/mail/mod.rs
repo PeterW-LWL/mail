@@ -1,4 +1,5 @@
 use std::ops::Deref;
+use std::fmt;
 
 use codec::{ MailEncoder, MailEncodable };
 use ascii::{ AsciiString, AsciiChar };
@@ -194,7 +195,7 @@ impl<E> Into<Mail<E>> for EncodableMail<E>
     }
 }
 
-impl<'a, E> MailEncodable<E> for EncodableMail<E>
+impl<E> MailEncodable<E> for EncodableMail<E>
     where E: MailEncoder
 {
 
@@ -202,5 +203,13 @@ impl<'a, E> MailEncodable<E> for EncodableMail<E>
         // does not panic as a EncodableMail only is constructed from
         // a Mail which has all of it's bodies resolved, without failure
         encode::encode_mail( &self, true, encoder )
+    }
+}
+
+impl<E> fmt::Debug for EncodableMail<E>
+    where E: MailEncoder
+{
+    fn fmt(&self, fter: &mut fmt::Formatter) -> fmt::Result {
+        write!(fter, "EncodableMail {{ .. }}")
     }
 }

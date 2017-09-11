@@ -1,4 +1,5 @@
 use std::any::{ Any, TypeId };
+use std::fmt::Debug;
 
 use ascii::{  AsciiStr, AsciiChar };
 
@@ -67,7 +68,7 @@ pub trait MailEncoder: 'static {
     fn write_body( &mut self, body: &[u8]);
 }
 
-pub trait MailEncodable<E: MailEncoder>: Any {
+pub trait MailEncodable<E: MailEncoder>: Any+Debug {
     fn encode( &self, encoder:  &mut E ) -> Result<()>;
 
     #[doc(hidden)]

@@ -53,6 +53,7 @@ impl<E> MailEncodable<E> for MessageID where E: MailEncoder {
     }
 }
 
+#[derive(Debug)]
 pub struct MessageIDList( pub Vec1<MessageID> );
 
 deref0!{ +mut MessageIDList => Vec1<MessageID> }
