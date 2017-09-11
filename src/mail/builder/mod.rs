@@ -92,14 +92,14 @@ impl<E> BuilderShared<E> where E: MailEncoder {
 pub fn check_multiple_headers<E>( headers: &HeaderMap<E> , is_multipart: bool) -> Result<()>
     where E: MailEncoder
 {
-    if let Some( .. ) = headers.get_single::<ContentTransferEncoding>()? {
+    if let Some( .. ) = headers.get_single(ContentTransferEncoding) {
         bail!( concat!(
             "setting content transfer encoding through a header is not supported,",
             "use Ressource::set_preferred_encoding on the body instead"
         ) );
     }
-    if let Some( mime ) = headers.get_single::<ContentType>()? {
-        if is_multipart != is_multipart_mime( mime ) {
+    if let Some( mime ) = headers.get_single(ContentType) {
+        if is_multipart != is_multipart_mime( mime? ) {
             return Err( ErrorKind::ContentTypeAndBodyIncompatible.into() )
         }
     }

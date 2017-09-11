@@ -1,75 +1,59 @@
-use std;
-use std::collections::hash_map::{ IntoIter as MapIntoIter };
+use std::{mem, vec};
 
 use codec::{ MailEncoder, MailEncodable };
 use headers::HeaderName;
 
-
-use super::HeaderBodies;
 use super::HeaderMap;
 
 impl<E> IntoIterator for HeaderMap<E>
     where E: MailEncoder
 {
     type Item = (HeaderName, Box<MailEncodable<E>>);
-    type IntoIter = IntoIter<E>;
+    type IntoIter = vec::IntoIter<(HeaderName, Box<MailEncodable<E>>)>;
 
     fn into_iter(self) -> Self::IntoIter {
-        IntoIter {
-            header_map_iter: self.headers.into_iter(),
-            sub_iter: None
-        }
+        let HeaderMap { header_map, header_vec } = self;
+        mem::drop(header_map);
+        header_vec.into_iter()
     }
 }
 
-type _Iter<E> = std::iter::FlatMap<
-    std::option::IntoIter<
-        std::vec::Vec<Box<MailEncodable<E> + 'static>>
-    >,
-    std::vec::IntoIter<
-        Box<MailEncodable<E> + 'static>
-    >,
-    fn(Vec<Box<MailEncodable<E>>>) -> std::vec::IntoIter<Box<MailEncodable<E>>>
->;
 
 
-pub struct IntoIter<E: MailEncoder> {
-    header_map_iter: MapIntoIter<HeaderName, HeaderBodies<E>>,
-    sub_iter: Option<(HeaderName, _Iter<E>)>
-}
+#[cfg(test)]
+mod test {
+    use codec::{ MailEncodable, MailEncoderImpl};
+    use headers::{ To, Subject, From};
+    use components::Unstructured;
+    use super::HeaderMap;
+    use super::super::downcast_ref;
 
-impl<E> Iterator for IntoIter<E>
-    where E: MailEncoder
-{
-    type Item = (HeaderName, Box<MailEncodable<E>>);
+    #[test]
+    fn into_iter() {
+        const TEST_TEXT: &str = "this is a subject";
+        let mut headers = HeaderMap::<MailEncoderImpl>::new();
+        headers.insert(To, [ "affen@haus" ]).unwrap();
+        headers.insert(Subject, TEST_TEXT).unwrap();
+        headers.insert(From, [ "nix@da", "ja@wohl" ]).unwrap();
 
-    fn next(&mut self) -> Option<Self::Item> {
-        let result = self.sub_iter.as_mut().and_then( |&mut (ref name, ref mut iter)| {
-            iter.next().map( |hbody| (*name, hbody) )
-        } );
-        if result.is_some() {
-            return result;
-        } else {
-            let hbodies = self.header_map_iter.next();
-            if let Some( ( name, HeaderBodies { first, other } ) ) = hbodies {
-                self.sub_iter = Some( (
-                    name,
-                    other
-                        .into_iter()
-                        .flat_map( |el| el
-                            .into_iter() )
-                ) );
-                return Some( (name, first) )
-            } else {
-                return None;
-            }
-        }
-    }
+        let headers = headers.into_iter()
+            .map(|(name, val)| {
+                (name.as_str(), val)
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(3, headers.len());
+        //check order
+        assert_eq!("To", headers[0].0 );
+        assert_eq!("Subject", headers[1].0);
+        assert_eq!("From", headers[2].0 );
 
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        let (min, _max) = self.header_map_iter.size_hint();
-        // we have at last as many elements as the header map has entries,
-        // but might have more
-        (min, None)
+        //check if we can use the data
+        let obj: &MailEncodable<_> = &*headers[1].1;
+        let text = downcast_ref::<_, Unstructured>(obj).unwrap();
+        assert_eq!(
+            TEST_TEXT,
+            text.as_str()
+        );
+
     }
 }

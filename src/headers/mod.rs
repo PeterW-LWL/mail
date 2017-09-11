@@ -7,13 +7,13 @@ use error::*;
 use grammar::is_ftext;
 
 
-
+#[macro_use]
 mod default_header;
 pub use self::default_header::*;
 
 #[macro_use]
 mod map;
-pub use self::map::{ HeaderMap, HeaderMultiBodyIter };
+pub use self::map::{HeaderMap, TypedMultiBodyIter, UntypedMultiBodyIter};
 
 
 
