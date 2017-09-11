@@ -1,26 +1,28 @@
-use std::mem;
+use std::{ mem, fmt };
 use std::any::{ Any, TypeId };
-use std::collections::{ HashMap as Map };
 use std::marker::PhantomData;
-use std::slice::{ Iter as SliceIter };
+use std::collections::{ HashMap as Map };
 use std::iter::Iterator;
+use std::slice::{ Iter as SliceIter };
 
+//reexport for headers macro
 pub use ascii::{ AsciiStr as _AsciiStr };
 
 use utils::HeaderTryInto;
 use error::*;
 use codec::{ MailEncoder, MailEncodable };
 
-use super::{ HeaderName, Header, SingularHeaderMarker };
+use super::{
+    HeaderName,
+    Header,
+    SingularHeaderMarker
+};
 
 mod into_iter;
 pub use self::into_iter::*;
 mod iter;
 pub use self::iter::*;
 
-// Note: no Drop impl needed as droping header_map
-//   drops all MailEncodable boxes through HeaderBodies
-//   (also invalidating header_vec...)
 //TODO implement: Debug,  remove
 pub struct HeaderMap<E: MailEncoder> {
     // the only header which is allowed/meant to appear more than one time is
@@ -232,6 +234,18 @@ impl<E: MailEncoder> HeaderMap<E> {
 //    }
 }
 
+impl<E> fmt::Debug for HeaderMap<E>
+    where E: MailEncoder
+{
+    fn fmt(&self, fter: &mut fmt::Formatter) -> fmt::Result {
+        write!(fter, "HeaderMap {{ ")?;
+        for (name, component) in self.iter() {
+            write!(fter, "{}: {:?},", name, component)?;
+        }
+        write!(fter, " }}")
+    }
+}
+
 
 pub struct UntypedMultiBodyIter<'a, E: 'a> {
     first: Option<&'a MailEncodable<E>>,
@@ -392,5 +406,21 @@ mod test {
     #[test]
     fn get() {
 
+    }
+
+    #[test]
+    fn fmt_debug() {
+        use headers::Subject;
+
+        let headers = headers! {
+            Subject: "hy there"
+        }.unwrap();
+        typed(&headers);
+
+        let res = format!("{:?}", headers);
+        assert_eq!(
+            "HeaderMap { Subject: Unstructured { text: Input(Owned(\"hy there\")) }, }",
+            res.as_str()
+        );
     }
 }
