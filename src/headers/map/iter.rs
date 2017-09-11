@@ -69,3 +69,54 @@ mod ref_iter {
         iter, Iter, REF
     }
 }
+
+#[cfg(test)]
+mod test {
+    use codec::MailEncoderImpl;
+    use headers::{ Subject, Comments };
+    use components::Unstructured;
+    use super::super::{ HeaderMap, downcast_ref};
+
+    #[test]
+    fn iter_in_order() {
+        let mut map: HeaderMap<MailEncoderImpl> = HeaderMap::new();
+        map.insert(Comments, "A").unwrap();
+        map.insert(Subject, "B").unwrap();
+        map.insert(Comments, "nix C").unwrap();
+
+
+        let res = map.iter()
+            .map(|(name, val)| {
+                let name = name.as_str();
+                let text = downcast_ref::<_, Unstructured>(val).unwrap().as_str();
+                (name, text)
+            })
+            .collect::<Vec<_>>();
+
+        assert_eq!(
+            &[ ("Comments", "A") , ("Subject", "B"), ("Comments", "nix C") ],
+            res.as_slice()
+        );
+    }
+
+    #[test]
+    fn iter_mut_in_order() {
+        let mut map: HeaderMap<MailEncoderImpl> = HeaderMap::new();
+        map.insert(Comments, "A").unwrap();
+        map.insert(Subject, "B").unwrap();
+        map.insert(Comments, "nix C").unwrap();
+
+        let res = map.iter_mut()
+            .map(|(name, val)| {
+                let name = name.as_str();
+                let text = downcast_ref::<_, Unstructured>(val).unwrap().as_str();
+                (name, text)
+            })
+            .collect::<Vec<_>>();
+
+        assert_eq!(
+            &[ ("Comments", "A") , ("Subject", "B"), ("Comments", "nix C") ],
+            res.as_slice()
+        );
+    }
+}
