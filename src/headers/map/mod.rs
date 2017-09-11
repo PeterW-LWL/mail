@@ -59,6 +59,14 @@ impl<E: MailEncoder> HeaderMap<E> {
         }
     }
 
+    #[inline(always)]
+    pub fn get_single<'a ,H>( &'a self, _type_hint: H ) -> Option<Result<&'a H::Component>>
+        where H: Header + SingularHeaderMarker,
+              H::Component: 'static
+    {
+        self._get_single::<H>()
+    }
+
     ///
     /// Note:
     /// if you implement `SingularHeaderMarker` on a header
@@ -67,7 +75,7 @@ impl<E: MailEncoder> HeaderMap<E> {
     /// (if there are any) with out any guarantees which one
     /// or that multiple call to it will always return the
     /// same one
-    pub fn get_single<'a ,H>( &'a self ) -> Option<Result<&'a H::Component>>
+    pub fn _get_single<'a ,H>( &'a self ) -> Option<Result<&'a H::Component>>
         where H: Header + SingularHeaderMarker,
               H::Component: 'static
     {
@@ -81,7 +89,15 @@ impl<E: MailEncoder> HeaderMap<E> {
             })
     }
 
-    pub fn get<H>( &self ) -> Option<TypedMultiBodyIter<E, H>>
+
+    #[inline(always)]
+    pub fn get<H>( &self, _type_hint: H) -> Option<TypedMultiBodyIter<E, H>>
+        where H: Header, H::Component: MailEncodable<E>
+    {
+        self._get::<H>()
+    }
+
+    pub fn _get<H>( &self ) -> Option<TypedMultiBodyIter<E, H>>
         where H: Header, H::Component: MailEncodable<E>
     {
         self.get_untyped( H::name() )
@@ -398,7 +414,7 @@ mod test {
         let count = headers
             // all headers _could_ have multiple values, through neither
             // ContentType nor Subject do have multiple value
-            .get::<ContentType>()
+            .get(ContentType)
             .expect( "content type header must be present" )
             .map( |h: Result<&Mime>| {
                 // each of the multiple values could have a different
@@ -409,7 +425,7 @@ mod test {
         assert_eq!( 1, count );
 
         let count = headers
-            .get::<Subject>()
+            .get(Subject)
             .expect( "content type header must be present" )
             .map( |h: Result<&Unstructured>| {
                 h.expect( "the trait object to be downcastable to H::Component" );
@@ -418,7 +434,7 @@ mod test {
         assert_eq!( 1, count );
 
         let count = headers
-            .get::<From>()
+            .get(From)
             .expect( "content type header must be present" )
             .map( |h: Result<&MailboxList>| {
                 h.expect( "the trait object to be downcastable to H::Component" );
@@ -437,10 +453,10 @@ mod test {
 
         typed(&headers);
 
-        assert_eq!( false, headers.get_single::<From>().is_some() );
+        assert_eq!( false, headers.get_single(From).is_some() );
         assert_eq!(
             "abc",
-            headers.get_single::<Subject>()
+            headers.get_single(Subject)
                 .unwrap()//Some
                 .unwrap()//Result
                 .as_str()
@@ -455,7 +471,7 @@ mod test {
 
         typed(&headers);
 
-        let res = headers.get_single::<BadSubject>();
+        let res = headers.get_single(BadSubject);
         assert_eq!( true, res.is_some() );
         assert_err!( res.unwrap() );
     }
@@ -470,7 +486,7 @@ mod test {
 
         typed(&headers);
 
-        let mut res = headers.get::<Comments>()
+        let mut res = headers.get(Comments)
             .unwrap();
 
         assert_eq!((2, Some(2)), res.size_hint());

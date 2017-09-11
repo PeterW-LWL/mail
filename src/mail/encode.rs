@@ -137,7 +137,7 @@ fn encode_mail_part<E>(mail: &Mail<E>, encoder:  &mut E ) -> Result<()>
             }
             let boundary: String = {
                 //FIXME there has to be a better way
-                if let Some( mime ) = mail.headers.get_single::<ContentType>() {
+                if let Some( mime ) = mail.headers.get_single(ContentType) {
                     mime?.get_param(BOUNDARY)
                         .ok_or_else( ||-> Error { "boundary gone missing".into() } )?
                         .to_string()
