@@ -1,3 +1,5 @@
+use std::fmt;
+
 use ascii::AsciiStr;
 pub use ascii::{  AsciiStr as _AsciiStr };
 
@@ -71,6 +73,12 @@ impl HeaderName {
     #[inline(always)]
     pub fn as_str( &self ) -> &'static str {
         self.name.as_str()
+    }
+}
+
+impl fmt::Display for HeaderName {
+    fn fmt(&self, fter: &mut fmt::Formatter) -> fmt::Result {
+        write!(fter, "{}", self.as_str())
     }
 }
 
