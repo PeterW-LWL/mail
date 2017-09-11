@@ -33,7 +33,7 @@ macro_rules! iter_impl {
         }
 
         pub struct $tp_name<'a, E: MailEncoder> {
-            vec_ptr_iter: slice::$tp_name<'a, (HeaderName, *mut MailEncodable<E>)>
+            vec_ptr_iter: slice::$tp_name<'a, (HeaderName, Box<MailEncodable<E>>)>
         }
 
         impl<'a, E> Iterator for $tp_name<'a, E>
@@ -43,13 +43,9 @@ macro_rules! iter_impl {
 
             fn next(&mut self) -> Option<Self::Item> {
                 self.vec_ptr_iter.next()
-                    .map( |name_and_ptr| {
-                        let name = name_and_ptr.0;
-                        //SAFE: the signature of HeaderMap::iter/iter_mut gurantees
-                        // that this is safe
-                        let reference = unsafe { 
-                            iter_impl!{ _REF EXPR $mutability *name_and_ptr.1  }
-                        };
+                    .map( |name_and_box| {
+                        let name = name_and_box.0;
+                        let reference = iter_impl!{_REF EXPR $mutability *name_and_box.1 };
                         (name, reference)
                     })
             }
