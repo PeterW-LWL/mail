@@ -34,6 +34,13 @@ macro_rules! def_headers {
             def_headers!{ _PRIV_impl_marker $multi $name }
         )+
 
+        //TODO warn if header type name and header name diverges
+        // (by stringifying the type name and then ziping the
+        //  array of type names with header names removing
+        //  "-" from the header names and comparing them to
+        //  type names)
+
+
         #[cfg(test)]
         const HEADER_NAMES: &[ &str ] = &[ $(
             $hname
@@ -41,7 +48,15 @@ macro_rules! def_headers {
 
         #[test]
         fn $tn() {
+            use std::collections::HashSet;
             use $crate::codec::{ MailEncoder, MailEncodable, MailEncoderImpl };
+
+            let mut name_set = HashSet::new();
+            for name in HEADER_NAMES {
+                if !name_set.insert(name) {
+                    panic!("name appears more than one time in same def_headers macro: {:?}", name);
+                }
+            }
             fn can_be_trait_object<E: MailEncoder, EN: MailEncodable<E>>( v: Option<&EN> ) {
                 let _ = v.map( |en| en as &MailEncodable<E> );
             }
@@ -94,7 +109,7 @@ def_headers! {
     + ResentDate,              unsafe { "Resent-Date"   },  DateTime,
     + ResentFrom,              unsafe { "Resent-From"   },  MailboxList,
     + ResentSender,            unsafe { "Resent-Sender" },  Mailbox,
-    + ResentTo,                unsafe { "Resent-Sender" },  MailboxList,
+    + ResentTo,                unsafe { "Resent-To"     },  MailboxList,
     + ResentCc,                unsafe { "Resent-Cc"     },  MailboxList,
     + ResentBcc,               unsafe { "Resent-Bcc"    },  OptMailboxList,
     + ResentMsgId,             unsafe { "Resent-Msg-Id" },  MessageID,

@@ -1,4 +1,4 @@
-use std;
+use std::{self, mem};
 use std::collections::hash_map::{ IntoIter as MapIntoIter };
 
 use codec::{ MailEncoder, MailEncodable };
@@ -15,8 +15,10 @@ impl<E> IntoIterator for HeaderMap<E>
     type IntoIter = IntoIter<E>;
 
     fn into_iter(self) -> Self::IntoIter {
+        let HeaderMap { header_map, header_vec } = self;
+        mem::drop(header_vec);
         IntoIter {
-            header_map_iter: self.headers.into_iter(),
+            header_map_iter: header_map.into_iter(),
             sub_iter: None
         }
     }

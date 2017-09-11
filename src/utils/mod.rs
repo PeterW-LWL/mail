@@ -163,3 +163,15 @@ pub fn uneraser_mut<GOT: 'static, EXP: 'static>(inp: &mut GOT ) -> Option<&mut E
 //        Err( inp )
 //    }
 //}
+
+//fn get_flat_byte_repr<T>(val: &T) -> Vec<u8> {
+//    let count = mem::size_of::<T>();
+//    let mut out = Vec::with_capacity(count);
+//    let byte_ptr = val as *const T as *const u8;
+//    for offset in 0..count {
+//        out.push( unsafe {
+//            *byte_ptr.offset(offset as isize)
+//        })
+//    }
+//    out
+//}

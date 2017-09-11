@@ -1,3 +1,4 @@
+use std::mem;
 use std::any::{ Any, TypeId };
 use std::collections::{ HashMap as Map };
 use std::marker::PhantomData;
@@ -17,6 +18,9 @@ pub use self::into_iter::*;
 mod iter;
 pub use self::iter::*;
 
+// Note: no Drop impl needed as droping header_map
+//   drops all MailEncodable boxes through HeaderBodies
+//   (also invalidating header_vec...)
 //TODO implement: Debug,  remove
 pub struct HeaderMap<E: MailEncoder> {
     // the only header which is allowed/meant to appear more than one time is
@@ -27,8 +31,15 @@ pub struct HeaderMap<E: MailEncoder> {
     //
     // Idea have some kind of wrapper and move this property into the type system
     // we are already abstracting with Trait objects, so why not?
-    headers: Map<HeaderName, HeaderBodies<E>>,
+    //headers: Map<HeaderName, HeaderBodies<E>>,
+    // we want to keep and reproduce the insertion order of
+    // all headers
+    header_vec: Vec<(HeaderName, *mut MailEncodable<E>)>,
+    // we don't want to search for a header when accessing it,
+    // we also have to kow if such a header is set etc.
+    header_map: Map<HeaderName, HeaderBodies<E>>
 }
+
 
 
 struct HeaderBodies<E: MailEncoder> {
@@ -40,7 +51,10 @@ struct HeaderBodies<E: MailEncoder> {
 impl<E: MailEncoder> HeaderMap<E> {
 
     pub fn new() -> Self {
-        HeaderMap { headers: Map::new() }
+        HeaderMap {
+            header_vec: Vec::new(),
+            header_map: Map::new()
+        }
     }
 
     ///
@@ -56,7 +70,7 @@ impl<E: MailEncoder> HeaderMap<E> {
               H::Component: 'static
     {
 
-      if let Some( body ) = self.headers.get( &H::name() ) {
+      if let Some( body ) = self.get_bodies( H::name() ) {
             downcast_ref::<E, H::Component>( &*body.first )
                 .ok_or_else( ||->Error {
                     "use of different header types with same header name".into() } )
@@ -67,8 +81,15 @@ impl<E: MailEncoder> HeaderMap<E> {
 
     }
 
+    pub fn get<H>( &self ) -> Option<TypedMultiBodyIter<E, H>>
+        where H: Header, H::Component: MailEncodable<E>
+    {
+        self.get_untyped( H::name() )
+            .map( |untyped| untyped.with_typing() )
+    }
+
     pub fn get_untyped( &self, name: HeaderName ) -> Option<UntypedMultiBodyIter<E>> {
-        if let Some( body ) = self.headers.get( &name ) {
+        if let Some( body ) = self.get_bodies( name ) {
             Some( UntypedMultiBodyIter::new(
                 &*body.first,
                 body.other.as_ref().map( |o| o.iter() )
@@ -78,17 +99,22 @@ impl<E: MailEncoder> HeaderMap<E> {
         }
     }
 
-    pub fn get<H>( &self ) -> Option<TypedMultiBodyIter<E, H>>
-        where H: Header, H::Component: MailEncodable<E>
-    {
-        self.get_untyped( H::name() )
-            .map( |untyped| untyped.with_typing() )
+    /// As this method requires a `&self` borrow it
+    /// assures that there won't be any `&mut` borrows,
+    /// neither based on `header_vec` nor `header_map`
+    /// through there _could_ be other non-mut borrows
+    fn get_bodies( &self, name: HeaderName ) -> Option<&HeaderBodies<E>> {
+        self.header_map.get( &name )
     }
 
     // we can't have a public `std::iter::Extend` as insertion
     // is failable
     pub fn extend( &mut self, other: HeaderMap<E> ) -> Result<()> {
-        for (name, hbody) in other.headers.into_iter() {
+        let HeaderMap { header_vec, header_map } = other;
+        //SAFETY: after dropping header_vec using header_map in any way
+        // is completely safe
+        mem::drop(header_vec);
+        for (name, hbody) in header_map.into_iter() {
             self.insert_trait_object( name, hbody.first, hbody.other.is_some())?;
             if let Some( other ) = hbody.other {
                 for tobj in other {
@@ -136,23 +162,37 @@ impl<E: MailEncoder> HeaderMap<E> {
     fn insert_trait_object(
         &mut self,
         name: HeaderName,
-        tobj: Box<MailEncodable<E>>,
+        mut tobj: Box<MailEncodable<E>>,
+        can_appear_multiple_times: bool
+    ) -> Result<()> {
+        //SAFTY: we get a second pointer, while using two at a time is unsafe
+        //  the mere existence is not a problem
+
+        let obj_ptr = (&mut *tobj) as *mut MailEncodable<E>;
+        self._insert_trait_object_to_map(name, tobj, can_appear_multiple_times)?;
+        //only if we succesfull inserted it to the map can we insert it to the vec
+        self.header_vec.push( (name, obj_ptr) );
+        Ok( () )
+    }
+
+    fn _insert_trait_object_to_map(
+        &mut self,
+        name: HeaderName,
+        obj: Box<MailEncodable<E>>,
         can_appear_multiple_times: bool
     ) -> Result<()> {
         {
-            if let Some( body ) = self.headers.get_mut( &name ) {
-                let has_multiple = body.other.is_some();
-                if can_appear_multiple_times != has_multiple {
-                    bail!( "multi appearance header combined with single apparence header with same name" );
+            if let Some( body ) = self.header_map.get_mut( &name ) {
+                if !can_appear_multiple_times {
+                    bail!( "field already set and field can appear at most one time" );
                 }
-                if can_appear_multiple_times {
-                    //UNWRAP_SAFE: as multi == has_multi == other.is_some() == true
-                    body.other.as_mut().unwrap().push( tobj );
+                if let Some( other ) = body.other.as_mut() {
+                    other.push( obj );
+                    return Ok(())
                 } else {
-                    //override non multi entry
-                    body.first = tobj;
+                    bail!( concat!( "multi appearance header combined with single ",
+                        "apparence header with same name" ) );
                 }
-                return Ok(())
             }
         }
 
@@ -162,13 +202,34 @@ impl<E: MailEncoder> HeaderMap<E> {
             None
         };
 
-        self.headers.insert( name.to_owned(), HeaderBodies {
-            first: tobj,
+        self.header_map.insert( name, HeaderBodies {
+            first: obj,
             other: empty_other
-        });
+        } );
 
         Ok( () )
     }
+
+    // we currently do not have a mechanism to remove header
+//    fn _remove_from_vec( &mut self, obj_ptr: *mut MailEncodable<E> ) {
+//        let ptr_as_num = obj_ptr as usize;
+//        let mut rem_idx = None;
+//        for (idx, &(name, ptr)) in self.header_map.iter().enumerate() {
+//            if ptr as usize == ptr_as_num {
+//                rem_idx = Some(idx)
+//            }
+//        }
+//        if let Some( rem_idx ) = rem_idx {
+//            self.header_vec.remove( rem_idx );
+//        } else {
+//            panic!(concat!(
+//                "no matching ptr found in vec ==",
+//                " inconsistent state ==",
+//                " possible broken safety gurantees",
+//                " (or just misuse of _remove_from_vec fn)"
+//            ));
+//        }
+//    }
 }
 
 
@@ -278,7 +339,9 @@ mod test {
         let headers = headers! {
             ContentType: "text/plain; charset=us-ascii",
             Subject: "Having a lot of fun",
-            From: ("Bla Blup", "bla.blub@not.a.domain")
+            From: [
+                ("Bla Blup", "bla.blub@not.a.domain")
+            ]
         }.unwrap();
 
 
