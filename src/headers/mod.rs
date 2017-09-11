@@ -7,7 +7,7 @@ use error::*;
 use grammar::is_ftext;
 
 
-
+#[macro_use]
 mod default_header;
 pub use self::default_header::*;
 

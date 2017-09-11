@@ -67,22 +67,18 @@ impl<E: MailEncoder> HeaderMap<E> {
     /// (if there are any) with out any guarantees which one
     /// or that multiple call to it will always return the
     /// same one
-    pub fn get_single<'a ,H>( &'a self ) -> Result<Option<&'a H::Component>>
+    pub fn get_single<'a ,H>( &'a self ) -> Option<Result<&'a H::Component>>
         where H: Header + SingularHeaderMarker,
               H::Component: 'static
     {
-
-      if let Some( body ) = self.get_bodies( H::name() ) {
-            //SAFE: all pointers are always valid and borrowing rules are
-            //  indirectly enforced by the `&self` borrow
-            downcast_ref::<E, H::Component>( unsafe { &*body.first } )
-                .ok_or_else( ||->Error {
-                    "use of different header types with same header name".into() } )
-                .map( |res_ref| Some( res_ref ) )
-        } else {
-            Ok( None )
-        }
-
+        self.get_bodies( H::name() )
+            .map( |body| {
+                //SAFE: all pointers are always valid and borrowing rules are
+                //  indirectly enforced by the `&self` borrow
+                downcast_ref::<E, H::Component>( unsafe { &*body.first } )
+                    .ok_or_else( ||->Error {
+                        "use of different header types with same header name".into() } )
+            })
     }
 
     pub fn get<H>( &self ) -> Option<TypedMultiBodyIter<E, H>>
@@ -297,6 +293,16 @@ impl<'a, E> Iterator for UntypedMultiBodyIter<'a, E>
                     .map( |val| unsafe { &**val } )
             })
     }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let offset = if self.first.is_some() { 1 } else { 0 };
+        if let Some( other ) = self.other.as_ref() {
+            let (min, max) = other.size_hint();
+            (min+offset, max.map(|v|v+offset))
+        } else {
+            (offset, Some(offset))
+        }
+    }
 }
 
 
@@ -317,6 +323,10 @@ impl<'a, E, H> Iterator for TypedMultiBodyIter<'a, E, H>
                 .ok_or_else( ||->Error {
                     "use of different header types with same header name".into() } )
         })
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.untyped_iter.size_hint()
     }
 }
 
@@ -350,9 +360,27 @@ mod test {
         MailboxList
     };
     use headers::{
-        ContentType, Subject, From
+        ContentType, Subject,
+        From, To,
+        Comments
     };
     use super::*;
+
+    use self::collision_headers::{
+        Subject as BadSubject,
+        Comments as BadComments
+    };
+
+    mod collision_headers {
+        use components;
+        def_headers! {
+            test_name: validate_header_names,
+            scope: components,
+            1 Subject, unsafe { "Subject" }, Mime,
+            + Comments, unsafe { "Comments" }, Mime
+        }
+    }
+
 
     fn typed(_v: &HeaderMap<MailEncoderImpl>) {}
 
@@ -402,24 +430,103 @@ mod test {
     }
 
     #[test]
-    fn iter() {
+    fn get_single() {
+        let headers = headers! {
+            Subject: "abc"
+        }.unwrap();
 
+        typed(&headers);
+
+        assert_eq!( false, headers.get_single::<From>().is_some() );
+        assert_eq!(
+            "abc",
+            headers.get_single::<Subject>()
+                .unwrap()//Some
+                .unwrap()//Result
+                .as_str()
+        );
     }
 
     #[test]
-    fn get_single() {
+    fn get_single_cast_error() {
+        let headers = headers! {
+            Subject: "abc"
+        }.unwrap();
 
+        typed(&headers);
+
+        let res = headers.get_single::<BadSubject>();
+        assert_eq!( true, res.is_some() );
+        assert_err!( res.unwrap() );
     }
 
     #[test]
     fn get() {
+        let headers = headers! {
+            Subject: "abc",
+            Comments: "1st",
+            BadComments: "text/plain"
+        }.unwrap();
+
+        typed(&headers);
+
+        let mut res = headers.get::<Comments>()
+            .unwrap();
+
+        assert_eq!((2, Some(2)), res.size_hint());
+
+        assert_eq!(
+            "1st",
+            assert_ok!(res.next().unwrap()).as_str()
+        );
+
+        assert_err!(res.next().unwrap());
+
+        assert!( res.next().is_none() )
 
     }
 
     #[test]
-    fn fmt_debug() {
-        use headers::Subject;
+    fn get_untyped() {
+        let headers = headers! {
+            Subject: "abc",
+            Comments: "1st",
+            BadComments: "text/plain"
+        }.unwrap();
 
+        typed(&headers);
+
+        let res = headers.get_untyped(Subject::name())
+            .unwrap()
+            .map(|entry| downcast_ref::<_, Unstructured>(entry).unwrap().as_str() )
+            .collect::<Vec<_>>();
+
+        assert_eq!(
+            &[ "abc" ],
+            res.as_slice()
+        );
+
+        let mut res = headers.get_untyped(Comments::name()).unwrap();
+
+        assert_eq!((2, Some(2)), res.size_hint());
+
+        assert_eq!(
+            "1st",
+            downcast_ref::<_, Unstructured>(res.next().unwrap()).unwrap().as_str()
+        );
+
+        assert_eq!((1, Some(1)), res.size_hint());
+
+        assert_eq!(
+            "text/plain".to_owned(),
+            format!("{}", downcast_ref::<_, Mime>(res.next().unwrap()).unwrap())
+        );
+
+        assert!(res.next().is_none());
+    }
+
+    #[test]
+    fn fmt_debug() {
         let headers = headers! {
             Subject: "hy there"
         }.unwrap();
@@ -434,8 +541,6 @@ mod test {
 
     #[test]
     fn extend_keeps_order() {
-        use headers::{ From, To, Subject };
-
         let mut headers = headers! {
             To: [ "ab@c" ]
         }.unwrap();

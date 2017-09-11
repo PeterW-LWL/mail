@@ -10,6 +10,7 @@
 ///
 /// Nevertheless a test is created with the given test name which
 /// tests if all field names are valide.
+#[macro_export]
 macro_rules! def_headers {
     (
         test_name: $tn:ident,
