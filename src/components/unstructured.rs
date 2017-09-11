@@ -1,3 +1,5 @@
+use std::ops::{ Deref, DerefMut};
+
 use ascii::AsciiChar;
 
 use error::*;
@@ -15,6 +17,19 @@ pub struct Unstructured {
     text: Input,
 }
 
+impl Deref for Unstructured {
+    type Target = Input;
+
+    fn deref(&self) -> &Self::Target {
+        &self.text
+    }
+}
+
+impl DerefMut for Unstructured {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.text
+    }
+}
 
 impl FromInput for Unstructured {
     fn from_input<I: Into<Input>>( text: I ) -> Result<Self> {
