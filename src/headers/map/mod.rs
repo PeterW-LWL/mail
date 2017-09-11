@@ -1,5 +1,4 @@
 use std::fmt;
-use std::any::{ Any, TypeId };
 use std::marker::PhantomData;
 use std::collections::{ HashMap as Map };
 use std::iter::Iterator;
@@ -62,7 +61,7 @@ impl<E: MailEncoder> HeaderMap<E> {
     #[inline(always)]
     pub fn get_single<'a ,H>( &'a self, _type_hint: H ) -> Option<Result<&'a H::Component>>
         where H: Header + SingularHeaderMarker,
-              H::Component: 'static
+              H::Component: MailEncodable<E>
     {
         self._get_single::<H>()
     }
@@ -77,13 +76,14 @@ impl<E: MailEncoder> HeaderMap<E> {
     /// same one
     pub fn _get_single<'a ,H>( &'a self ) -> Option<Result<&'a H::Component>>
         where H: Header + SingularHeaderMarker,
-              H::Component: 'static
+              H::Component: MailEncodable<E>
     {
         self.get_bodies( H::name() )
             .map( |body| {
                 //SAFE: all pointers are always valid and borrowing rules are
                 //  indirectly enforced by the `&self` borrow
-                downcast_ref::<E, H::Component>( unsafe { &*body.first } )
+                let as_ref = unsafe { &*body.first };
+                as_ref.downcast_ref::<H::Component>()
                     .ok_or_else( ||->Error {
                         "use of different header types with same header name".into() } )
             })
@@ -335,7 +335,7 @@ impl<'a, E, H> Iterator for TypedMultiBodyIter<'a, E, H>
     fn next(&mut self) -> Option<Self::Item> {
         let tobj_item = self.untyped_iter.next();
         tobj_item.map( |tobj| {
-            downcast_ref::<E, H::Component>( tobj )
+            tobj.downcast_ref::<H::Component>()
                 .ok_or_else( ||->Error {
                     "use of different header types with same header name".into() } )
         })
@@ -343,14 +343,6 @@ impl<'a, E, H> Iterator for TypedMultiBodyIter<'a, E, H>
 
     fn size_hint(&self) -> (usize, Option<usize>) {
         self.untyped_iter.size_hint()
-    }
-}
-
-fn downcast_ref<E: MailEncoder, O: Any+'static>( tobj: &MailEncodable<E>) -> Option<&O> {
-    if TypeId::of::<O>() == tobj.type_id() {
-        Some( unsafe { &*( tobj as *const MailEncodable<E> as *const O) } )
-    } else {
-        None
     }
 }
 
@@ -514,7 +506,7 @@ mod test {
 
         let res = headers.get_untyped(Subject::name())
             .unwrap()
-            .map(|entry| downcast_ref::<_, Unstructured>(entry).unwrap().as_str() )
+            .map(|entry| entry.downcast_ref::<Unstructured>().unwrap().as_str() )
             .collect::<Vec<_>>();
 
         assert_eq!(
@@ -528,14 +520,14 @@ mod test {
 
         assert_eq!(
             "1st",
-            downcast_ref::<_, Unstructured>(res.next().unwrap()).unwrap().as_str()
+            res.next().unwrap().downcast_ref::<Unstructured>().unwrap().as_str()
         );
 
         assert_eq!((1, Some(1)), res.size_hint());
 
         assert_eq!(
             "text/plain".to_owned(),
-            format!("{}", downcast_ref::<_, Mime>(res.next().unwrap()).unwrap())
+            format!("{}", res.next().unwrap().downcast_ref::<Mime>().unwrap())
         );
 
         assert!(res.next().is_none());

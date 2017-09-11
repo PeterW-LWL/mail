@@ -75,7 +75,7 @@ mod test {
     use codec::MailEncoderImpl;
     use headers::{ Subject, Comments };
     use components::Unstructured;
-    use super::super::{ HeaderMap, downcast_ref};
+    use super::super::HeaderMap;
 
     #[test]
     fn iter_in_order() {
@@ -88,7 +88,7 @@ mod test {
         let res = map.iter()
             .map(|(name, val)| {
                 let name = name.as_str();
-                let text = downcast_ref::<_, Unstructured>(val).unwrap().as_str();
+                let text = val.downcast_ref::<Unstructured>().unwrap().as_str();
                 (name, text)
             })
             .collect::<Vec<_>>();
@@ -109,7 +109,7 @@ mod test {
         let res = map.iter_mut()
             .map(|(name, val)| {
                 let name = name.as_str();
-                let text = downcast_ref::<_, Unstructured>(val).unwrap().as_str();
+                let text = val.downcast_ref::<Unstructured>().unwrap().as_str();
                 (name, text)
             })
             .collect::<Vec<_>>();

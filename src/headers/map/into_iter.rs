@@ -26,7 +26,6 @@ mod test {
     use headers::{ To, Subject, From};
     use components::Unstructured;
     use super::HeaderMap;
-    use super::super::downcast_ref;
 
     #[test]
     fn into_iter() {
@@ -49,7 +48,7 @@ mod test {
 
         //check if we can use the data
         let obj: &MailEncodable<_> = &*headers[1].1;
-        let text = downcast_ref::<_, Unstructured>(obj).unwrap();
+        let text = obj.downcast_ref::<Unstructured>().unwrap();
         assert_eq!(
             TEST_TEXT,
             text.as_str()
