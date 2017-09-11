@@ -229,26 +229,41 @@ impl<E: MailEncoder> HeaderMap<E> {
         Ok( () )
     }
 
-    // we currently do not have a mechanism to remove header
-//    fn _remove_from_vec( &mut self, obj_ptr: *mut MailEncodable<E> ) {
-//        let ptr_as_num = obj_ptr as usize;
-//        let mut rem_idx = None;
-//        for (idx, &(name, ptr)) in self.header_map.iter().enumerate() {
-//            if ptr as usize == ptr_as_num {
-//                rem_idx = Some(idx)
-//            }
-//        }
-//        if let Some( rem_idx ) = rem_idx {
-//            self.header_vec.remove( rem_idx );
-//        } else {
-//            panic!(concat!(
-//                "no matching ptr found in vec ==",
-//                " inconsistent state ==",
-//                " possible broken safety gurantees",
-//                " (or just misuse of _remove_from_vec fn)"
-//            ));
-//        }
-//    }
+    //FIXME use SmallVac/StackVac or whaterver provides the smal vec optimization
+    //TODO once drain_filter is stable (rust #43244) use it and return a Vector
+    // of removed trait objects
+    /// remove all headers with the given header name
+    ///
+    /// returns true, if at last one element was removed
+    ///
+    /// # Example
+    ///
+    /// # Note
+    ///
+    /// because of the way the insertion order
+    /// is stored/remembered removing element is,
+    /// in comparsion to e.g. an hash map, not
+    /// a cheap operation
+    pub fn remove_by_name(&mut self, name: HeaderName ) -> bool {
+        if let Some( HeaderBodies { first, other } ) = self.header_map.remove(&name) {
+            //FIXME use HashSet once *mut T,T:?Sized impl Hash (rust #???)
+            let mut to_remove_from_vec = Vec::<*const MailEncodable<E>>::new();
+            to_remove_from_vec.push( first );
+            if let Some( other ) = other {
+                to_remove_from_vec.extend( other.into_iter().map(|x| x as *const _) )
+            }
+
+            self.header_vec.retain(|&(_name, ref boxed)| {
+                let as_ptr = (&**boxed) as *const _;
+                let keep_it = !to_remove_from_vec.contains(&as_ptr);
+                keep_it
+            });
+            true
+        } else {
+            false
+        }
+    }
+
 }
 
 impl<E> fmt::Debug for HeaderMap<E>
@@ -570,6 +585,61 @@ mod test {
                 .map(|(name, _val)| name.as_str())
                 .collect::<Vec<_>>()
                 .as_slice()
+        );
+    }
+
+
+    #[test]
+    fn remove_1() {
+        let mut headers = headers!{
+            Comments: "a",
+            Subject: "b",
+            Comments: "c",
+            Comments: "d"
+        }.unwrap();
+
+        typed(&headers);
+
+        assert_eq!( false, headers.remove_by_name( From::name() ) );
+        assert_eq!( true, headers.remove_by_name( Subject::name() ) );
+
+        assert_eq!( 3, headers.iter().count() );
+
+        let values = headers.get(Comments)
+            .unwrap()
+            .map(|comp| comp.unwrap().as_str() )
+            .collect::<Vec<_>>();
+
+        assert_eq!(
+            &[ "a", "c", "d" ],
+            values.as_slice()
+        )
+    }
+
+    #[test]
+    fn remove_2() {
+        let mut headers = headers!{
+            Comments: "a",
+            Subject: "b",
+            Comments: "c",
+            Comments: "d"
+        }.unwrap();
+
+        typed(&headers);
+
+        assert_eq!( true, headers.remove_by_name( Comments::name() ) );
+        assert_eq!( false, headers.remove_by_name( Comments::name() ) );
+
+        assert_eq!( 1, headers.iter().count() );
+
+        let values = headers.get(Subject)
+            .unwrap()
+            .map(|comp| comp.unwrap().as_str() )
+            .collect::<Vec<_>>();
+
+        assert_eq!(
+            &[ "b" ],
+            values.as_slice()
         );
 
 
