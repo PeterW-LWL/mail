@@ -12,15 +12,13 @@ use super::input::Input;
 use super::inner_item::InnerAscii;
 use codec::MailEncoder;
 use codec::{ WriterWrapper, VecWriter };
-use codec::quoted_printable::{
-    header_encode_utf8 as q_header_encode
-};
+use codec::quoted_printable::
+    encoded_word_encode_utf8 as q_header_encode;
 use codec::utf8_to_ascii::{
     base64_encoded_for_encoded_word,
     base64_decode_for_encoded_word,
-    q_decode_for_encoded_word,
 };
-
+use codec::quoted_printable;
 
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq)]
 pub enum Encoding {
@@ -164,7 +162,7 @@ impl EncodedWord {
                 base64_decode_for_encoded_word( data.as_str() )?
             },
             "Q" => {
-                q_decode_for_encoded_word( data.as_str() )?
+                quoted_printable::encoded_word_decode( data.as_str() )?
             },
             other => bail!( "unknown encoding: {:?}", other )
         };

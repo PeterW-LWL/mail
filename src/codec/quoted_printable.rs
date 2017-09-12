@@ -1,21 +1,45 @@
-//FUTURE_TODO: make it it's own crate, possible push to `quoted_printable`
-use ascii::AsciiChar;
+use ascii::{ AsciiChar, AsciiString };
+use error::*;
+use { quoted_printable as extern_quoted_printable };
 
 use super::traits::EncodedWordWriter;
 
+/// a quoted printable encoding suitable for content transfer encoding,
+/// but _not_ suited for the encoding in encoded words
+pub fn normal_encode<A: AsRef<[u8]>>(data: A) -> AsciiString {
+    let encoded = extern_quoted_printable::encode(data.as_ref());
+    unsafe { AsciiString::from_ascii_unchecked(encoded) }
+}
 
-/// Simple wrapper around header_encode for utf8 strings only
-pub fn header_encode_utf8<'a,  O>( word: &str, writer: &mut O )
+/// a quoted printable decoding suitable for content transfer encoding
+#[inline]
+pub fn normal_decode( input: &str ) -> Result<Vec<u8>> {
+    //extern_quoted_printable h
+    Ok( extern_quoted_printable::decode(
+        input.as_bytes(),
+        extern_quoted_printable::ParseMode::Strict )? )
+}
+
+/// a quoted printable decoding suitable for decoding a quoted printable
+/// encpded text in encoded words
+#[inline(always)]
+pub fn encoded_word_decode( input: &str ) -> Result<Vec<u8>> {
+    //we can just use the stadard decoding
+    normal_decode( input )
+}
+
+/// Simple wrapper around ecoded_word_encode for utf8 strings only
+pub fn encoded_word_encode_utf8<'a,  O>(word: &str, writer: &mut O )
     where O: EncodedWordWriter
 {
     let iter = word.char_indices().map( |(idx, ch)| {
         &word.as_bytes()[idx..idx+ch.len_utf8()]
     });
-    header_encode( iter, writer );
+    encoded_word_encode(iter, writer );
 }
 
 ///
-/// Quoted Printable encoding for MIME-Headers
+/// Quoted Printable encoding for Encoded Words in MIME-Headers
 ///
 /// Which means:
 /// 1. there is a limit to the maximum number of characters
@@ -66,7 +90,7 @@ pub fn header_encode_utf8<'a,  O>( word: &str, writer: &mut O )
 ///   might be encoded with completely different bytes, but when the RFC speaks of
 ///   '\r','\n' it normally means the bytes 10/13 independent of the character set,
 ///   or if they appear in a image, zip-archiev etc. )
-pub fn header_encode<'a, I, O>(input: I, out: &mut O )
+pub fn encoded_word_encode<'a, I, O>(input: I, out: &mut O )
     where I: Iterator<Item=&'a [u8]>, O: EncodedWordWriter
 {
     out.write_ecw_start();
@@ -123,6 +147,7 @@ macro_rules! ascii_table {
     }}
 }
 
+#[inline]
 fn lower_nibble_to_hex( half_byte: u8 ) -> AsciiChar {
     let chars = ascii_table! {
         _0 _1 _2 _3 _4 _5 _6 _7 _8 _9
@@ -156,14 +181,14 @@ mod test {
 
     }
 
-    macro_rules! test {
+    macro_rules! test_ecw_encode {
         ($name:ident, data $data:expr => [$($item:expr),*]) => {
             #[test]
             fn $name() {
                 let test_data = $data;
                 let mut out = VecWriter::new( ascii_str!{ u t f _8 }, Encoding::QuotedPrintable );
 
-                header_encode_utf8( test_data, &mut out );
+                encoded_word_encode_utf8( test_data, &mut out );
 
                 let expected = &[
                     $($item),*
@@ -190,54 +215,138 @@ mod test {
         };
     }
 
-    test! { can_be_used_in_comments,
+    test_ecw_encode! { can_be_used_in_comments,
         data "()\"" => [
             "=?utf8?Q?=28=29=22?="
         ]
     }
 
-    test! { can_be_used_in_phrase,
+    test_ecw_encode! { can_be_used_in_phrase,
         data "{}~@#$%^&*()=|\\[]';:." => [
             "=?utf8?Q?=7B=7D=7E=40=23=24=25=5E=26*=28=29=3D=7C=5C=5B=5D=27=3B=3A=2E?="
         ]
     }
 
-    test! { bad_chars_in_all_contexts,
+    test_ecw_encode! { bad_chars_in_all_contexts,
         data "?= \t\r\n" => [
             "=?utf8?Q?=3F=3D=20=09=0D=0A?="
         ]
     }
 
-    test!{ encode_ascii,
+    test_ecw_encode!{ encode_ascii,
         data  "abcdefghijklmnopqrstuvwxyz \t?=0123456789!@#$%^&*()_+-" => [
              "=?utf8?Q?abcdefghijklmnopqrstuvwxyz=20=09=3F=3D0123456789!=40=23=24=25=5E?=",
              "=?utf8?Q?=26*=28=29_+-?="
         ]
     }
 
-    test! { how_it_handales_newlines,
+    test_ecw_encode! { how_it_handales_newlines,
         data "\r\n" => [
             "=?utf8?Q?=0D=0A?="
         ]
     }
 
 
-    test! { split_into_multiple_ecws,
+    test_ecw_encode! { split_into_multiple_ecws,
         data "0123456789012345678901234567890123456789012345678901234567891234newline" => [
             "=?utf8?Q?0123456789012345678901234567890123456789012345678901234567891234?=",
             "=?utf8?Q?newline?="
         ]
     }
 
-    test!{ bigger_chunks,
+    test_ecw_encode!{ bigger_chunks,
         data "ランダムテキスト ראַנדאָם טעקסט" => [
             //ランダムテキス
             "=?utf8?Q?=E3=83=A9=E3=83=B3=E3=83=80=E3=83=A0=E3=83=86=E3=82=AD=E3=82=B9?=",
             //ト ראַנדאָם
             "=?utf8?Q?=E3=83=88=20=D7=A8=D7=90=D6=B7=D7=A0=D7=93=D7=90=D6=B8=D7=9D=20?=",
-            //ראַנדאָם
+            //טעקסט
             "=?utf8?Q?=D7=98=D7=A2=D7=A7=D7=A1=D7=98?="
         ]
     }
 
+    #[test]
+    fn ecw_decode() {
+        let pairs = [
+            ("=28=29=22", "()\""),
+            (
+                "=7B=7D=7E=40=23=24=25=5E=26*=28=29=3D=7C=5C=5B=5D=27=3B=3A=2E",
+                "{}~@#$%^&*()=|\\[]';:."
+            ),
+            (
+                "=3F=3D=20=09=0D=0A",
+                "?= \t\r\n"
+            ),
+            (
+                "=26*=28=29_+-",
+                "&*()_+-"
+            ),
+            (
+                "abcdefghijklmnopqrstuvwxyz=20=09=3F=3D0123456789!=40=23=24=25=5E",
+                "abcdefghijklmnopqrstuvwxyz \t?=0123456789!@#$%^"
+            ),
+            (
+                "=0D=0A",
+                "\r\n"
+            ),
+            (
+                "=E3=83=A9=E3=83=B3=E3=83=80=E3=83=A0=E3=83=86=E3=82=AD=E3=82=B9",
+                "ランダムテキス"
+            ),
+            (
+                "=E3=83=88=20=D7=A8=D7=90=D6=B7=D7=A0=D7=93=D7=90=D6=B8=D7=9D=20",
+                "ト ראַנדאָם "
+            ),
+            (
+                "=D7=98=D7=A2=D7=A7=D7=A1=D7=98",
+                "טעקסט"
+            )
+        ];
+        for &(inp, outp) in pairs.iter() {
+            let dec = assert_ok!(encoded_word_decode(inp));
+            let dec = String::from_utf8(dec).unwrap();
+            assert_eq!(
+                outp.as_bytes(),
+                dec.as_bytes()
+            );
+        }
+    }
+
+    #[test]
+    fn normal_encode_text() {
+        let text = concat!(
+            "This is a llllllllllllllllllllllllllllllllllllll00000000000000000000ng test    0123456789qwertyuio\r\n",
+            "With many lines\r\n",
+            "And utf→→→→8"
+        );
+        let encoded = normal_encode(text);
+        assert_eq!(
+            concat!(
+                "This is a llllllllllllllllllllllllllllllllllllll00000000000000000000ng test =\r\n",
+                "   0123456789qwertyuio\r\n",
+                "With many lines\r\n",
+                "And utf=E2=86=92=E2=86=92=E2=86=92=E2=86=928"
+            ),
+            encoded.as_str()
+        );
+    }
+
+    #[test]
+    fn normal_decode_text() {
+        let text = concat!(
+                "This is a llllllllllllllllllllllllllllllllllllll00000000000000000000ng test =\r\n",
+                "   0123456789qwertyuio\r\n",
+                "With many lines\r\n",
+                "And utf=E2=86=92=E2=86=92=E2=86=92=E2=86=928"
+            );
+        let encoded = String::from_utf8(normal_decode(text).unwrap()).unwrap();
+        assert_eq!(
+            concat!(
+                "This is a llllllllllllllllllllllllllllllllllllll00000000000000000000ng test    0123456789qwertyuio\r\n",
+                "With many lines\r\n",
+                "And utf→→→→8"
+            ),
+            encoded.as_str()
+        );
+    }
 }
