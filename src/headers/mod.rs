@@ -16,10 +16,6 @@ mod map;
 pub use self::map::{HeaderMap, TypedMultiBodyIter, UntypedMultiBodyIter};
 
 
-
-
-
-
 pub trait Header {
     const CAN_APPEAR_MULTIPLE_TIMES: bool;
     type Component;

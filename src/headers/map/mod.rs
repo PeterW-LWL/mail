@@ -22,7 +22,7 @@ pub use self::into_iter::*;
 mod iter;
 pub use self::iter::*;
 
-//TODO implement: Debug,  remove
+
 pub struct HeaderMap<E: MailEncoder> {
     // the only header which is allowed/meant to appear more than one time is
     // Trace!/Comment?, we _could_ consider using a Name->SingleEncodable mapping and
@@ -126,9 +126,7 @@ impl<E: MailEncoder> HeaderMap<E> {
         self.header_map.get( &name )
     }
 
-    //FIXME keep order!!
-    // we can't have a public `std::iter::Extend` as insertion
-    // is failable
+
     pub fn extend( &mut self, other: HeaderMap<E> ) -> Result<&mut Self> {
         let HeaderMap { header_vec, header_map } = other;
 
@@ -176,8 +174,6 @@ impl<E: MailEncoder> HeaderMap<E> {
         self.insert_trait_object( H::name(), tobj, H::CAN_APPEAR_MULTIPLE_TIMES )
     }
 
-    //FIXME make can_appear_multiple_times a constant generic parameter
-    // when supported by rust
     fn insert_trait_object(
         &mut self,
         name: HeaderName,
@@ -263,8 +259,8 @@ impl<E: MailEncoder> HeaderMap<E> {
             false
         }
     }
-
 }
+
 
 impl<E> fmt::Debug for HeaderMap<E>
     where E: MailEncoder
