@@ -278,7 +278,7 @@ impl<'a> Deref for Guard<'a> {
     }
 }
 
-//TODO make test require default impl
+
 #[cfg(test)]
 mod test {
     use std::fmt::Debug;
