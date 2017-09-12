@@ -1,8 +1,8 @@
-//use std::ascii::AsciiExt;
 use error::*;
 
-use ascii::{ AsciiString, AsAsciiStr };
-use codec::MailEncoder;
+use idna;
+
+use ascii::AsciiString;
 use quoted_printable;
 use base64;
 use grammar::encoded_word::EncodedWordContext;
@@ -55,26 +55,69 @@ pub fn q_encode_for_encoded_word( input: &str, _ctx: EncodedWordContext ) -> Asc
 }
 
 
-pub fn puny_code_domain<E>( input: &str, encoder: &mut E )
-    where E: MailEncoder
-{
-    //TODO there is a crate for it in the dependencies of the url crate
-//    let mut out = String::new();
-//    for ch in input.chars() {
-//        if ch.is_ascii() {
-//            out.push( ch )
-//        } else {
-//            //makar that there was non asci and which non asci
-//        }
-//    }
-//
-//    if has_non_ascii {
-//        out.push( "-" );
-//
-//    }
-    if let Ok( val ) = input.as_ascii_str() {
-        encoder.write_str( val )
-    } else {
-        unimplemented!();
+//TODO(refactor): make an idna module which wraps idna
+// provides a domain_to_ascii function returning
+// a AsciiString and a Error type wrapper implementing
+// std Error, so that error_chain foreign_links can be
+// used
+
+/// uses puny code on given domain to return a ascii representation
+///
+/// # Implementation Detail
+/// this function uses `idna::domain_to_ascii`, see the
+/// `idna` crates documentation fore more details on how
+/// exactly all edcases are handled
+///
+/// # Note
+/// that this function does not validat the domain, e.g.
+/// if you puny code the domain `"this seems\0so;wrong"` it
+/// will return `Ok("this seems\0so;wrong")`
+///
+pub fn puny_code_domain( domain: &str ) -> Result<AsciiString> {
+    match idna::domain_to_ascii( domain ) {
+        Ok( asciified ) => {
+            //SAFE: well we converted it to ascii, so it's ascii
+            Ok( unsafe { AsciiString::from_ascii_unchecked(asciified) } )
+        },
+        Err( err ) => {
+            //FIXME(UPSTREAM): uts46::Errors does not implement Error... ;=(
+            bail!(ErrorKind::PunyCodeingDomainFailed(err));
+        }
+    }
+}
+
+
+#[cfg(test)]
+mod test {
+    use idna;
+    use super::puny_code_domain;
+
+    #[test]
+    fn idna_does_not_validate() {
+        let domain = "this seems\0so;wrong";
+        assert_eq!(
+            domain.to_owned(),
+            assert_ok!( idna::domain_to_ascii(domain) )
+        );
+    }
+
+    #[test]
+    fn nop_puny_code() {
+        let domain = "is_ascii.notadomain";
+
+        let encoded = assert_ok!( puny_code_domain( domain ) );
+        assert_eq!(
+            "is_ascii.notadomain",
+            &*encoded
+        );
+    }
+    #[test]
+    fn puny_code_ascii_mail() {
+        let domain = "nöt_ascii.ü";
+        let encoded = assert_ok!( puny_code_domain(domain) );
+        assert_eq!(
+            "xn--nt_ascii-n4a.xn--tda",
+            &*encoded
+        );
     }
 }

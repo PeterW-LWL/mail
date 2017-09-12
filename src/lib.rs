@@ -4,6 +4,7 @@ extern crate ascii;
 extern crate mime;
 extern crate owning_ref;
 extern crate quoted_printable;
+extern crate idna;
 extern crate chrono;
 extern crate futures;
 extern crate serde;

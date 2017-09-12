@@ -4,7 +4,7 @@ use mime::Mime;
 use mime::FromStrError as MimeParsingErr;
 use base64;
 use quoted_printable;
-
+use idna::uts46::{ Errors as PunyCodeErrors };
 
 #[allow(unused_doc_comment)]
 error_chain! {
@@ -61,6 +61,11 @@ error_chain! {
             description( "expected a non-multipart mime for a non-multipart body" )
             display( _self ) -> ( "{}, got: {}", _self.description(), mime )
         }
+
+        PunyCodeingDomainFailed( errors: PunyCodeErrors ) {
+            description( "using puny code to encode the domain failed" )
+        }
+
 
         NeedPlainAndOrHtmlMailBody {
 
