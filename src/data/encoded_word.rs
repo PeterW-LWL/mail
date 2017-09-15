@@ -14,10 +14,8 @@ use codec::MailEncoder;
 use codec::{ WriterWrapper, VecWriter };
 use codec::quoted_printable::
     encoded_word_encode_utf8 as q_header_encode;
-use codec::utf8_to_ascii::{
-    base64_encoded_for_encoded_word,
-    base64_decode_for_encoded_word,
-};
+use codec::base64;
+
 use codec::quoted_printable;
 
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq)]
@@ -82,20 +80,15 @@ impl EncodedWord {
         use self::Encoding::*;
         match encoding {
             Base64 => {
-                let mut out = AsciiString::with_capacity( 11 + 4*word.len()/3 + 1 );
-                out.extend( ascii_str!{ Equal Question u t f _8 Question } );
-                //not yet fixed
-                out.push( AsciiChar::B );
-                out.push( AsciiChar::Question );
-                out.extend( base64_encoded_for_encoded_word( &*word, ctx ).chars() );
-                out.push( AsciiChar::Question );
-                out.push( AsciiChar::Equal );
-                //FIXME currently this can not fail, but the question is if encoding e.g. \x00-\x31 is ok?
-                //FIXME currently we only return 1 word and ignore length limitations
-                Vec1::new( EncodedWord {
+                let mut out = VecWriter::new(ascii_str! { u t f _8 }, Encoding::Base64 );
+                base64::encoded_word_encode( word, &mut out );
+                let vec: Vec1<_> = out.into();
+                let vec = vec.into_iter().map( |ascii| EncodedWord {
                     ctx,
-                    inner: InnerAscii::Owned( out ),
-                } )
+                    inner: InnerAscii::Owned(ascii)
+                }).collect();
+                //UNWRAP_SAFE: we can't lose element with a into_iter->map->collect
+                Vec1::from_vec(vec).unwrap()
             },
             QuotedPrintable => {
                 let mut writer = VecWriter::new( ascii_str!{ u t f _8 }, QuotedPrintable );
@@ -159,7 +152,7 @@ impl EncodedWord {
 
         let raw_decoded = match encoding {
             "B" => {
-                base64_decode_for_encoded_word( data.as_str() )?
+                base64::encoded_word_decode( data )?
             },
             "Q" => {
                 quoted_printable::encoded_word_decode( data.as_str() )?
