@@ -2,7 +2,7 @@ use ascii::{ AsciiChar };
 
 use error::*;
 use codec::{ MailEncoder, MailEncodable };
-use codec::utf8_to_ascii::puny_code_domain;
+use codec::idna;
 
 use grammar::{
     is_ascii,
@@ -194,7 +194,7 @@ impl<E> MailEncodable<E> for Domain where E: MailEncoder {
             },
             SimpleItem::Utf8( ref utf8 ) => {
                 if !encoder.try_write_utf8( utf8 ).is_ok() {
-                    encoder.write_str( &*puny_code_domain( utf8 )? )
+                    encoder.write_str( &*idna::puny_code_domain( utf8 )? )
                 }
             }
         }

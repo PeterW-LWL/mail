@@ -3,44 +3,7 @@ use error::*;
 use idna;
 
 use ascii::AsciiString;
-use base64;
-use grammar::encoded_word::EncodedWordContext;
 
-
-macro_rules! base64_config {
-    () => {
-        // as we neither have const_fn constructors (currently) nor is
-        // Config a POD (with public fields) a `const` wont work and
-        // a lazy_static feels wrong ( I mean it's basically a
-        // 4*8bit = 32bit )
-        base64::Config::new(
-            base64::CharacterSet::Standard,
-            //padding
-            true,
-            //only relevant for decoding
-            true,
-            base64::LineWrap::NoWrap
-        )
-    }
-}
-
-pub fn base64_decode_for_encoded_word( input: &str ) -> Result<Vec<u8>> {
-    Ok( base64::decode_config( input, base64_config!() )? )
-}
-
-pub fn base64_encoded_for_encoded_word( input: &str, _ctx: EncodedWordContext ) -> AsciiString {
-    //FIXME ok for body but does not comply with header restrictions
-    let res = base64::encode_config( input, base64_config!() );
-    let asciied = unsafe { AsciiString::from_ascii_unchecked( res ) };
-    asciied
-}
-
-
-//TODO(refactor): make an idna module which wraps idna
-// provides a domain_to_ascii function returning
-// a AsciiString and a Error type wrapper implementing
-// std Error, so that error_chain foreign_links can be
-// used
 
 /// uses puny code on given domain to return a ascii representation
 ///

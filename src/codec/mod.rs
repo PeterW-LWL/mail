@@ -1,7 +1,7 @@
 pub mod transfer_encoding;
-pub mod utf8_to_ascii;
 pub mod quoted_printable;
 pub mod base64;
+pub mod idna;
 
 
 #[cfg(test)]
