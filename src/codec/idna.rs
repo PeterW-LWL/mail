@@ -17,7 +17,10 @@ use ascii::AsciiString;
 /// if you puny code the domain `"this seems\0so;wrong"` it
 /// will return `Ok("this seems\0so;wrong")`
 ///
-pub fn puny_code_domain( domain: &str ) -> Result<AsciiString> {
+pub fn puny_code_domain<R: AsRef<str>>( domain: R ) -> Result<AsciiString> {
+    _puny_code_domain(domain.as_ref())
+}
+fn _puny_code_domain( domain: &str ) -> Result<AsciiString> {
     match idna::domain_to_ascii( domain ) {
         Ok( asciified ) => {
             //SAFE: well we converted it to ascii, so it's ascii
