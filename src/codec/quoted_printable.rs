@@ -13,17 +13,17 @@ pub fn normal_encode<A: AsRef<[u8]>>(data: A) -> AsciiString {
 
 /// a quoted printable decoding suitable for content transfer encoding
 #[inline]
-pub fn normal_decode( input: &str ) -> Result<Vec<u8>> {
+pub fn normal_decode<R: AsRef<[u8]>>( input: R ) -> Result<Vec<u8>> {
     //extern_quoted_printable h
     Ok( extern_quoted_printable::decode(
-        input.as_bytes(),
+        input.as_ref(),
         extern_quoted_printable::ParseMode::Strict )? )
 }
 
 /// a quoted printable decoding suitable for decoding a quoted printable
 /// encpded text in encoded words
 #[inline(always)]
-pub fn encoded_word_decode( input: &str ) -> Result<Vec<u8>> {
+pub fn encoded_word_decode<R: AsRef<[u8]>>( input: R ) -> Result<Vec<u8>> {
     //we can just use the stadard decoding
     normal_decode( input )
 }
