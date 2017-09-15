@@ -1,9 +1,9 @@
 use std::ops::Deref;
 
 use base64;
-use quoted_printable;
 
 
+use codec::quoted_printable;
 use error::*;
 use utils::FileBuffer;
 use components::TransferEncoding;
@@ -136,7 +136,7 @@ fn encode_binary( buffer: FileBuffer ) -> Result<TransferEncodedFileBuffer> {
 
 fn encode_quoted_printable( buffer: FileBuffer ) -> Result<TransferEncodedFileBuffer> {
     Ok( TransferEncodedFileBuffer::buffer_is_encoded(
-        buffer.with_data( |data| quoted_printable::encode( &*data ) ),
+        buffer.with_data( |data| quoted_printable::normal_encode( data ).into() ),
         TransferEncoding::QuotedPrintable
     ) )
 }

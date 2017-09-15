@@ -1,31 +1,23 @@
 use std::ops::Deref;
 
-use ascii::AsciiString;
-use ascii::AsciiChar;
-
 use error::*;
 
 use utils::Vec1;
 
-use grammar::encoded_word::{ is_encoded_word, EncodedWordContext };
+use grammar::encoded_word::{
+    is_encoded_word,
+    EncodedWordContext
+};
 use super::input::Input;
 use super::inner_item::InnerAscii;
-use codec::MailEncoder;
-use codec::{ WriterWrapper, VecWriter };
-use codec::quoted_printable::{
-    header_encode_utf8 as q_header_encode
-};
-use codec::utf8_to_ascii::{
-    base64_encoded_for_encoded_word,
-    base64_decode_for_encoded_word,
-    q_decode_for_encoded_word,
+use codec::{
+    MailEncoder,
+    WriterWrapper, VecWriter,
+    base64,
+    quoted_printable,
+    EncodedWordEncoding
 };
 
-
-#[derive(Debug, Copy, Clone, Hash, Eq, PartialEq)]
-pub enum Encoding {
-    Base64, QuotedPrintable
-}
 
 #[derive( Debug, Clone, Hash, Eq, PartialEq )]
 pub struct EncodedWord {
@@ -39,30 +31,16 @@ impl EncodedWord {
     pub fn write_into<E>(
         encoder: &mut E,
         word: &str,
-        encoding: Encoding,
-        ctx: EncodedWordContext
+        encoding: EncodedWordEncoding,
+        _ctx: EncodedWordContext
     ) where E: MailEncoder {
-        use self::Encoding::*;
-        match encoding {
-            Base64 => {
-                //base64 is not jet "fixed"
-                //OPTIMIZE: do not unnecessarily allocate strings, but directly write to Encoder
-                //  REQUIREMENT: write_into style method for encode base64/quoted-printable
-                let iter = EncodedWord::encode_word( word, encoding, ctx ).into_iter();
-                sep_for!{ word in iter;
-                    sep { encoder.write_fws() };
-                    encoder.write_str( &**word )
-                }
-            },
-            QuotedPrintable => {
-                let mut writer = WriterWrapper::new(
-                    ascii_str!{ u t f _8 },
-                    Encoding::QuotedPrintable,
-                    encoder
-                );
-                q_header_encode( word, &mut writer );
-            }
-        }
+        //FIXME use the EncodedWordContext
+        let mut writer = WriterWrapper::new(
+            ascii_str!{ u t f _8 },
+            encoding,
+            encoder
+        );
+        encoding.encode(word, &mut writer);
     }
 
     pub fn parse( already_encoded: InnerAscii, ctx: EncodedWordContext ) -> Result<Self> {
@@ -80,37 +58,17 @@ impl EncodedWord {
     ///
     //TODO use a Vecor which has up to N elements on the stack, this normally is eith 1 or 2
     // of which both can be on the stack
-    pub fn encode_word( word: &str, encoding: Encoding, ctx: EncodedWordContext ) -> Vec1<Self> {
-        use self::Encoding::*;
-        match encoding {
-            Base64 => {
-                let mut out = AsciiString::with_capacity( 11 + 4*word.len()/3 + 1 );
-                out.extend( ascii_str!{ Equal Question u t f _8 Question } );
-                //not yet fixed
-                out.push( AsciiChar::B );
-                out.push( AsciiChar::Question );
-                out.extend( base64_encoded_for_encoded_word( &*word, ctx ).chars() );
-                out.push( AsciiChar::Question );
-                out.push( AsciiChar::Equal );
-                //FIXME currently this can not fail, but the question is if encoding e.g. \x00-\x31 is ok?
-                //FIXME currently we only return 1 word and ignore length limitations
-                Vec1::new( EncodedWord {
-                    ctx,
-                    inner: InnerAscii::Owned( out ),
-                } )
-            },
-            QuotedPrintable => {
-                let mut writer = VecWriter::new( ascii_str!{ u t f _8 }, QuotedPrintable );
-                q_header_encode( word, &mut writer );
-                let parts: Vec1<AsciiString> = writer.into();
-                Vec1::from_vec(
-                    parts.into_iter().map( |astr| EncodedWord {
-                        ctx,
-                        inner: InnerAscii::Owned( astr )
-                    }).collect()
-                ).expect( "[BUG] Vec1 -> iter -> map -> Vec1 can not lead to 0 elements" )
-            }
-        }
+    pub fn encode_word( word: &str, encoding: EncodedWordEncoding, ctx: EncodedWordContext ) -> Vec1<Self> {
+        let mut writer = VecWriter::new(ascii_str! { u t f _8 }, encoding);
+        encoding.encode( word, &mut writer );
+        let vec: Vec1<_> = writer.into();
+        let vec = vec.into_iter().map( |ascii| EncodedWord {
+            ctx,
+            inner: InnerAscii::Owned(ascii)
+        }).collect();
+        //UNWRAP_SAFE: we can't lose element with a into_iter->map->collect
+        Vec1::from_vec(vec)
+            .expect( "[BUG] Vec1 -> iter -> map -> Vec1 can not lead to 0 elements" )
     }
 
     pub fn context( &self ) -> EncodedWordContext {
@@ -161,10 +119,10 @@ impl EncodedWord {
 
         let raw_decoded = match encoding {
             "B" => {
-                base64_decode_for_encoded_word( data.as_str() )?
+                base64::encoded_word_decode( data )?
             },
             "Q" => {
-                q_decode_for_encoded_word( data.as_str() )?
+                quoted_printable::encoded_word_decode( data.as_str() )?
             },
             other => bail!( "unknown encoding: {:?}", other )
         };
@@ -187,6 +145,8 @@ impl Deref for EncodedWord {
 
 #[cfg(test)]
 mod test {
+    use ascii::AsciiString;
+    use codec::EncodedWordEncoding;
     use super::*;
     // we do NOT test if encoding/decoding on itself work in this function, it is teste where
     // the function is defined
@@ -194,7 +154,8 @@ mod test {
     #[test]
     fn encode_quoted_printable() {
         let res =
-            EncodedWord::encode_word( "täst", Encoding::QuotedPrintable, EncodedWordContext::Text );
+            EncodedWord::encode_word( "täst", EncodedWordEncoding::QuotedPrintable,
+                                      EncodedWordContext::Text );
 
         assert_eq!( 1, res.len() );
         assert_eq!(
@@ -206,7 +167,8 @@ mod test {
     #[test]
     fn encode_base64() {
         let res =
-            EncodedWord::encode_word( "täst", Encoding::Base64, EncodedWordContext::Text );
+            EncodedWord::encode_word( "täst", EncodedWordEncoding::Base64,
+                                      EncodedWordContext::Text );
 
         assert_eq!( 1, res.len() );
         assert_eq!(

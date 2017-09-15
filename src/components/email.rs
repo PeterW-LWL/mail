@@ -2,7 +2,7 @@ use ascii::{ AsciiChar };
 
 use error::*;
 use codec::{ MailEncoder, MailEncodable };
-use codec::utf8_to_ascii::puny_code_domain;
+use codec::idna;
 
 use grammar::{
     is_ascii,
@@ -144,6 +144,9 @@ impl FromInput for Domain {
 }
 
 impl Domain {
+    //SAFETY:
+    //  the function is only allowed to return MailType::Ascii
+    //  if the domain is actually ascii
     fn check_domain( domain: &str ) -> Result<MailType> {
         let mut ascii = true;
         if domain.starts_with("[") && domain.ends_with("]") {
@@ -190,8 +193,8 @@ impl<E> MailEncodable<E> for Domain where E: MailEncoder {
                 encoder.write_str( ascii )
             },
             SimpleItem::Utf8( ref utf8 ) => {
-                if encoder.try_write_utf8( utf8 ).is_err() {
-                    puny_code_domain( utf8, encoder );
+                if !encoder.try_write_utf8( utf8 ).is_ok() {
+                    encoder.write_str( &*idna::puny_code_domain( utf8 )? )
                 }
             }
         }
@@ -275,13 +278,14 @@ mod test {
         OptFWS
     ]}
 
-//TODO implement punnycode
-//    ec_test!{ domain_encoded, {
-//
-//    } => ascii => [
-//
-//    ]}
-//
+
+    ec_test!{ domain_encoded, {
+        Domain::from_input( "dat.ü.dü" )
+    } => ascii => [
+        OptFWS,
+        LinePart("dat.xn--tda.xn--d-eha"),
+        OptFWS
+    ]}
 
 
     ec_test!{ email_simple, {

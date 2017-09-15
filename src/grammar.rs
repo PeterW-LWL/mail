@@ -8,6 +8,7 @@ pub enum MailType {
 }
 
 impl MailType {
+    //FIXME rename to internationalized
     pub fn supports_utf8( &self ) -> bool {
         use self::MailType::*;
         match *self {

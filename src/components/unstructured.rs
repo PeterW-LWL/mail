@@ -5,8 +5,11 @@ use ascii::AsciiChar;
 use error::*;
 use grammar::is_vchar;
 use grammar::encoded_word::EncodedWordContext;
-use codec::{ MailEncoder, MailEncodable };
-use data::{ FromInput, Encoding, EncodedWord };
+use codec::{
+    MailEncoder, MailEncodable,
+    EncodedWordEncoding
+};
+use data::{ FromInput, EncodedWord };
 
 use super::utils::text_partition::{partition, Partition};
 use data::Input;
@@ -60,7 +63,7 @@ impl<E> MailEncodable<E> for Unstructured where E: MailEncoder {
                     if needs_encoding {
                         EncodedWord::write_into( encoder,
                                                  data,
-                                                 Encoding::QuotedPrintable,
+                                                 EncodedWordEncoding::QuotedPrintable,
                                                  EncodedWordContext::Text );
                     } else {
                         // if needs_encoding is false all chars a vchars wrt. the mail

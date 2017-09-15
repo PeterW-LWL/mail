@@ -1,5 +1,8 @@
 use error::*;
-use codec::{ MailEncodable, MailEncoder };
+use codec::{ 
+    EncodedWordEncoding,
+    MailEncodable, MailEncoder
+};
 
 use grammar::is_atext;
 use grammar::encoded_word::EncodedWordContext;
@@ -8,7 +11,6 @@ use data::{
     FromInput,
     Input,
     EncodedWord,
-    Encoding as ECWEncoding,
     QuotedString
 };
 
@@ -76,7 +78,8 @@ pub fn do_encode_word<E: MailEncoder>(
         encoder.write_str_unchecked( input )
     } else {
         if let Some( ecw_ctx ) = ecw_ctx {
-            EncodedWord::write_into( encoder, input, ECWEncoding::QuotedPrintable, ecw_ctx );
+            EncodedWord::write_into( encoder, input,
+                                     EncodedWordEncoding::QuotedPrintable, ecw_ctx );
         } else {
             QuotedString::write_into( encoder, input )?;
         }

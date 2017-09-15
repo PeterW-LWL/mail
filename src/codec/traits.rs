@@ -7,26 +7,30 @@ use ascii::{  AsciiStr, AsciiChar };
 
 use error::*;
 use grammar::MailType;
-use data::encoded_word::Encoding;
+
+use super::EncodedWordEncoding;
 
 pub trait EncodedWordWriter {
     fn write_char( &mut self, ch: AsciiChar );
     fn write_charset( &mut self );
-    fn encoding( &self ) -> Encoding;
+    fn encoding( &self ) -> EncodedWordEncoding;
     fn write_ecw_seperator( &mut self );
+
+    /// Returns the maximal length of the paylod/encoded data
+    ///
+    /// Any number of calls to methods on in trait in any way
+    /// should never be able to change the returned value.
+    /// Only changing e.g. the charset or encoding should be
+    /// able to change what `max_paylod_len` returns.
     fn max_payload_len( &self ) -> usize;
 
     fn write_ecw_start( &mut self ) {
-
         self.write_char( AsciiChar::Equal );
         self.write_char( AsciiChar::Question );
         self.write_charset();
         self.write_char( AsciiChar::Question );
-        let encoding = self.encoding();
-        self.write_char( match encoding {
-            Encoding::Base64 => AsciiChar::B,
-            Encoding::QuotedPrintable => AsciiChar::Q
-        } );
+        let acronym = self.encoding().acronym();
+        self.write_str( acronym );
         self.write_char( AsciiChar::Question );
     }
 
@@ -36,11 +40,16 @@ pub trait EncodedWordWriter {
     }
 
 
-    fn start_new_encoded_word( &mut self ) -> usize {
+    fn start_next_encoded_word( &mut self )  {
         self.write_ecw_end();
         self.write_ecw_seperator();
         self.write_ecw_start();
-        self.max_payload_len()
+    }
+
+    fn write_str( &mut self, str: &AsciiStr ) {
+        for char in str {
+            self.write_char(*char)
+        }
     }
 }
 
@@ -54,6 +63,7 @@ pub trait MailEncoder: 'static {
     fn write_char( &mut self, char: AsciiChar );
     fn write_str( &mut self, str: &AsciiStr );
 
+    //FIXME default impl
     fn try_write_utf8( &mut self, str: &str ) -> Result<()>;
     fn try_write_atext( &mut self, str: &str ) -> Result<()>;
     //fn write_encoded_word( &mut self, data: &str, ctx: EncodedWordContext );
