@@ -1,11 +1,6 @@
-use std::cmp::min;
-
 use error::*;
 use {base64 as extern_base64};
 use ascii::{ AsciiString, AsciiChar };
-use codec::writer_impl::VecWriter;
-//FIXME change import to data::encoded_word::Encoding;
-use data::Encoding;
 
 use super::EncodedWordWriter;
 
@@ -121,6 +116,8 @@ pub fn encoded_word_decode<R: AsRef<[u8]>>(input: R) -> Result<Vec<u8>> {
 
 #[cfg(test)]
 mod test {
+    use codec::writer_impl::VecWriter;
+    use codec::EncodedWordEncoding;
     use super::*;
 
     #[test]
@@ -163,7 +160,7 @@ mod test {
             #[test]
             fn $name() {
                 let test_data = $data;
-                let mut out = VecWriter::new( ascii_str!{ u t f _8 }, Encoding::Base64 );
+                let mut out = VecWriter::new( ascii_str!{ u t f _8 }, EncodedWordEncoding::Base64 );
 
                 encoded_word_encode( test_data, &mut out );
 

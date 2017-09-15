@@ -167,7 +167,7 @@ fn lower_nibble_to_hex( half_byte: u8 ) -> AsciiChar {
 
 #[cfg(test)]
 mod test {
-    use data::encoded_word::Encoding;
+    use codec::EncodedWordEncoding;
     use super::super::writer_impl::VecWriter;
     use super::*;
 
@@ -191,7 +191,10 @@ mod test {
             #[test]
             fn $name() {
                 let test_data = $data;
-                let mut out = VecWriter::new( ascii_str!{ u t f _8 }, Encoding::QuotedPrintable );
+                let mut out = VecWriter::new(
+                    ascii_str!{ u t f _8 },
+                    EncodedWordEncoding::QuotedPrintable
+                );
 
                 encoded_word_encode_utf8( test_data, &mut out );
 
