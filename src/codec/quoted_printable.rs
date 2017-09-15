@@ -98,7 +98,8 @@ pub fn encoded_word_encode<'a, I, O>(input: I, out: &mut O )
     where I: Iterator<Item=&'a [u8]>, O: EncodedWordWriter
 {
     out.write_ecw_start();
-    let mut remaining = out.max_payload_len();
+    let max_payload_len = out.max_payload_len();
+    let mut remaining = max_payload_len;
     //WARN: on remaining being > 67
     let mut buf = [AsciiChar::A; 16];
 
@@ -130,8 +131,8 @@ pub fn encoded_word_encode<'a, I, O>(input: I, out: &mut O )
             }
         }
         if buf_idx > remaining {
-            remaining = out.start_new_encoded_word();
-            //WARN: on remaining being > 67
+            out.start_next_encoded_word();
+            remaining = max_payload_len;
         }
         if buf_idx > remaining {
             panic!( "single character longer then max length ({:?}) of encoded word", remaining );

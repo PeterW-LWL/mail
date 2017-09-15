@@ -14,6 +14,13 @@ pub trait EncodedWordWriter {
     fn write_charset( &mut self );
     fn encoding( &self ) -> Encoding;
     fn write_ecw_seperator( &mut self );
+
+    /// Returns the maximal length of the paylod/encoded data
+    ///
+    /// Any number of calls to methods on in trait in any way
+    /// should never be able to change the returned value.
+    /// Only changing e.g. the charset or encoding should be
+    /// able to change what `max_paylod_len` returns.
     fn max_payload_len( &self ) -> usize;
 
     fn write_ecw_start( &mut self ) {
@@ -36,11 +43,10 @@ pub trait EncodedWordWriter {
     }
 
 
-    fn start_new_encoded_word( &mut self ) -> usize {
+    fn start_next_encoded_word( &mut self )  {
         self.write_ecw_end();
         self.write_ecw_seperator();
         self.write_ecw_start();
-        self.max_payload_len()
     }
 }
 
@@ -54,6 +60,7 @@ pub trait MailEncoder: 'static {
     fn write_char( &mut self, char: AsciiChar );
     fn write_str( &mut self, str: &AsciiStr );
 
+    //FIXME default impl
     fn try_write_utf8( &mut self, str: &str ) -> Result<()>;
     fn try_write_atext( &mut self, str: &str ) -> Result<()>;
     //fn write_encoded_word( &mut self, data: &str, ctx: EncodedWordContext );
