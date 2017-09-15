@@ -45,7 +45,14 @@ fn calc_max_input_len(max_output_len: usize) -> usize {
 /// # Note
 /// for now this only supports utf8/ascii input, as
 /// we have to know where we can split
-pub fn encoded_word_encode<O>( input: &str, out: &mut O )
+#[inline(always)]
+pub fn encoded_word_encode<O, R: AsRef<str>>( input: R, out: &mut O )
+    where O: EncodedWordWriter
+{
+    _encoded_word_encode(input.as_ref(), out)
+}
+
+fn _encoded_word_encode<O>( input: &str, out: &mut O )
     where O: EncodedWordWriter
 {
     let config = extern_base64::Config::new(
