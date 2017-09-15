@@ -81,6 +81,12 @@ macro_rules! inner_impl {
             }
         }
 
+        impl AsRef<str> for $name {
+            fn as_ref(&self) -> &str {
+                self.as_str()
+            }
+        }
+
     )
 }
 
