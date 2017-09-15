@@ -28,6 +28,10 @@ pub fn encoded_word_decode( input: &str ) -> Result<Vec<u8>> {
     normal_decode( input )
 }
 
+//FIXME we don't use EncodedWord context here,
+// instead we use the most restructive context as a basis,
+// making it compatilble with all context, but not nessesary
+// the best solution...
 /// Simple wrapper around ecoded_word_encode for utf8 strings only
 pub fn encoded_word_encode_utf8<'a,  O>(word: &str, writer: &mut O )
     where O: EncodedWordWriter
@@ -322,8 +326,8 @@ mod test {
         let encoded = normal_encode(text);
         assert_eq!(
             concat!(
-                "This is a llllllllllllllllllllllllllllllllllllll00000000000000000000ng test =\r\n",
-                "   0123456789qwertyuio\r\n",
+                "This is a llllllllllllllllllllllllllllllllllllll00000000000000000000ng test=\r\n",
+                "    0123456789qwertyuio\r\n",
                 "With many lines\r\n",
                 "And utf=E2=86=92=E2=86=92=E2=86=92=E2=86=928"
             ),
@@ -334,8 +338,8 @@ mod test {
     #[test]
     fn normal_decode_text() {
         let text = concat!(
-                "This is a llllllllllllllllllllllllllllllllllllll00000000000000000000ng test =\r\n",
-                "   0123456789qwertyuio\r\n",
+                "This is a llllllllllllllllllllllllllllllllllllll00000000000000000000ng test=\r\n",
+                "    0123456789qwertyuio\r\n",
                 "With many lines\r\n",
                 "And utf=E2=86=92=E2=86=92=E2=86=92=E2=86=928"
             );
