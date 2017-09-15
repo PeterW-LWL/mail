@@ -1,3 +1,5 @@
+use futures::Future;
+use std::marker::Send;
 use std::any::TypeId;
 use std::mem;
 
@@ -176,3 +178,6 @@ pub fn uneraser_mut<GOT: 'static, EXP: 'static>(inp: &mut GOT ) -> Option<&mut E
 //    }
 //    out
 //}
+
+
+pub type SendBoxFuture<I, E> = Box<Future<Item=I, Error=E>+Send>;

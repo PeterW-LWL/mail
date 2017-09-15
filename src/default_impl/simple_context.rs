@@ -3,10 +3,11 @@ use std::fmt;
 use std::path::Path;
 use std::borrow::Cow;
 
-use futures::{ Future, BoxFuture };
+use futures::Future;
 use futures_cpupool::{ CpuPool, Builder };
 
 use error::*;
+use utils::SendBoxFuture;
 use mail::{ FileLoader, RunElsewhere, CompositeBuilderContext };
 use composition::ContentIdGen;
 use components::MessageID;
@@ -79,7 +80,7 @@ impl FileLoader for SimpleContext {
 }
 
 impl RunElsewhere for SimpleContext {
-    fn execute<F>( &self, fut: F) -> BoxFuture<F::Item, F::Error>
+    fn execute<F>( &self, fut: F) -> SendBoxFuture<F::Item, F::Error>
         where F: Future + Send + 'static,
               F::Item: Send+'static,
               F::Error: Send+'static

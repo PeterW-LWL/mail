@@ -1,13 +1,13 @@
 use std::fmt;
 
-use futures::future::BoxFuture;
+use utils::SendBoxFuture;
 use futures::Async;
 
 use error::*;
 use codec::transfer_encoding::TransferEncodedFileBuffer;
 
 
-pub type FutureBuf = BoxFuture<TransferEncodedFileBuffer, Error>;
+pub type FutureBuf = SendBoxFuture<TransferEncodedFileBuffer, Error>;
 
 #[derive(Debug)]
 pub struct Body {
@@ -163,7 +163,7 @@ mod test {
     #[test]
     fn file_buffer_ref() {
         let body = Body { body: InnerBody::Future(
-            futures::future::err( "fail".into() ).boxed()
+            Box::new( futures::future::err( "fail".into() ) )
         ) };
         assert_eq!( false, body.file_buffer_ref().is_some() );
         let body = Body { body: InnerBody::Failed };
@@ -191,7 +191,7 @@ mod test {
     fn poll_body_in_ready_future() {
         let mut body = Body {
             body: InnerBody::Future(
-                futures::future::ok(_tenc_fb()).boxed()
+                Box::new( futures::future::ok(_tenc_fb()) )
             )
         };
         {
@@ -209,7 +209,7 @@ mod test {
     fn poll_body_in_err_future() {
         let mut body = Body {
             body: InnerBody::Future(
-                futures::future::err( "failed".into() ).boxed()
+                Box::new( futures::future::err( "failed".into() ) )
             )
         };
         {
@@ -229,7 +229,7 @@ mod test {
             Ok( futures::Async::NotReady )
         }
         let mut body = Body { body: InnerBody::Future(
-            futures::future::poll_fn( not_ready ).boxed()
+            Box::new( futures::future::poll_fn( not_ready ) )
         ) };
         let res = body.poll_body();
         assert_eq!( true, res.is_ok() );

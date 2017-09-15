@@ -4,8 +4,8 @@ use std::ops::Deref;
 use std::borrow::Cow;
 
 
-use futures::{ Future, IntoFuture };
-use futures::future::{ self,  BoxFuture };
+use futures::{ future, Future, IntoFuture };
+use utils::SendBoxFuture;
 
 use error::*;
 
@@ -32,12 +32,12 @@ impl<F: FileLoader> FileLoader for Arc<F> {
 
 pub trait RunElsewhere {
     /// executes the futures `fut` "elswhere" e.g. in a cpu pool
-    fn execute<F>( &self, fut: F) -> BoxFuture<F::Item, F::Error>
+    fn execute<F>( &self, fut: F) -> SendBoxFuture<F::Item, F::Error>
         where F: Future + Send + 'static,
               F::Item: Send+'static,
               F::Error: Send+'static;
 
-    fn execute_fn<FN, I>( &self, fut: FN ) -> BoxFuture<I::Item, I::Error>
+    fn execute_fn<FN, I>( &self, fut: FN ) -> SendBoxFuture<I::Item, I::Error>
         where FN: FnOnce() -> I + Send + 'static,
               I: IntoFuture + 'static,
               I::Future: Send + 'static,
@@ -49,7 +49,7 @@ pub trait RunElsewhere {
 }
 
 impl<I: RunElsewhere> RunElsewhere for Arc<I> {
-    fn execute<F>( &self, fut: F) -> BoxFuture<F::Item, F::Error>
+    fn execute<F>( &self, fut: F) -> SendBoxFuture<F::Item, F::Error>
         where F: Future + Send + 'static,
               F::Item: Send+'static,
               F::Error: Send+'static
@@ -89,7 +89,7 @@ impl<FL: FileLoader, EW>  FileLoader for CompositeBuilderContext<FL, EW> {
 }
 
 impl<FL, EW: RunElsewhere> RunElsewhere for CompositeBuilderContext<FL, EW> {
-    fn execute<F>( &self, fut: F) -> BoxFuture<F::Item, F::Error>
+    fn execute<F>( &self, fut: F) -> SendBoxFuture<F::Item, F::Error>
         where F: Future + Send + 'static,
               F::Item: Send+'static,
               F::Error: Send+'static

@@ -4,11 +4,12 @@ use std::path::Path;
 use std::fmt;
 use std::borrow::Cow;
 
-use futures::{ Future, BoxFuture };
+use futures::Future;
 use futures_cpupool::{ CpuPool, Builder };
-use super::VFSFileLoader;
 
+use utils::SendBoxFuture;
 use mail::{ FileLoader, RunElsewhere, CompositeBuilderContext };
+use super::VFSFileLoader;
 
 #[derive(Clone)]
 pub struct SimpleBuilderContext( Arc< CompositeBuilderContext<VFSFileLoader, CpuPool>  > );
@@ -62,7 +63,7 @@ impl FileLoader for SimpleBuilderContext {
 }
 
 impl RunElsewhere for SimpleBuilderContext {
-    fn execute<F>( &self, fut: F) -> BoxFuture<F::Item, F::Error>
+    fn execute<F>( &self, fut: F) -> SendBoxFuture<F::Item, F::Error>
         where F: Future + Send + 'static,
               F::Item: Send+'static,
               F::Error: Send+'static

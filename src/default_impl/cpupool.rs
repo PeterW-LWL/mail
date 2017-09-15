@@ -1,5 +1,6 @@
 
-use futures::{ Future, BoxFuture };
+use futures::Future;
+use utils::SendBoxFuture;
 
 use futures_cpupool::CpuPool;
 
@@ -8,12 +9,12 @@ use mail::RunElsewhere;
 
 impl RunElsewhere for CpuPool {
     /// executes the futures `fut` "elswhere" e.g. in a cpu pool
-    fn execute<F>( &self, fut: F) -> BoxFuture<F::Item, F::Error>
+    fn execute<F>( &self, fut: F) -> SendBoxFuture<F::Item, F::Error>
         where F: Future + Send + 'static,
               F::Item: Send+'static,
               F::Error: Send+'static
     {
-        self.spawn( fut ).boxed()
+        Box::new( self.spawn( fut ) )
     }
 }
 

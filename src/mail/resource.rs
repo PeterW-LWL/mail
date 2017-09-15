@@ -7,8 +7,9 @@ use std::borrow::Cow;
 
 use mime::Mime;
 
-use futures::future::BoxFuture;
+
 use futures::{  Future, Poll, Async };
+use utils::SendBoxFuture;
 
 use error::{ Error, Result };
 
@@ -46,9 +47,9 @@ pub struct Resource {
 
 enum ResourceInner {
     Spec( ResourceSpec ),
-    LoadingBuffer( BoxFuture<FileBuffer, Error> ),
+    LoadingBuffer( SendBoxFuture<FileBuffer, Error> ),
     Loaded( FileBuffer ),
-    EncodingBuffer( BoxFuture<TransferEncodedFileBuffer, Error> ),
+    EncodingBuffer( SendBoxFuture<TransferEncodedFileBuffer, Error> ),
     TransferEncoded( TransferEncodedFileBuffer ),
     Failed
 }
@@ -81,7 +82,7 @@ impl Resource {
     }
 
     #[inline]
-    pub fn from_future( fut: BoxFuture<FileBuffer, Error> ) -> Self {
+    pub fn from_future( fut: SendBoxFuture<FileBuffer, Error> ) -> Self {
         Self::new_inner( ResourceInner::LoadingBuffer( fut ) )
     }
 
@@ -91,7 +92,7 @@ impl Resource {
     }
 
     #[inline]
-    pub fn from_future_encoded( fut: BoxFuture<TransferEncodedFileBuffer, Error> ) -> Self {
+    pub fn from_future_encoded( fut: SendBoxFuture<TransferEncodedFileBuffer, Error> ) -> Self {
         Self::new_inner( ResourceInner::EncodingBuffer( fut ) )
     }
 

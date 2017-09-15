@@ -3,7 +3,8 @@ use std::ops::Deref;
 use std::path::Path;
 use std::borrow::Cow;
 
-use futures::{ Future, BoxFuture };
+use futures::Future;
+use utils::SendBoxFuture;
 
 use error::*;
 use mail::{ FileLoader, RunElsewhere, BuilderContext };
@@ -46,7 +47,7 @@ impl<CIG, BC: BuilderContext> FileLoader for ComposedContext<CIG, BC> {
 }
 
 impl<CIG, BC: BuilderContext> RunElsewhere for ComposedContext<CIG, BC> {
-    fn execute<F>( &self, fut: F) -> BoxFuture<F::Item, F::Error>
+    fn execute<F>( &self, fut: F) -> SendBoxFuture<F::Item, F::Error>
         where F: Future + Send + 'static,
               F::Item: Send+'static,
               F::Error: Send+'static

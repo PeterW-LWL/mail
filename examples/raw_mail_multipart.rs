@@ -12,7 +12,7 @@ use mail_codec::default_impl::SimpleBuilderContext;
 fn get_some_resource() -> Resource {
     let data: Vec<u8> = "abcd↓efg".as_bytes().to_vec();
     Resource::from_future(
-        future::ok( FileBuffer::new( mime::TEXT_PLAIN, data ) ).boxed()
+        Box::new(future::ok( FileBuffer::new( mime::TEXT_PLAIN, data ) ))
     )
 }
 
