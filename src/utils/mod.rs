@@ -36,7 +36,8 @@ pub(crate) fn timeout( s: u32, ms: u32 ) -> oneshot::Receiver<()> {
 
     thread::spawn( move || {
         thread::sleep( Duration::new( s as u64, ms * 1_000_000) );
-        timeout_trigger.send( () ).unwrap()
+        //we do not care if it faile i.e. the receiver got dropped
+        let _ = timeout_trigger.send( () );
     });
 
     timeout
