@@ -278,13 +278,14 @@ mod test {
         OptFWS
     ]}
 
-//TODO implement punnycode
-//    ec_test!{ domain_encoded, {
-//
-//    } => ascii => [
-//
-//    ]}
-//
+
+    ec_test!{ domain_encoded, {
+        Domain::from_input( "dat.ü.dü" )
+    } => ascii => [
+        OptFWS,
+        LinePart("dat.xn--tda.xn--d-eha"),
+        OptFWS
+    ]}
 
 
     ec_test!{ email_simple, {
