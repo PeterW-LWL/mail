@@ -9,7 +9,7 @@ use error::*;
 use headers::{
     HeaderMap,
     From, To,
-    Subject, Date,
+    Subject,
     ContentId,
     ContentDisposition
 };
@@ -19,7 +19,7 @@ use components::{
     Disposition,
     Unstructured,
     Mailbox,
-    Phrase, DateTime
+    Phrase
 };
 use mail::mime::MultipartMime;
 use mail::{
@@ -79,7 +79,6 @@ impl<T, C, CP, D> Compositor<T, C, CP, D>
             self.preprocess_send_context( send_context, &mut data )?;
 
         let core_headers = headers! {
-            Date: DateTime::now(),
             //NOTE: if we support multiple mailboxes in From we have to
             // ensure Sender is used _iff_ there is more than one from
             From: (from_mailbox,),

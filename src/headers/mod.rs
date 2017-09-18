@@ -1,4 +1,5 @@
 use std::fmt;
+use codec::MailEncoder;
 
 use ascii::AsciiStr;
 pub use ascii::{  AsciiStr as _AsciiStr };
@@ -24,6 +25,28 @@ pub trait Header {
     // requires at last `const fn` support in stable and the ascii
     // crate appear
     fn name() -> HeaderName;
+
+    //NOTE: this is a circular dependency between Header/HeaderMap
+    // but putting up e.g. a GeneraicHeaderMap trait/interface is
+    // not worth the work at all
+    /// Returns a function which is meant to be called with a reference
+    /// to the final header map before encoding the headers. It is
+    /// meant to be used do some of the contextual validations,
+    /// like e.g. a `From` header might return a function which
+    /// checks if the `From` header has multiple mailboxes and
+    /// if so checks if there is a `Sender` header
+    ///
+    /// Calling a contextual validator with a header map not
+    /// containing a header which it is meant to validate
+    /// should not cause an error. Only if the header is
+    /// there and the component is of the expected type
+    /// and it is invalid in the context
+    /// an error should be returned.
+    fn get_contextual_validator<E>() -> Option<fn(&HeaderMap<E>) -> Result<()>>
+        where E: MailEncoder
+    {
+        None
+    }
 }
 
 /// all headers defined with `def_headers!` where
@@ -32,6 +55,25 @@ pub trait Header {
 /// the `HeaderMap::get_single` functionality.
 pub trait SingularHeaderMarker {}
 
+/// a utility trait allowing us to use type hint structs
+/// in `HeaderMap::{contains, get_untyped}`
+pub trait HasHeaderName {
+    fn get_name(&self) -> HeaderName;
+}
+
+impl HasHeaderName for HeaderName {
+    fn get_name(&self) -> HeaderName {
+        *self
+    }
+}
+
+impl<H> HasHeaderName for H
+    where H: Header
+{
+    fn get_name(&self) -> HeaderName {
+        H::name()
+    }
+}
 
 ///
 /// Note: Normally you will never have the need to create a HeaderName instance by

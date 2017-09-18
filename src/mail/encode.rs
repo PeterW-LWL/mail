@@ -3,11 +3,6 @@ use mime::BOUNDARY;
 use ascii::IntoAsciiString;
 use headers::HeaderName;
 
-use headers::{
-    ContentType,
-    ContentTransferEncoding
-};
-
 ///
 /// # Panics
 /// if the body is not yet resolved use `Body::poll_body` or `IntoFuture`
@@ -41,47 +36,10 @@ fn _encode_mail<E>( mail: &Mail<E>, top: bool, encoder: &mut E ) -> Result<()>
 fn encode_headers<E>(mail: &Mail<E>, top: bool, encoder:  &mut E ) -> Result<()>
     where E: MailEncoder
 {
-
     if top {
         encoder.write_str( ascii_str!{ M I M E Minus V e r s i o n Colon Space _1 Dot _0 } );
         encoder.write_new_line();
     }
-
-    //TODO we have to special handle some headers which
-    // _should_ be at the beginning mainly `Trace` and `Resend-*`
-
-    // also the Resend's are grouped in blocks ...
-    // ... so I have to have some sored of grouping/ordering hint
-    // ... also this is NOT a static property as you have to know
-    //     which belong together
-    // ... what can be part of the type is wether or not there
-    //     might be an ordering
-    // ... we also want to be able to access the information about
-    //     if it needs special ordering without VCalls
-    // ... we could have a wrapper type `WithOrdering(T, OrderInfo)`
-    //     but we can not implicity add it
-    // ... there information wether or not ther is/might be a ordering
-    //     can be stored in the body so no VCall for it
-
-    let header_override;
-    match mail.body {
-        MailPart::SingleBody { ref body } => {
-            let file_buffer = body.get_if_encoded()?
-                .expect( "encoded mail, should only contain already transferencoded resources" );
-
-            // handle Content-Type/Transfer-Encoding <-> Resource link
-            encode_header( encoder,
-                           ContentType::name(), file_buffer.content_type() )?;
-            encode_header( encoder,
-                           ContentTransferEncoding::name(), file_buffer.transfer_encoding() )?;
-
-            header_override = true;
-        },
-        _ => {
-            header_override = false;
-        }
-    }
-
 
     for (name, hbody) in mail.headers.iter() {
         let name_as_str = name.as_str();
@@ -91,10 +49,6 @@ fn encode_headers<E>(mail: &Mail<E>, top: bool, encoder:  &mut E ) -> Result<()>
 
         if ignored_header {
             //TODO warn!
-        }
-        if header_override && ( &name == "Content-Type" || &name == "Content-Transfer-Encoding" ) {
-            //TODO warn!? header will be overriden (but possible with same value)
-            continue
         }
 
         encode_header( encoder, name, hbody)?;
