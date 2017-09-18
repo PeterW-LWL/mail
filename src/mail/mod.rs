@@ -11,7 +11,7 @@ use headers::{
     Header, HeaderMap,
     ContentType, From,
     ContentTransferEncoding,
-    Date
+    Date, MessageId
 };
 use components::DateTime;
 
@@ -195,6 +195,9 @@ impl<E> EncodableMail<E>
         }
         if !mail.headers.contains(From) {
             bail!("a mail must have a From header field");
+        }
+        if !mail.headers.contains(MessageId) {
+            //TODO warn
         }
         Ok(EncodableMail(mail))
     }
