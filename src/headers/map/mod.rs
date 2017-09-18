@@ -465,8 +465,8 @@ mod test {
         def_headers! {
             test_name: validate_header_names,
             scope: components,
-            1 Subject, unsafe { "Subject" }, Mime,
-            + Comments, unsafe { "Comments" }, Mime
+            1 Subject, unsafe { "Subject" }, Mime, None,
+            + Comments, unsafe { "Comments" }, Mime, None
         }
     }
 
