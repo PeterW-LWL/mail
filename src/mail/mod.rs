@@ -7,7 +7,13 @@ use futures::{ Future, Async, Poll };
 
 use error::*;
 use utils::HeaderTryInto;
-use headers::{ Header, HeaderMap };
+use headers::{
+    Header, HeaderMap,
+    ContentType,
+    ContentTransferEncoding,
+    Date
+};
+use components::DateTime;
 
 use self::builder::{
     check_header,
@@ -151,7 +157,7 @@ impl<'a, E, T> Future for MailFuture<'a, T, E>
         let ctx: &T = &self.ctx;
         self.mail.as_mut()
             // this is conform with how futures work, as calling poll on a random future
-            // after it completes has unpredictable results (through one of NotRady/Err/Panic)
+            // after it completes has unpredictable results (through one of NotReady/Err/Panic)
             // use `Fuse` if you want more preditable behaviour in this edge case
             .expect( "poll not to be called after completion" )
             .walk_mail_bodies_mut( &mut |body: &mut Resource| {
@@ -170,13 +176,38 @@ impl<'a, E, T> Future for MailFuture<'a, T, E>
             })?;
 
         if done {
-            Ok( Async::Ready( EncodableMail( self.mail.take().unwrap() ) ) )
+            EncodableMail::from_loaded_mail( self.mail.take().unwrap() )
+                .map( |enc_mail| Async::Ready(enc_mail) )
         } else {
             Ok( Async::NotReady )
         }
     }
 }
 
+impl<E> EncodableMail<E>
+    where E: MailEncoder
+{
+    fn from_loaded_mail(mut mail: Mail<E>) -> Result<Self> {
+        Self::insert_generated_headers(&mut mail)?;
+        mail.headers.use_contextual_validators()?;
+        Ok(EncodableMail(mail))
+    }
+
+    fn insert_generated_headers(mail: &mut Mail<E>) -> Result<()> {
+        if let MailPart::SingleBody { ref body } = mail.body {
+            let file_buffer = body.get_if_encoded()?
+                .expect( "encoded mail, should only contain already transferencoded resources" );
+
+            mail.headers.insert(ContentType, file_buffer.content_type().clone())?;
+            mail.headers.insert(ContentTransferEncoding, file_buffer.transfer_encoding().clone())?;
+        }
+
+        if !mail.headers.contains(Date) {
+            mail.headers.insert(Date, DateTime::now())?;
+        }
+        Ok(())
+    }
+}
 
 impl<E> Deref for EncodableMail<E>
     where E: MailEncoder
