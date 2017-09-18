@@ -14,7 +14,8 @@ use codec::{ MailEncoder, MailEncodable };
 use super::{
     HeaderName,
     Header,
-    SingularHeaderMarker
+    SingularHeaderMarker,
+    HasHeaderName
 };
 
 mod into_iter;
@@ -143,10 +144,10 @@ impl<E: MailEncoder> HeaderMap<E> {
             .map( |untyped| untyped.with_typing() )
     }
 
-    pub fn get_untyped( &self, name: HeaderName ) -> Option<UntypedMultiBodyIter<E>> {
-        if let Some( body ) = self.get_bodies( name ) {
+    pub fn get_untyped<H: HasHeaderName>( &self, name: H ) -> Option<UntypedMultiBodyIter<E>> {
+        if let Some( body ) = self.get_bodies( name.get_name() ) {
             Some( UntypedMultiBodyIter::new(
-                //SAFE: all pointers allways point to valide data, and the
+                //SAFE: all pointers always point to valid data, and the
                 // borrow aspects (no mut borrow) are archived through the
                 // &self borrow
                 unsafe { &*body.first },
@@ -163,6 +164,11 @@ impl<E: MailEncoder> HeaderMap<E> {
     /// through there _could_ be other non-mut borrows
     fn get_bodies( &self, name: HeaderName ) -> Option<&HeaderBodies<E>> {
         self.header_map.get( &name )
+    }
+
+    /// returns true if the headermap contains a header with the same name
+    pub fn contains<H: HasHeaderName>(&self, name: H ) -> bool {
+        self.header_map.contains_key(&name.get_name())
     }
 
 
@@ -724,6 +730,19 @@ mod test {
             }
             Some(validator::<E>)
         }
+    }
+
+    #[test]
+    fn contains_works() {
+        let map = headers! {
+            Subject: "soso"
+        }.unwrap();
+        typed(&map);
+
+        assert_eq!( true, map.contains(Subject::name()) );
+        assert_eq!( true, map.contains(Subject) );
+        assert_eq!( false, map.contains(Comments::name()) );
+        assert_eq!( false, map.contains(Comments) );
     }
 
     #[test]

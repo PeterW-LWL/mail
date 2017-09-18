@@ -55,6 +55,25 @@ pub trait Header {
 /// the `HeaderMap::get_single` functionality.
 pub trait SingularHeaderMarker {}
 
+/// a utility trait allowing us to use type hint structs
+/// in `HeaderMap::{contains, get_untyped}`
+pub trait HasHeaderName {
+    fn get_name(&self) -> HeaderName;
+}
+
+impl HasHeaderName for HeaderName {
+    fn get_name(&self) -> HeaderName {
+        *self
+    }
+}
+
+impl<H> HasHeaderName for H
+    where H: Header
+{
+    fn get_name(&self) -> HeaderName {
+        H::name()
+    }
+}
 
 ///
 /// Note: Normally you will never have the need to create a HeaderName instance by
