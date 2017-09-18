@@ -99,6 +99,7 @@ pub fn is_special(ch: char ) -> bool {
     }
 }
 
+
 /// check if a char is an tspecial (based on RFC 2045)
 pub fn is_tspecial( ch: char ) -> bool {
     match ch {
@@ -113,6 +114,13 @@ pub fn is_tspecial( ch: char ) -> bool {
         _ => false
     }
 }
+
+/// check if a char is an token char (based on RFC 2045)
+pub fn is_token_char( ch: char ) -> bool {
+    ' ' < ch && ch <= '~' && !is_tspecial(ch)
+}
+
+
 
 
 
