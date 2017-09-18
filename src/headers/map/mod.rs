@@ -1,14 +1,14 @@
 use std::fmt;
 use std::marker::PhantomData;
-use std::collections::{ HashMap as Map };
-use std::iter::Iterator;
+use std::collections::{ HashMap as Map, HashMap, hash_map };
+use std::iter::{ self as std_iter, Iterator};
 use std::slice::{ Iter as SliceIter };
 
 //reexport for headers macro
 pub use ascii::{ AsciiStr as _AsciiStr };
 
-use utils::HeaderTryInto;
 use error::*;
+use utils::HeaderTryInto;
 use codec::{ MailEncoder, MailEncodable };
 
 use super::{
@@ -21,7 +21,6 @@ mod into_iter;
 pub use self::into_iter::*;
 mod iter;
 pub use self::iter::*;
-
 
 pub struct HeaderMap<E: MailEncoder> {
     // the only header which is allowed/meant to appear more than one time is
@@ -38,7 +37,12 @@ pub struct HeaderMap<E: MailEncoder> {
     header_vec: Vec<(HeaderName, Box<MailEncodable<E>>)>,
     // we don't want to search for a header when accessing it,
     // we also have to kow if such a header is set etc.
-    header_map: Map<HeaderName, HeaderBodies<E>>
+    header_map: Map<HeaderName, HeaderBodies<E>>,
+
+    //OTPIMIZE: I think there are optional hashers better suited for a set of functions
+    //WORKAROUND: for rust limitations? bug? we cast the function pointer
+    // to usize and use it as key
+    contextual_validators: HashMap<usize, fn(&HeaderMap<E>) -> Result<()>>
 }
 
 
@@ -48,14 +52,49 @@ struct HeaderBodies<E: MailEncoder> {
     other: Option<Vec<*mut MailEncodable<E>>>
 }
 
+type ValidatorIter<'a, E> = std_iter::Map<
+    hash_map::Iter<'a,usize, fn(&HeaderMap<E>)->Result<()>>,
+    fn((&'a usize, &'a fn(&HeaderMap<E>)->Result<()>)) -> fn(&HeaderMap<E>)->Result<()>
+>;
+
 
 impl<E: MailEncoder> HeaderMap<E> {
 
     pub fn new() -> Self {
         HeaderMap {
             header_vec: Vec::new(),
-            header_map: Map::new()
+            header_map: Map::new(),
+            contextual_validators: HashMap::new()
         }
+    }
+
+    /// remove all contextual validators
+    pub fn clear_contextual_validators(&mut self) {
+        self.contextual_validators.clear()
+    }
+
+    /// add an additional contextual validator
+    pub fn add_contextual_validator(&mut self, vfn: fn(&Self) -> Result<()>) {
+        self.contextual_validators.insert(vfn as usize, vfn);
+    }
+
+    pub fn iter_contextual_validators(&self) -> ValidatorIter<E> {
+        fn map_fn<'a, E: MailEncoder>(
+            key_val: (
+                &'a usize,
+                &'a for<'b> fn(&'b HeaderMap<E>)-> Result<()>
+            )
+        ) -> for<'b> fn(&'b HeaderMap<E>)->Result<()> {
+            *key_val.1
+        }
+        self.contextual_validators.iter().map(map_fn)
+    }
+
+    pub fn use_contextual_validators(&self) -> Result<()> {
+        for validator in self.iter_contextual_validators() {
+            (validator)(self)?;
+        }
+        Ok(())
     }
 
     #[inline(always)]
@@ -127,8 +166,12 @@ impl<E: MailEncoder> HeaderMap<E> {
     }
 
 
+    /// # Note
+    /// If `extend` fails some values of `other` might already have
+    /// been added to this map but non of the contextual validator have
+    /// been added yet.
     pub fn extend( &mut self, other: HeaderMap<E> ) -> Result<&mut Self> {
-        let HeaderMap { header_vec, header_map } = other;
+        let HeaderMap { header_vec, header_map, contextual_validators } = other;
 
         let multi_state = header_map.iter()
             .map( |(name, bodies)| (name, bodies.other.is_some()) )
@@ -139,10 +182,15 @@ impl<E: MailEncoder> HeaderMap<E> {
             let is_multi = *multi_state.get(&name).unwrap();
             self.insert_trait_object( name, body, is_multi)?;
         }
+
+        self.contextual_validators.extend(contextual_validators);
         Ok( self )
     }
 
-    ///
+    /// Inserts given header into the header map,
+    /// including the contextual validator which
+    /// might be returned by the `Header::get_contextual_validator`
+    /// function
     ///
     /// Note:
     /// the original signature did not take the header as a
@@ -170,6 +218,9 @@ impl<E: MailEncoder> HeaderMap<E> {
               C: HeaderTryInto<H::Component>
     {
         let hbody: H::Component = hbody.try_into()?;
+        if let Some(validator) = H::get_contextual_validator() {
+            self.add_contextual_validator(validator);
+        }
         let tobj: Box<MailEncodable<E>> = Box::new( hbody );
         self.insert_trait_object( H::name(), tobj, H::CAN_APPEAR_MULTIPLE_TIMES )
     }
@@ -240,6 +291,19 @@ impl<E: MailEncoder> HeaderMap<E> {
     /// is stored/remembered removing element is,
     /// in comparsion to e.g. an hash map, not
     /// a cheap operation
+    ///
+    /// also it does not remove `contextual_validators`
+    /// implicitly added when adding values, normally
+    /// this should not be a problem, as validators are
+    /// not supposed to error if the header they are meant
+    /// for is not there or is there but has a different
+    /// component type. Only if you remove a header and
+    /// replace it by a alternate implementation of the
+    /// same header which only differs in the contextual
+    /// validator, in a way that  the new validator allows
+    /// thinks the other does not _and_ you relay on it
+    /// allowing this things it can cause an validation
+    /// error.
     pub fn remove_by_name(&mut self, name: HeaderName ) -> bool {
         if let Some( HeaderBodies { first, other } ) = self.header_map.remove(&name) {
             //FIXME use HashSet once *mut T,T:?Sized impl Hash (rust #???)
@@ -637,7 +701,62 @@ mod test {
             &[ "b" ],
             values.as_slice()
         );
+    }
 
+    struct XComment;
+    impl Header for XComment {
+        const CAN_APPEAR_MULTIPLE_TIMES: bool = true;
+        type Component = Unstructured;
 
+        fn name() -> HeaderName {
+            HeaderName::new(ascii_str!(X Minus C o m m e n t )).unwrap()
+        }
+
+        fn get_contextual_validator<E>() -> Option<fn(&HeaderMap<E>) -> Result<()>>
+            where E: MailEncoder
+        {
+            //some stupid but simple validator
+            fn validator<E: MailEncoder>(map: &HeaderMap<E>) -> Result<()> {
+                if map.get_untyped(Comments::name()).is_some() {
+                    bail!("can't have X-Comment and Comments in same mail")
+                }
+                Ok(())
+            }
+            Some(validator::<E>)
+        }
+    }
+
+    #[test]
+    fn insert_does_insert_validator() {
+        let map = headers! {
+            XComment: "yay",
+            Subject: "soso"
+        }.unwrap();
+        typed(&map);
+
+        assert_eq!(1, map.iter_contextual_validators().count());
+    }
+
+    #[test]
+    fn use_validator_ok() {
+        let map = headers! {
+            XComment: "yay",
+            Subject: "soso"
+        }.unwrap();
+        typed(&map);
+
+        assert_ok!(map.use_contextual_validators());
+    }
+
+    #[test]
+    fn use_validator_err() {
+        let map = headers! {
+            XComment: "yay",
+            Comments: "oh no",
+            Subject: "soso"
+        }.unwrap();
+        typed(&map);
+
+        assert_err!(map.use_contextual_validators());
     }
 }
