@@ -9,7 +9,7 @@ use error::*;
 use utils::HeaderTryInto;
 use headers::{
     Header, HeaderMap,
-    ContentType,
+    ContentType, From,
     ContentTransferEncoding,
     Date
 };
@@ -190,6 +190,12 @@ impl<E> EncodableMail<E>
     fn from_loaded_mail(mut mail: Mail<E>) -> Result<Self> {
         Self::insert_generated_headers(&mut mail)?;
         mail.headers.use_contextual_validators()?;
+        if !mail.headers.contains(Date) {
+            bail!("a mail must have a Date header field");
+        }
+        if !mail.headers.contains(From) {
+            bail!("a mail must have a From header field");
+        }
         Ok(EncodableMail(mail))
     }
 
