@@ -80,7 +80,7 @@ mod test {
             ReceivedToken::Word( word )
         } )
     } => ascii => [
-        LinePart( r#""sim\ ple""# )
+        LinePart( r#""sim ple""# )
     ]}
 
 

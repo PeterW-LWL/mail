@@ -51,7 +51,7 @@ pub fn is_ascii( ch: char ) -> bool {
 #[inline(always)]
 pub fn is_ascii_vchar( ch: char ) -> bool {
     let u32_ch = ch as u32;
-    32 < u32_ch && u32_ch < 128
+    32 < u32_ch && u32_ch <= 126
 }
 
 //VCHAR as defined by RFC 5243
@@ -147,9 +147,20 @@ pub fn is_qtext( ch: char, mt: MailType ) -> bool {
 }
 
 /// is it a CTL (based on RFC 822)
+///
+/// # Note
+/// the standard specifies `'\t'` as a CTL but not `' '`
+/// but both `'\t'` and `' '` are LWSP-char i.e. semantically
+/// space i.e. _semantically equivalent_.
 #[inline(always)]
 pub fn is_ctl( ch: char ) -> bool {
     (ch as u32) < 32
+}
+
+
+#[inline(always)]
+pub fn is_token_char( ch: char ) -> bool {
+    is_ascii( ch ) && !is_ctl( ch ) && !is_tspecial( ch ) && ch != ' '
 }
 
 
@@ -336,4 +347,29 @@ pub mod quoted_word {
 }
 
 
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn _is_ascii_vchar() {
+        assert_eq!(false, is_ascii_vchar('\x7f'));
+        for bad_char in b'\0'..b' ' {
+            if is_ascii_vchar(bad_char as char) {
+                panic!("{:?} should not be a VCHAR", bad_char);
+            }
+        }
+        for good_char in b'!'..(b'~'+1) {
+            if !is_ascii_vchar(good_char as char) {
+                panic!("{:?} should be a VCHAR", good_char as char);
+            }
+        }
+    }
+
+    #[test]
+    fn htap_is_ctl_space_is_not() {
+        assert_eq!(true, is_ctl('\t'));
+        assert_eq!(false, is_ctl(' '));
+    }
+}
 
