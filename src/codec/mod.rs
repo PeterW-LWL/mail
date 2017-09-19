@@ -4,7 +4,7 @@ pub mod transfer_encoding;
 pub mod quoted_printable;
 pub mod base64;
 pub mod idna;
-
+pub mod quoted_string;
 
 #[cfg(test)]
 #[macro_use]

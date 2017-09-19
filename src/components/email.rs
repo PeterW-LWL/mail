@@ -241,7 +241,7 @@ mod test {
         LocalPart::from_input(  "ha ns" )
     } => ascii => [
         OptFWS,
-        LinePart("\"ha\\ ns\""),
+        LinePart("\"ha ns\""),
         OptFWS
     ]}
 

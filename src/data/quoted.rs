@@ -3,9 +3,9 @@ use std::ops::Deref;
 use ascii::AsciiString;
 
 use error::*;
-use grammar::{is_qtext, is_ascii, is_ws, is_vchar, MailType };
+use grammar::MailType;
 use grammar::quoted_word::is_quoted_word;
-use codec::MailEncoder;
+use codec::{ MailEncoder, self};
 
 use super::simple_item::SimpleItem;
 use super::inner_item::{ InnerAscii, InnerUtf8 };
@@ -42,33 +42,12 @@ impl QuotedString {
     }
 
     pub fn quote( input: &str ) -> Result<Self> {
-        let mut ascii = true;
-        let mut out = String::new();
-        out.push( '"' );
-        for char in input.chars() {
-            if ascii { ascii = is_ascii( char ) }
-            if is_qtext( char, MailType::Internationalized ) {
-                out.push( char )
-            } else {
-                //NOTE: while quoting ws is possible it is not nessesary as
-                // a quoted string can contain FWS, and only CRLF in a quoted
-                // string are semantically invisible (meaning the WSP after
-                // CRLF _is_ semantically visible)
-                if is_vchar( char, MailType::Internationalized) || is_ws( char ) {
-                    out.push( '\\' );
-                    out.push( char );
-                } else {
-                    // char: 0-31
-                    bail!( "can not quote char: {:?}", char );
-                }
-            }
-        }
-        out.push( '"' );
-        if ascii {
-            let asciied = unsafe { AsciiString::from_ascii_unchecked( out ) };
+        let (mt, res) = codec::quoted_string::quote(input)?;
+        if mt == MailType::Ascii {
+            let asciied = unsafe { AsciiString::from_ascii_unchecked( res ) };
             Ok( QuotedString( asciied.into() ) )
         } else {
-            Ok( QuotedString( SimpleItem::from_utf8( out.into() ) ) )
+            Ok( QuotedString( SimpleItem::from_utf8( res.into() ) ) )
         }
     }
 
@@ -155,7 +134,7 @@ mod test {
     #[test]
     fn quote_some_chars() {
         let quoted = QuotedString::quote( "tr@al al\"a" ).unwrap();
-        assert_eq!(  "\"tr@al\\ al\\\"a\"", &**quoted );
+        assert_eq!(  "\"tr@al al\\\"a\"", &**quoted );
     }
 
     #[test]

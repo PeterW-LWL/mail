@@ -51,7 +51,7 @@ pub fn is_ascii( ch: char ) -> bool {
 #[inline(always)]
 pub fn is_ascii_vchar( ch: char ) -> bool {
     let u32_ch = ch as u32;
-    32 < u32_ch && u32_ch < 128
+    32 < u32_ch && u32_ch <= 126
 }
 
 //VCHAR as defined by RFC 5243
@@ -336,4 +336,24 @@ pub mod quoted_word {
 }
 
 
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn _is_ascii_vchar() {
+        assert_eq!(false, is_ascii_vchar('\x7f'));
+        let bad_chars = (b'\0'..b' ').filter(|&b| b != b'\t');
+        for bad_char in bad_chars {
+            if is_ascii_vchar(bad_char as char) {
+                panic!("{:?} should not be a VCHAR", bad_char);
+            }
+        }
+        for good_char in b'!'..(b'~'+1) {
+            if !is_ascii_vchar(good_char as char) {
+                panic!("{:?} should be a VCHAR", good_char as char);
+            }
+        }
+    }
+}
 
