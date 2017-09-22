@@ -116,9 +116,6 @@ pub fn is_tspecial( ch: char ) -> bool {
 
 
 
-
-
-
 /// atext as defined by RFC 5322
 #[inline(always)]
 pub fn is_atext( ch: char, tp: MailType  ) -> bool {
@@ -181,6 +178,11 @@ pub fn is_especial( ch: char ) -> bool {
         _ => false
     }
 }
+
+pub fn is_token(s: &str) -> bool {
+    0 < s.len() && s.chars().all(is_token_char)
+}
+
 //
 //pub fn is_dot_atom_text( text: &str, mt: MailType ) -> bool {
 //    use nom::IResult;
@@ -369,6 +371,11 @@ mod test {
     fn htap_is_ctl_space_is_not() {
         assert_eq!(true, is_ctl('\t'));
         assert_eq!(false, is_ctl(' '));
+    }
+
+    #[test]
+    fn is_toke_empty() {
+        assert_eq!(false, is_token(""));
     }
 }
 

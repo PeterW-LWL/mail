@@ -6,8 +6,47 @@ use grammar::{
     is_ascii,
     is_vchar,
     is_ws,
-    is_qtext
+    is_qtext,
+    //used by glue
+    is_atext,
+    is_token_char
 };
+
+
+/// Used to determine
+/// 1. if the string needs quoting
+/// 2. where the first char which migth require quoting appear, to efficiently copy it over
+///
+/// Note that a string can compare only of chars which do not need quoting in a
+/// quoted string but still requires quoting, e.g. a `"a."` local-part is not
+/// valide but an `"\"a.\""` local-part is.
+pub trait ValidWithoutQuotationCheck {
+    /// should return true if the next char is valid without quotation
+    fn next_char(&mut self, ch: char) -> bool;
+
+    /// Called after the last char was passed to `next_char`.
+    /// It should return true if the whole string is valid without
+    /// quotation _assuming_ that before all chars where passed in
+    /// order to `next_char` and all calls to `next_char` returned
+    /// true.
+    ///
+    /// This can be used to checks not possible with on a char by
+    /// char basis e.g. if it does not end in a `.`.
+    ///
+    /// Note that because it is only called after one iteration,
+    /// validation should be done, if possible, in the `next_char`
+    /// method.
+    fn end(&mut self, _all: &str) -> bool { true }
+}
+
+impl<T> ValidWithoutQuotationCheck for T
+    where T: FnMut(char) -> bool
+{
+    fn next_char(&mut self, ch: char) -> bool {
+        (self)(ch)
+    }
+}
+
 
 /// quotes the input string
 ///
@@ -55,23 +94,43 @@ pub fn quote(input: &str) -> Result<(MailType, String)> {
 /// quoted string, no quoting will be done and therefore no error
 /// will be returned even through it contains a CTL.
 ///
-pub fn quote_if_needed<'a, FN>(input: &'a str, valid_without_quoting: FN, allowed_mail_type: MailType )
-    -> Result<(MailType, Cow<'a, str>)>
-    where FN: FnMut(char) -> bool
+pub fn quote_if_needed<'a, FN>(
+    input: &'a str,
+    mut valid_without_quotation: FN,
+    allowed_mail_type: MailType
+) -> Result<(MailType, Cow<'a, str>)>
+    where FN: ValidWithoutQuotationCheck
 {
-    let (mut ascii, offset) = scan_ahead(input, valid_without_quoting, allowed_mail_type)?;
-    //NOTE: no need to check ascii scan_ahead errors if !ascii && allowed_mail_type == Ascii
-    if offset == input.len() {
+    let valid_without_quoting = &mut valid_without_quotation;
+
+    let (ascii, offset) = scan_ahead(input, valid_without_quoting, allowed_mail_type)?;
+    if offset == input.len() && valid_without_quoting.end(input) {
+        //NOTE: no need to check ascii scan_ahead errors if !ascii && allowed_mail_type == Ascii
         return Ok((mailtype_from_is_ascii_bool(ascii), Cow::Borrowed(input)))
     }
 
-    let (ok, rest) = input.split_at(offset);
+    let (ascii, out) = _quote(input, ascii, allowed_mail_type, offset)?;
+
+    Ok( (mailtype_from_is_ascii_bool(ascii), Cow::Owned(out)) )
+}
+
+fn _quote(
+        input: &str,
+        was_ascii: bool,
+        allowed_mail_type: MailType,
+        start_escape_check_from: usize
+) -> Result<(bool, String)>
+{
+    let ascii_only = allowed_mail_type == MailType::Ascii;
+    debug_assert!(!(ascii_only && !was_ascii));
+
+    let (ok, rest) = input.split_at(start_escape_check_from);
     //just guess half of the remaining chars needs escaping
     let mut out = String::with_capacity((rest.len() as f64 * 1.5) as usize);
     out.push('\"');
     out.push_str(ok);
 
-    let ascii_only = allowed_mail_type == MailType::Ascii;
+    let mut ascii = was_ascii;
     for ch in rest.chars() {
         if ascii && !is_ascii( ch ) {
             if ascii_only {
@@ -80,8 +139,10 @@ pub fn quote_if_needed<'a, FN>(input: &'a str, valid_without_quoting: FN, allowe
                 ascii = false;
             }
         }
+
+        // we are no asci specific in this part of the algorithm (and it's fine)
         if is_qtext( ch, MailType::Internationalized ) {
-            out.push( ch )
+            out.push( ch );
         } else {
             // we do not have to escape ' ' and '\t' (but could)
             if is_ws( ch ) {
@@ -96,8 +157,8 @@ pub fn quote_if_needed<'a, FN>(input: &'a str, valid_without_quoting: FN, allowe
         }
     }
     out.push( '"' );
+    Ok((ascii, out))
 
-    Ok( (mailtype_from_is_ascii_bool(ascii), Cow::Owned(out)) )
 }
 
 
@@ -110,8 +171,8 @@ fn mailtype_from_is_ascii_bool(is_ascii: bool) -> MailType {
     }
 }
 
-fn scan_ahead<FN>(inp: &str, mut valid_without_quoting: FN, tp: MailType) -> Result<(bool, usize)>
-    where FN: FnMut(char) -> bool
+fn scan_ahead<FN>(inp: &str, valid_without_quoting: &mut FN, tp: MailType) -> Result<(bool, usize)>
+    where FN: ValidWithoutQuotationCheck
 {
     let ascii_only = tp == MailType::Ascii;
     let mut ascii = true;
@@ -123,16 +184,71 @@ fn scan_ahead<FN>(inp: &str, mut valid_without_quoting: FN, tp: MailType) -> Res
                 ascii = false;
             }
         }
-        if !valid_without_quoting(ch) {
+        if !valid_without_quoting.next_char(ch) {
             return Ok((ascii, offset))
         }
     }
     Ok((ascii, inp.len()))
 }
 
+
+//NOTE: this struct can not be placed in grammar as it specific
+// to quoted_string, but it can be placed here in the
+// mail-codec <==> quted_string glue, as the glue can depend on
+// grammar
+pub struct DotAtomTextCheck {
+    can_be_dot: bool,
+    mail_type: MailType
+}
+
+impl DotAtomTextCheck {
+    pub fn new(mail_type: MailType) -> DotAtomTextCheck {
+        DotAtomTextCheck {
+            mail_type,
+            can_be_dot: false,
+        }
+    }
+}
+
+impl ValidWithoutQuotationCheck for DotAtomTextCheck {
+    fn next_char(&mut self, ch: char) -> bool {
+        if ch == '.' {
+            if self.can_be_dot {
+                self.can_be_dot = false;
+                true
+            } else {
+                false
+            }
+        } else {
+            self.can_be_dot = true;
+            is_atext(ch, self.mail_type)
+        }
+    }
+
+    fn end(&mut self, _all: &str) -> bool {
+        let can_be_dot = self.can_be_dot;
+        //reset it, just to be on the safe side
+        self.can_be_dot = false;
+        // it's only false if "empty" or "dot at end" which are both invalid
+        can_be_dot == true
+    }
+}
+
+
+pub struct TokenCheck;
+
+impl ValidWithoutQuotationCheck for TokenCheck {
+    fn next_char(&mut self, ch: char) -> bool {
+        is_token_char(ch)
+    }
+    fn end(&mut self, all: &str) -> bool {
+        0 < all.len()
+    }
+}
+
 #[cfg(test)]
 mod test {
-    use grammar::{ is_vchar, is_token_char, is_qtext};
+    use grammar::{ is_vchar, is_qtext};
     use super::*;
 
 
@@ -171,8 +287,8 @@ mod test {
     
     #[test]
     fn no_quotation_needed_ascii() {
-        let (mt, res) = assert_ok!(
-            quote_if_needed("simple", is_token_char, MailType::Ascii));
+        let res = quote_if_needed("simple", TokenCheck, MailType::Ascii);
+        let (mt, res) = assert_ok!(res);
         assert_eq!(MailType::Ascii, mt);
         assert_eq!("simple", &*res);
         let is_borrowed = if let Cow::Borrowed(_) = res { true } else { false };
@@ -222,7 +338,8 @@ mod test {
             ("a-token-it-is", "a-token-it-is", false)
         ];
         for &(unquoted, exp_res, quoted) in data.iter() {
-            let (mt, res) = assert_ok!(quote_if_needed(unquoted, is_token_char, MailType::Ascii));
+            let res = quote_if_needed(unquoted, TokenCheck, MailType::Ascii);
+            let (mt, res) = assert_ok!(res);
             assert_eq!(MailType::Ascii, mt);
             if quoted {
                 let owned: Cow<str> = Cow::Owned(exp_res.to_owned());
@@ -236,7 +353,7 @@ mod test {
     #[test]
     fn quotes_utf8() {
         let mt = MailType::Internationalized;
-        let res = quote_if_needed("l↓r", is_token_char, mt);
+        let res = quote_if_needed("l↓r", TokenCheck, mt);
         let res = assert_ok!(res);
         let was_quoted = if let &Cow::Owned(..) = &res.1 { true } else { false };
         assert_eq!( true, was_quoted );
@@ -256,5 +373,52 @@ mod test {
                                   |ch|is_qtext(ch, MailType::Ascii),
                                   MailType::Ascii);
         assert_err!(res);
+    }
+
+    #[test]
+    fn check_end_is_used() {
+        let mt = MailType::Ascii;
+        let res = quote_if_needed("a.", DotAtomTextCheck::new(mt), mt);
+        let (got_mt, quoted) = assert_ok!(res);
+        assert_eq!(MailType::Ascii, got_mt);
+        assert_eq!("\"a.\"", quoted);
+    }
+
+    #[test]
+    fn is_dot_atom_text_check() {
+        let checks = [
+            ("simepl", true),
+            ("more.complex", true),
+            (".um", false),
+            ("a..b", false),
+            //we only test with next_char so it's ok
+            ("a.", true)
+        ];
+
+        for &(text, ok) in checks.iter() {
+            let mut check = DotAtomTextCheck::new(MailType::Ascii);
+            let res = text.chars().all(|ch| check.next_char(ch) );
+            if res != ok {
+                panic!("expected `chars().all(closure)` on {:?} to return {:?}", text, ok);
+            }
+        }
+    }
+
+    #[test]
+    fn dot_atom_text_no_tailing_dot() {
+        let text = "a.";
+        let mut check = DotAtomTextCheck::new(MailType::Ascii);
+        let res = text.chars().all(|ch| check.next_char(ch) );
+        assert_eq!(true, res);
+        assert_eq!(false, check.end(text))
+    }
+
+    #[test]
+    fn dot_atom_text_utf8() {
+        let text = "a↓.→";
+        let mut check = DotAtomTextCheck::new(MailType::Internationalized);
+        let res = text.chars().all(|ch| check.next_char(ch) );
+        assert_eq!(true, res);
+        assert_eq!(true, check.end(text))
     }
 }

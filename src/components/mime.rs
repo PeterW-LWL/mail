@@ -7,7 +7,7 @@ use ascii::AsciiStr;
 
 use error::*;
 use utils::HeaderTryFrom;
-use grammar::{is_token_char, MailType};
+use grammar::{ is_token, MailType};
 use codec::{ MailEncoder, MailEncodable, self };
 
 pub use mime::Mime;
@@ -34,7 +34,7 @@ pub fn create_encoded_mime_parameter<K,V>(
     assure_token(name)?;
     let value = value.as_ref();
 
-    let res = codec::quoted_string::quote_if_needed(value, is_token_char, tp);
+    let res = codec::quoted_string::quote_if_needed(value, codec::quoted_string::TokenCheck, tp);
     let (value, needed_encoding) =
         if let Ok( (got_tp, res) ) = res  {
             debug_assert!( !(tp==MailType::Ascii && got_tp==MailType::Internationalized) );
@@ -82,7 +82,7 @@ pub fn create_mime<T, ST, I, K, V>(_type: T, subtype: ST, params: I, mt: MailTyp
 }
 
 fn assure_token(s: &str) -> Result<&str> {
-    if !s.chars().all(is_token_char) {
+    if !is_token(s) {
         bail!("string {:?} is not a valid token", s);
     }
     Ok(s)

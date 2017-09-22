@@ -1,7 +1,7 @@
 use ascii::{ AsciiChar };
 
 use error::*;
-use codec::{ MailEncoder, MailEncodable };
+use codec::{ self, MailEncoder, MailEncodable };
 use codec::idna;
 
 use grammar::{
@@ -9,11 +9,10 @@ use grammar::{
     is_atext,
     is_dtext,
     is_ws,
-    is_quotable,
     MailType
 };
 
-use data::{FromInput, Input, QuotedString, SimpleItem, InnerUtf8 };
+use data::{FromInput, Input, SimpleItem, InnerUtf8 };
 
 
 /// an email of the form `local-part@domain`
@@ -79,46 +78,22 @@ impl FromInput for LocalPart {
 impl<E> MailEncodable<E> for LocalPart where E: MailEncoder {
 
     fn encode(&self, encoder: &mut E) -> Result<()> {
-        encoder.note_optional_fws();
-
         let input: &str = &*self.0;
+        let mail_type = encoder.mail_type();
 
-        //OPTIMIZE: directly write to encoder
-        //  REQUIREMENT: the encoder has to have something like encoder.resetable_writer(),
-        //    which allows us to split a write_str/write_str_unchecked into multiple
-        //    chunks, while allowing us to "abort" this write
-        let mut requires_quoting = false;
-        //FIXME I'm pretty sure here is a bug, find it and test it
-        let mut mail_type = MailType::Ascii;
-        for char in input.chars() {
-            if !is_atext( char, mail_type ) {
-                if !is_ascii( char ) {
-                    mail_type = MailType::Internationalized;
-                    if is_atext( char, mail_type ) {
-                        continue;
-                    }
-                }
-                if is_quotable( char, MailType::Internationalized ) {
-                    requires_quoting = true;
-                    // the quoting code will also iter over it so no need
-                    // to continue here
-                    break
-                } else {
-                    bail!( "unquotable charachter {:?} in local part", char );
-                }
-            }
-        }
+        let (got_mt, res) = codec::quoted_string::quote_if_needed(
+            input,
+            codec::quoted_string::DotAtomTextCheck::new(mail_type),
+            mail_type
+        )?;
 
-        if requires_quoting {
-            QuotedString::write_into( encoder, input )?;
-        } else {
-            match mail_type {
-                MailType::Ascii => encoder.write_str_unchecked( input ),
-                MailType::Internationalized => encoder.try_write_utf8( input )?
-            }
-        }
+        debug_assert!(!(got_mt == MailType::Internationalized && mail_type == MailType::Ascii));
 
-
+        encoder.note_optional_fws();
+        // if mail_type == Ascii quote_if_needed already made sure this
+        // is ascii (or returned an error if not)
+        // it also made sure it is valid as it is either `dot-atom-text` or `quoted-string`
+        encoder.write_str_unchecked(&*res);
         encoder.note_optional_fws();
         Ok( () )
     }
