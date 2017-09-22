@@ -4,7 +4,8 @@ use error::*;
 use ascii::AsciiChar;
 use codec::{MailEncoder, MailEncodable };
 
-use utils::{ Vec1, HeaderTryFrom, HeaderTryInto};
+use external::vec1::Vec1;
+use utils::{ HeaderTryFrom, HeaderTryInto};
 use super::Mailbox;
 
 #[derive(Debug)]
@@ -130,7 +131,7 @@ macro_rules! impl_header_try_from_tuple {
                 )*
                 Ok( MailboxList(
                     //UNWRAP_SAFE: len 0 is not implemented with the macro
-                    $crate::utils::Vec1::from_vec(out).unwrap()
+                    $crate::external::vec1::Vec1::from_vec(out).unwrap()
                 ) )
             }
         }

@@ -11,7 +11,7 @@ macro_rules! vec1 {
     ( $first:expr, $($item:expr),* ) => (
         #[allow(unused_mut)]
         {
-            let mut tmp = $crate::utils::Vec1::new( $first );
+            let mut tmp = $crate::external::vec1::Vec1::new( $first );
             $( tmp.push( $item ); )*
             tmp
         }

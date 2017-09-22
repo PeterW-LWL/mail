@@ -2,7 +2,7 @@ use std::ops::Deref;
 
 use error::*;
 
-use utils::Vec1;
+use external::vec1::Vec1;
 
 use grammar::encoded_word::{
     is_encoded_word,

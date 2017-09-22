@@ -1,6 +1,6 @@
 use ascii::{ AsciiString, AsciiChar, AsciiStr };
 
-use utils::Vec1;
+use external::vec1::Vec1;
 use grammar::encoded_word::{ MAX_ECW_LEN, ECW_SEP_OVERHEAD };
 use super::{ EncodedWordEncoding as Encoding };
 use super::traits::MailEncoder;

@@ -34,6 +34,8 @@ mod macros;
 pub mod utils;
 pub mod error;
 pub mod grammar;
+#[macro_use]
+pub mod external;
 #[cfg_attr(test, macro_use)]
 pub mod codec;
 pub mod data;
@@ -93,7 +95,7 @@ pub mod template_engine_prelude {
     pub type StdResult<R,E> = ::std::result::Result<R,E>;
     pub use serde::Serialize;
 
-    pub use utils::Vec1;
+    pub use external::vec1::Vec1;
     pub use mail::{
         Resource
     };

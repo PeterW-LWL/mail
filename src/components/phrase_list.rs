@@ -2,7 +2,8 @@ use ascii::AsciiChar;
 
 use error::*;
 use codec::{ MailEncoder, MailEncodable };
-use utils::{ Vec1, HeaderTryFrom, HeaderTryInto };
+use external::vec1::Vec1;
+use utils::{ HeaderTryFrom, HeaderTryInto };
 
 use super::Phrase;
 

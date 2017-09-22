@@ -22,9 +22,6 @@ pub use self::date_time::DateTime;
 mod file_meta;
 pub use self::file_meta::FileMeta;
 
-#[macro_use]
-mod vec1;
-pub use self::vec1::Vec1;
 
 
 pub fn is_multipart_mime( mime: &Mime ) -> bool {
