@@ -1,13 +1,9 @@
-//FIXME use Fnv?
 use std::ascii::AsciiExt;
 
-use ascii::{ AsciiChar, AsciiStr };
-
 use error::*;
-use grammar::{is_ctl, is_tspecial };
 use codec::{ MailEncodable, MailEncoder };
 use utils::{ FileMeta, HeaderTryFrom };
-
+use components::mime::create_encoded_mime_parameter;
 
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
@@ -69,44 +65,6 @@ impl<'a> HeaderTryFrom<&'a str> for Disposition {
     }
 }
 
-macro_rules! encode_disposition_param {
-    ( do $ec:expr, ( $($ch:ident)* ) $inner:ident | $value:expr => $code:block ) => ({
-        if let Some( ref $inner ) = $value {
-            $ec.write_char( AsciiChar::Semicolon );
-            $ec.write_str( ascii_str!{ $($ch)* } );
-            $ec.write_char( AsciiChar::Equal );
-            $code
-        }
-    });
-
-    ( $ec:expr, $( $tp:tt ( $($ch:ident)* )  $value:expr; )* ) => ({
-        let encoder = $ec;
-        $(
-            encode_disposition_param!{ $tp encoder, ( $($ch)* ) $value }
-        )*
-    });
-
-    ( STR $ec:expr,  ( $($ch:ident)* )  $value:expr ) => (
-        encode_disposition_param!{ do $ec, ( $($ch)*) filename | $value => {
-            encode_file_name( &**filename, $ec )?;
-        }}
-    );
-    ( DATE $ec:expr, ( $($ch:ident)* ) $value:expr ) => (
-        encode_disposition_param!{ do $ec, ( $($ch)* ) date | $value  => {
-            $ec.write_char( AsciiChar::Quotation );
-            date.encode( $ec )?;
-            $ec.write_char( AsciiChar::Quotation );
-        }}
-    );
-    ( USIZE $ec:expr,  ( $($ch:ident)* ) $value:expr ) => (
-        encode_disposition_param!{ do $ec, ( $($ch)* ) val | $value  => {
-            let val: usize = *val;
-            //SAFETY: the string produced from converting a number to a (decimal) string is
-            //  always ascii, as such it is always safe
-            $ec.write_str( unsafe { AsciiStr::from_ascii_unchecked( &*val.to_string() ) } );
-        }}
-    );
-}
 
 //TODO provide a gnneral way for encoding header parameter ...
 //  which follow the scheme: <mainvalue> *(";" <key>"="<value> )
@@ -114,17 +72,33 @@ macro_rules! encode_disposition_param {
 impl<E> MailEncodable<E> for DispositionParameters where E: MailEncoder {
 
     fn encode(&self, encoder: &mut E) -> Result<()> {
-        encode_disposition_param! {
-            encoder,
-            STR ( f i l e n a m e )  self.file_name;
-            DATE ( c r e a t i o n Minus d a t e ) self.creation_date;
-            DATE ( m o d i f i c a t i o n Minus d a t e ) self.modification_date;
-            DATE ( r e a d Minus d a t e ) self.read_date;
-            USIZE ( s i z e ) self.size;
+        let mt = encoder.mail_type();
+        let mut out = String::new();
+        if let Some(filename) = self.file_name.as_ref() {
+            create_encoded_mime_parameter(
+                "filename", filename, &mut out, mt)?;
         }
+        if let Some(creation_date) = self.creation_date.as_ref() {
+            create_encoded_mime_parameter(
+                "creation-date", creation_date.to_rfc2822(), &mut out, mt)?;
+        }
+        if let Some(date) = self.modification_date.as_ref() {
+            create_encoded_mime_parameter(
+                "modification-date", date.to_rfc2822(), &mut out, mt)?;
+        }
+        if let Some(date) = self.read_date.as_ref() {
+            create_encoded_mime_parameter(
+                "read-date", date.to_rfc2822(), &mut out, mt)?;
+        }
+        if let Some(size) = self.size.as_ref() {
+            create_encoded_mime_parameter(
+                "size", size.to_string(), &mut out, mt)?;
+        }
+        encoder.write_str_unchecked(&*out);
         Ok( () )
     }
 }
+
 
 impl<E> MailEncodable<E> for Disposition where E: MailEncoder {
 
@@ -144,28 +118,11 @@ impl<E> MailEncodable<E> for Disposition where E: MailEncoder {
 }
 
 
-fn encode_file_name<E>(file_name: &AsciiStr, encoder: &mut E) -> Result<()>
-    where E: MailEncoder
-{
-    for achar in file_name.chars() {
-        //TODO this needs way better handling
-        let char = achar.as_char();
-        if !char.is_ascii() ||  is_tspecial( char ) || is_ctl( char ) || char == ' '  {
-            bail!(
-                "handling non token file names in ContentDisposition is currently not supported" );
-        } else {
-            encoder.write_char( *achar );
-        }
-    }
-    Ok( () )
-}
-
-
 deref0!{+mut DispositionParameters => FileMeta }
 
 #[cfg(test)]
 mod test {
-    use ascii::IntoAsciiString;
+    use std::default::Default;
 
     use super::*;
     use codec::test_utils::*;
@@ -183,9 +140,18 @@ mod test {
         LinePart("attachment")
     ]}
 
+    ec_test!{ attachment_encode_file_name, {
+        Some( Disposition::new( DispositionKind::Attachment, FileMeta {
+            file_name: Some("this is nice".to_owned()),
+            ..Default::default()
+        }))
+    } => ascii => [
+        LinePart("attachment;filename=\"this is nice\"")
+    ]}
+
     ec_test!{ attachment_all_params, {
         Some( Disposition::new( DispositionKind::Attachment, FileMeta {
-            file_name: Some( "random.png".into_ascii_string().unwrap() ),
+            file_name: Some( "random.png".to_owned() ),
             creation_date: Some( DateTime::test_time( 1 ) ),
             modification_date: Some( DateTime::test_time( 2 ) ),
             read_date: Some( DateTime::test_time( 3 ) ),

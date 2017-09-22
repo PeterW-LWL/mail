@@ -88,6 +88,7 @@ impl<E> MailEncodable<E> for LocalPart where E: MailEncoder {
         //    which allows us to split a write_str/write_str_unchecked into multiple
         //    chunks, while allowing us to "abort" this write
         let mut requires_quoting = false;
+        //FIXME I'm pretty sure here is a bug, find it and test it
         let mut mail_type = MailType::Ascii;
         for char in input.chars() {
             if !is_atext( char, mail_type ) {
@@ -97,7 +98,7 @@ impl<E> MailEncodable<E> for LocalPart where E: MailEncoder {
                         continue;
                     }
                 }
-                if is_quotable( char ) {
+                if is_quotable( char, MailType::Internationalized ) {
                     requires_quoting = true;
                     // the quoting code will also iter over it so no need
                     // to continue here

@@ -64,7 +64,11 @@ pub trait MailEncoder: 'static {
     fn write_str( &mut self, str: &AsciiStr );
 
     //FIXME default impl
+    /// Writes the string to the buffer if the mail type supports utf8
+    /// (`MailType::Internationalized`) else it returns an error, even
+    /// if the text passed in is ascii only.
     fn try_write_utf8( &mut self, str: &str ) -> Result<()>;
+
     fn try_write_atext( &mut self, str: &str ) -> Result<()>;
     //fn write_encoded_word( &mut self, data: &str, ctx: EncodedWordContext );
 
