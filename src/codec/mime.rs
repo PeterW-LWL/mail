@@ -20,7 +20,7 @@ impl EncodeSet for MimeParamEncodingSet {
 
 /// percent encodes a byte sequence so that it can be used
 /// in a RFC 2231 conform encoded mime header parameter
-pub fn percent_encode_param<'a, R>(input: &'a R) -> Cow<'a, AsciiStr>
+pub fn percent_encode_param_value<'a, R>(input: &'a R) -> Cow<'a, AsciiStr>
     where R: ?Sized+AsRef<[u8]>
 {
     let cow: Cow<'a, str> = percent_encode(input.as_ref(), MimeParamEncodingSet).into();
@@ -43,14 +43,14 @@ mod test {
     #[test]
     fn encode_simple() {
         let input = "this is tüxt";
-        let res = percent_encode_param(input);
+        let res = percent_encode_param_value(input);
         assert_eq!("this%20is%20t%C3%BCxt", res.as_str());
     }
 
     #[test]
     fn no_encode_no_alloc() {
         let input = "full_valid";
-        let res = percent_encode_param(input);
+        let res = percent_encode_param_value(input);
         assert_eq!(Cow::Borrowed(input), res);
     }
 }

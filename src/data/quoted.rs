@@ -4,7 +4,7 @@ use ascii::AsciiString;
 
 use error::*;
 use grammar::MailType;
-use grammar::quoted_word::is_quoted_word;
+use grammar::is_quoted_string;
 use codec::{ MailEncoder, self};
 
 use super::simple_item::SimpleItem;
@@ -34,7 +34,7 @@ impl QuotedString {
     }
 
     pub fn parse( already_quoted: SimpleItem ) -> Result<Self> {
-        if is_quoted_word( &*already_quoted, MailType::Internationalized ) {
+        if is_quoted_string( &*already_quoted, MailType::Internationalized ) {
             Ok( QuotedString( already_quoted ) )
         } else {
             bail!( "already quoted item is not actualy valid: {:?}", &*already_quoted );

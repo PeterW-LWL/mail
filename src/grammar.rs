@@ -63,9 +63,8 @@ pub fn is_vchar( ch: char, mt: MailType ) -> bool {
 
 //can be quoted in a quoted string (internalized) based on RFC ... and RFC ...
 #[inline(always)]
-pub fn is_quotable( ch: char ) -> bool {
-    //FIMXE hceck with RFC
-    is_vchar( ch, MailType::Internationalized ) || is_ws( ch )
+pub fn is_quotable( ch: char, tp: MailType ) -> bool {
+    is_vchar( ch, tp) || is_ws( ch )
 }
 
 ///any whitespace (char::is_whitespace
@@ -115,10 +114,6 @@ pub fn is_tspecial( ch: char ) -> bool {
     }
 }
 
-/// check if a char is an token char (based on RFC 2045)
-pub fn is_token_char( ch: char ) -> bool {
-    ' ' < ch && ch <= '~' && !is_tspecial(ch)
-}
 
 
 
@@ -165,7 +160,7 @@ pub fn is_ctl( ch: char ) -> bool {
     (ch as u32) < 32
 }
 
-
+/// check if a char is an token char (based on RFC 2045)
 #[inline(always)]
 pub fn is_token_char( ch: char ) -> bool {
     is_ascii( ch ) && !is_ctl( ch ) && !is_tspecial( ch ) && ch != ' '
@@ -315,43 +310,39 @@ pub mod encoded_word {
 
 }
 
-pub mod quoted_word {
-    use super::{ MailType, is_qtext, is_vchar, is_ws };
-
-
-    pub fn is_quoted_word( qword: &str, tp: MailType ) -> bool {
-        let mut iter = qword.chars();
-        if let Some('"') = iter.next() {} else { return false }
-        let mut next = iter.next();
-        while let Some(ch) = next {
-            match ch {
-                '\\' => {
-                    if let Some(next_char) = iter.next() {
-                        if !( is_vchar( next_char, tp ) || is_ws( next_char ) ) {
-                            return false;
-                        }
-                    } else {
+pub fn is_quoted_string( qstr: &str, tp: MailType ) -> bool {
+    let mut iter = qstr.chars();
+    if let Some('"') = iter.next() {} else { return false }
+    let mut next = iter.next();
+    while let Some(ch) = next {
+        match ch {
+            '\\' => {
+                if let Some(next_char) = iter.next() {
+                    if !( is_vchar( next_char, tp ) || is_ws( next_char ) ) {
                         return false;
                     }
-                },
-                '"' => {
-                    if iter.next().is_none() {
-                        return true;
-                    } else {
-                        return false;
-                    }
+                } else {
+                    return false;
                 }
-                ch => {
-                    if !is_qtext( ch, tp ) {
-                        return false
-                    }
+            },
+            '"' => {
+                if iter.next().is_none() {
+                    return true;
+                } else {
+                    return false;
                 }
             }
-            next = iter.next()
+            ch => {
+                if !is_qtext( ch, tp ) {
+                    return false
+                }
+            }
         }
-
-        return false;
+        next = iter.next()
     }
+
+    // The only true return if we have a '"' followed by iter.next().is_none()
+    return false;
 }
 
 
