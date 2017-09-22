@@ -1,13 +1,8 @@
-//FIXME use Fnv?
 use std::ascii::AsciiExt;
-use std::borrow::Cow;
-
-use ascii::{ AsciiChar, AsciiStr };
 
 use error::*;
-use codec::{ MailEncodable, MailEncoder, self };
-use utils::{ DateTime, FileMeta, HeaderTryFrom };
-use grammar::{is_tspecial, is_ctl };
+use codec::{ MailEncodable, MailEncoder };
+use utils::{ FileMeta, HeaderTryFrom };
 use components::mime::create_encoded_mime_parameter;
 
 
@@ -128,8 +123,6 @@ deref0!{+mut DispositionParameters => FileMeta }
 #[cfg(test)]
 mod test {
     use std::default::Default;
-
-    use ascii::IntoAsciiString;
 
     use super::*;
     use codec::test_utils::*;

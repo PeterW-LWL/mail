@@ -3,12 +3,11 @@ use std::fmt;
 use std::borrow::Cow;
 
 use mime;
-use ascii::{ AsciiStr, AsciiString };
+use ascii::AsciiStr;
 
 use error::*;
 use utils::HeaderTryFrom;
-use grammar::{is_token_char, is_quotable, MailType};
-use data::QuotedString;
+use grammar::{is_token_char, MailType};
 use codec::{ MailEncoder, MailEncodable, self };
 
 pub use mime::Mime;
