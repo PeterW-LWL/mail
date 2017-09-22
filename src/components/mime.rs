@@ -102,10 +102,12 @@ impl<E> MailEncodable<E> for mime::Mime where E: MailEncoder {
 
     fn encode(&self, encoder: &mut E) -> Result<()> {
         let res = self.to_string();
-        //TODO can mime be non ascii??, e.g. utf8 file names?
-        encoder.write_str( AsciiStr::from_ascii( &*res ).unwrap() );
-        //OPTIMIZE: as far as I know mime can not be non-ascii
-        //encoder.write_str( unsafe { AsciiStr::from_ascii_unchecked( &*res ) } );
+        if !encoder.try_write_utf8(&*res).is_ok() {
+            match AsciiStr::from_ascii(&*res) {
+                Ok(asciied) => encoder.write_str( asciied ),
+                Err(_err) => bail!("mime containining utf8 in ascii only mail")
+            }
+        }
         Ok( () )
     }
 }
