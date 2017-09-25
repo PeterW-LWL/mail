@@ -4,3 +4,4 @@
 #[macro_use]
 pub mod vec1;
 
+pub mod idotom;

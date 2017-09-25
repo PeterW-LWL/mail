@@ -1,0 +1,589 @@
+//! InDirection Optimized Total Order Multimap
+//!
+//! A multimap which keeps the total order of insertion
+//! (don't groups them by key). An still grants resonable
+//! fast access to the values.
+//!
+//! It is implemented as a vector of key, value pairs
+//! where the value has to be a container implementing
+//! stable deref (e.g. Box<T>) as well as a (multi-)map
+//! which contains pointers to the data contained by the
+//! values, granting fast access to it.
+//!
+//!
+//! Currently limited to Copy types, could support clone types
+//! but would be often quite a bad idea (except for shepish
+//! clonable types like e.g. a `Rc`/`Arc`).
+// a version of Idotom can be build wich also relies on inner pointer
+// address stability to cheaply share the keys (would also
+// work with `&'static str` as `&T` is `StableDeref`).
+// The problem is how to handle ownership in that case,
+// so not done for now.
+
+//TODO move in own crate
+
+use std::collections::HashMap;
+use std::ops::Deref;
+use std::{vec, slice};
+use std::hash::Hash;
+use std::cmp::{Eq, PartialEq};
+use std::iter::{ Extend, FromIterator };
+use std::fmt::{self, Debug};
+
+use stable_deref_trait::StableDeref;
+
+
+pub use self::iter::{ Iter, IterMut };
+pub use self::entry::Entry;
+pub use self::map_iter::{ Keys, GroupedValues };
+
+mod iter;
+mod entry;
+mod map_iter;
+
+// # SAFETY constraints (internal):
+//
+// - the ptr. contained in map_access have to be always valid,
+//   code adding elements should first add them to `vec_data`,
+//   and then to `map_access` code removing elements should
+//   first remove them from `map_access` and then from `vec_data`.
+//
+// - giving out references to data always requires `self` to be
+//   borrowed by the same kind of reference, a function giving
+//   out references (either direct or transitive) should either
+//   only use `vec_data` or `map_access` but not both, especially
+//   so wrt. `&mut`.
+//
+// - UNDER ANY CIRCUMSTANC NEVER return a mutable reference to the
+//   data container (`&mut V`) in difference to a `&mut T`/`&mut V::Target`
+//   it can override the container invalidating the `StableDeref` assumptions.
+//
+// ## StableDeref assumptions
+//
+// - reminder: containers implementing `StableDeref` deref always to the same
+//   memory address as long as the container itself is not mutated (but
+//   even if the data on the address is mutated)
+//
+// - reminder: as we keep pointers directly to the data we can't allow any
+//   mutation of the container
+//
+// - reminder: implementing `StableDeref` for a trait which on a safty level
+//   relies on sideffects (e.g. using inner mutability) in deref is unsafe
+
+
+pub struct Idotom<K, V>
+    where V: Deref, K: Hash + Eq + Copy
+{
+    vec_data: Vec<(K, V)>,
+    map_access: HashMap<K, Vec<*const V::Target>>,
+}
+
+impl<K, V> Default for Idotom<K, V> 
+    where K: Hash + Eq + Copy,
+          V: StableDeref
+{
+    fn default() -> Self {
+        Idotom {
+            vec_data: Default::default(),
+            map_access: Default::default()
+        }
+    }
+
+}
+
+impl<K,V> Idotom<K,V>
+    where K: Hash+Eq+Copy,
+          V: StableDeref
+{
+    pub fn new() -> Self {
+        Default::default()
+    }
+
+    pub fn with_capacity(capacity: usize) -> Self {
+        Idotom {
+            vec_data: Vec::with_capacity(capacity),
+            map_access: HashMap::with_capacity(capacity),
+        }
+    }
+
+    pub fn capacity(&self) -> usize {
+        self.vec_data.capacity()
+    }
+
+    /// # Panics
+    /// if the new allocation size overflows `usize`
+    pub fn reserve(&mut self, additional: usize) {
+        self.vec_data.reserve(additional);
+        self.map_access.reserve(additional);
+    }
+
+    /// reverses internal (insertion) order
+    pub fn reverse(&mut self) {
+        self.vec_data.reverse();
+        for (_, val) in self.map_access.iter_mut() {
+            val.reverse()
+        }
+    }
+
+    pub fn shrink_to_fit(&mut self) {
+        self.vec_data.shrink_to_fit();
+        self.map_access.shrink_to_fit();
+    }
+
+    pub fn len(&self) -> usize {
+        self.vec_data.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.vec_data.is_empty()
+    }
+
+    //
+    //drain range? what about drop+recovery safety while drain, map is already cleared...
+//    fn drain(&mut self) -> vec::Drain<(K, V)> {
+//        self.map_access.clear();
+//        self.vec_data.drain(..)
+//    }
+
+    pub fn clear(&mut self) {
+        self.map_access.clear();
+        self.vec_data.clear();
+    }
+
+    pub fn get(&self, k: K) -> Option<EntryValues<V::Target>>{
+        self.map_access.get(&k)
+            .map(|vec| EntryValues(vec.iter()) )
+    }
+
+//    pub fn get_mut(&mut self, k: K) -> Option<EntryValuesMut<V::Target>> {
+//        self.map_access.get_mut(&k)
+//            .map(|vec| EntryValuesMut(vec.iter_mut()))
+//    }
+
+    /// inserts a key, value pair returns the new count of values for the given key
+    pub fn insert(&mut self, k: K, v: V) -> usize {
+        let ptr: *const V::Target = &*v;
+        self.vec_data.push((k,v));
+        let list = self.map_access
+            .entry(k)
+            .or_insert(Vec::new());
+        list.push(ptr);
+        list.len()
+    }
+
+    //FIXME(UPSTREAM): use drain_filter instead of retain once stable then return Vec<V>
+    pub fn remove_all(&mut self, key_to_remove: K) {
+        self.map_access.remove(&key_to_remove);
+        self.vec_data.retain(|&(key, _)| key != key_to_remove);
+    }
+
+    pub fn retain<FN>(&mut self, mut func: FN)
+        where FN: FnMut(K, &V) -> bool
+    {
+        let mut to_remove = Vec::new();
+        self.vec_data.retain(|&(key, ref v)| {
+            let retrain = func(key, v);
+            if !retrain {
+                let vptr: *const V::Target = &**v;
+                to_remove.push((key, vptr));
+            }
+            retrain
+        });
+        for (key, ptr) in to_remove.into_iter() {
+            if let Some(values) = self.map_access.get_mut(&key) {
+                //TODO use remove_item once stable (rustc #40062) [inlined unstable def]
+                match values.iter().position(|x| *x == ptr) {
+                    Some(idx) => {
+                        values.remove(idx);
+                    },
+                    None => unreachable!(
+                        "[BUG] inconsistent state, value is not in map_access but in vec_data")
+                }
+            }
+        }
+    }
+
+}
+
+impl<K, V> Debug for Idotom<K, V>
+    where K: Hash + Eq + Copy + Debug,
+          V: StableDeref + Debug
+{
+    fn fmt(&self, fter: &mut fmt::Formatter) -> fmt::Result {
+        write!(fter, "Idotom {{ ")?;
+        for &(key, ref val_cont) in self.vec_data.iter() {
+            write!(fter, "{:?} => {:?},", key, val_cont)?;
+        }
+        write!(fter, " }}")
+    }
+}
+
+
+impl<K, V> Clone for Idotom<K, V>
+    where K: Hash + Eq + Copy,
+          V: StableDeref + Clone,
+{
+    fn clone(&self) -> Self {
+        //Note: all pointers have to be recreated
+        //SPEZIALIZE: V: StableCloneDeref, as no pointer has to be recreated
+        let mut out = Self::with_capacity(self.len());
+        out.extend(self.vec_data.iter().map(|&(key, ref val)| {
+            (key, val.clone())
+        }));
+        out
+    }
+}
+
+impl<K, V> PartialEq<Self> for Idotom<K, V>
+    where K: Hash + Eq + Copy,
+          V: StableDeref + PartialEq<V>,
+{
+    #[inline]
+    fn eq(&self, other: &Self) -> bool {
+        self.vec_data.eq(&other.vec_data)
+    }
+}
+
+impl<K, V> Eq for Idotom<K, V>
+    where K: Hash + Eq + Copy,
+          V: StableDeref + Eq,
+{}
+
+
+impl<K, V> IntoIterator for Idotom<K, V>
+    where K: Hash + Eq + Copy,
+          V: StableDeref,
+{
+    type Item = (K, V);
+    type IntoIter = vec::IntoIter<(K, V)>;
+
+
+    #[inline]
+    fn into_iter(self) -> Self::IntoIter {
+        let Idotom { vec_data, map_access } = self;
+        drop(map_access);
+        vec_data.into_iter()
+    }
+}
+
+impl<K, V> FromIterator<(K, V)> for Idotom<K, V>
+    where K: Hash + Eq + Copy,
+          V: StableDeref
+{
+
+    fn from_iter<I: IntoIterator<Item=(K,V)>>(src: I) -> Self {
+        let src_iter = src.into_iter();
+
+        let mut out = {
+            let (min, _) = src_iter.size_hint();
+            if min > 0 {
+                Self::with_capacity(min)
+            } else {
+                Self::default()
+            }
+        };
+
+        out.extend(src_iter);
+        out
+    }
+}
+
+impl<K, V> Extend<(K, V)> for Idotom<K, V>
+    where K: Hash + Eq + Copy,
+          V: StableDeref
+{
+    fn extend<I>(&mut self, src: I)
+        where I: IntoIterator<Item=(K,V)>
+    {
+        for (key, value) in src.into_iter() {
+            self.insert(key, value);
+        }
+    }
+}
+
+
+
+pub struct EntryValues<'a, T: ?Sized+'a>(slice::Iter<'a, *const T>);
+//FIMXE(UPSTREAM): StableDerefPlusMut
+//pub struct EntryValuesMut<'a, T: ?Sized+'a>(slice::IterMut<'a, *const T>);
+
+
+//for some reason derive does not work...
+impl<'a, T:?Sized+'a> Clone for EntryValues<'a, T> {
+    fn clone(&self) -> Self {
+        EntryValues(self.0.clone())
+    }
+}
+
+impl<'a, T: ?Sized + 'a> Iterator for EntryValues<'a, T> {
+    type Item = &'a T;
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        //SAFE: the pointers are guaranteed to be valid, at last for lifetime 'a
+        self.0.next().map(|&ptr| unsafe { &*ptr })
+    }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.0.size_hint()
+    }
+}
+
+impl<'a, T: ?Sized + 'a> ExactSizeIterator for EntryValues<'a, T> {
+
+    #[inline]
+    fn len(&self) -> usize {
+        self.0.len()
+    }
+}
+
+impl<'a, T: ?Sized + Debug + 'a> Debug for EntryValues<'a, T> {
+
+    fn fmt(&self, fter: &mut fmt::Formatter) -> fmt::Result {
+        let metoo: EntryValues<'a, T> = (*self).clone();
+        fter.debug_list()
+            .entries(metoo)
+            .finish()
+    }
+}
+
+
+//impl<'a, T: ?Sized + 'a> Iterator for EntryValuesMut<'a, T> {
+//    type Item = &'a mut T;
+//
+//    #[inline]
+//    fn next(&mut self) -> Option<Self::Item> {
+//        //SAFE: the pointers are guaranteed to be valid, at last for lifetime 'a
+//        self.0.next().map(|&mut ptr| unsafe { &mut *ptr} )
+//    }
+//
+//    #[inline]
+//    fn size_hint(&self) -> (usize, Option<usize>) {
+//        self.0.size_hint()
+//    }
+//}
+//
+//impl<'a, T: ?Sized + 'a> ExactSizeIterator for EntryValuesMut<'a, T> {
+//
+//    #[inline]
+//    fn len(&self) -> usize {
+//        self.0.len()
+//    }
+//}
+//
+//impl<'a, T: ?Sized + 'a> Debug for EntryValuesMut<'a, T> {
+//
+//    fn fmt(&self, fter: &mut fmt::Formatter) -> fmt::Result {
+//        self.0.fmt(fter)
+//    }
+//}
+
+
+#[cfg(test)]
+mod test {
+    use std::collections::HashSet;
+    use super::*;
+
+
+    use std::sync::Arc;
+    fn arc_str(s: &str) -> Arc<str> {
+        <Arc<str> as From<String>>::from(s.to_owned())
+    }
+
+    #[test]
+    fn aux_fns() {
+        let mut map = Idotom::with_capacity(10);
+
+        assert_eq!(true, map.is_empty());
+
+        map.insert("key1", Box::new(13u32));
+
+        assert_eq!(false, map.is_empty());
+        map.insert("key2", Box::new(1));
+
+        assert_eq!(10, map.capacity());
+        assert_eq!(2, map.len());
+
+        map.shrink_to_fit();
+
+        assert_eq!(2, map.capacity());
+
+        // this is not reserve_exact so it can reserve more
+        // than space for one element
+        map.reserve(1);
+
+        assert!(map.capacity() >= 3);
+
+        map.insert("key1", Box::new(44));
+        map.insert("key1", Box::new(44));
+
+        assert_eq!(4, map.len());
+        assert!(map.capacity() >= 4);
+
+        map.clear();
+        assert_eq!(true, map.is_empty());
+        assert_eq!(0, map.len());
+    }
+
+    #[test]
+    fn works_with_trait_objects() {
+        use std::fmt::Display;
+        let mut map = Idotom::<&'static str, Box<Display>>::new();
+        map.insert("hy", Box::new("ho".to_owned()));
+        map.insert("hy", Box::new("ha".to_owned()));
+        map.insert("ho", Box::new("ho".to_owned()));
+
+        let view = map.values().collect::<Vec<_>>();
+        assert_eq!(
+            "ho ha ho",
+            format!("{} {} {}", view[0], view[1], view[2])
+        )
+    }
+
+    #[test]
+    fn get_set() {
+        let mut map = Idotom::new();
+        let a = arc_str("a");
+        let co_a = a.clone();
+        let eq_a = arc_str("a");
+        map.insert("k1", a);
+        map.insert("k1", co_a);
+        map.insert("k1", eq_a.clone());
+        map.insert("k2", eq_a);
+        map.insert("k3", arc_str("y"));
+        map.insert("k4", arc_str("z"));
+        map.insert("k4", arc_str("a"));
+        map.insert("k1", arc_str("e"));
+
+        let val_k1 = map.get("k1");
+        assert_eq!(true, val_k1.is_some());
+        let val_k1 = val_k1.unwrap();
+        assert_eq!(4, val_k1.len());
+        assert_eq!((4,Some(4)), val_k1.size_hint());
+        assert_eq!(["a", "a", "a", "e"], val_k1.collect::<Vec<_>>().as_slice());
+
+        let val_k2 = map.get("k2");
+        assert_eq!(true, val_k2.is_some());
+        let val_k2 = val_k2.unwrap();
+        assert_eq!(1, val_k2.len());
+        assert_eq!((1,Some(1)), val_k2.size_hint());
+        assert_eq!(["a"], val_k2.collect::<Vec<_>>().as_slice());
+
+        assert_eq!(
+            ["a", "a", "a", "a", "y", "z", "a", "e" ],
+            map.values().collect::<Vec<_>>().as_slice()
+        );
+
+        let mut expected = HashSet::new();
+        expected.insert(("k1", vec![ "a", "a", "a", "e" ]));
+        expected.insert(("k2", vec![ "a" ]));
+        expected.insert(("k3", vec![ "y" ]));
+        expected.insert(("k4", vec![ "z", "a" ]));
+        assert_eq!(
+            expected,
+            map.grouped_iter()
+                .map(|giter| (giter.key(), giter.collect::<Vec<_>>()) )
+                .collect::<HashSet<_>>()
+        );
+
+        assert_eq!(
+            [ ("k1", "a"), ("k1", "a"), ("k1", "a"), ("k2", "a"),
+                ("k3", "y"), ("k4", "z"), ("k4", "a"), ("k1", "e")],
+            map.iter().collect::<Vec<_>>().as_slice()
+        );
+    }
+
+//    #[test]
+//    fn get_mut() {
+//        use std::sync::Arc;
+//        use std::cell::RefCell;
+//        let mut map = Idotom::new();
+//        map.insert("k1", Arc::new(RefCell::new(12)));
+//
+//        let cell = map.get_mut("k1").unwrap().next().unwrap();
+//        *cell.borrow_mut() = 55;
+//
+//        let exp_cell = RefCell::new(55);
+//        assert_eq!(
+//            [ ("k1", &exp_cell) ],
+//            map.iter().collect::<Vec<_>>().as_slice()
+//        )
+//    }
+
+    #[test]
+    fn reverse() {
+        let mut map = Idotom::new();
+        map.insert("k1", "ok");
+        map.insert("k2", "why not?");
+        map.reverse();
+
+        assert_eq!(
+            [("k2", "why not?"), ("k1", "ok")],
+            map.iter().collect::<Vec<_>>().as_slice()
+        );
+    }
+
+
+    #[test]
+    fn remove_all() {
+        let mut map = Idotom::new();
+        map.insert("k1", "ok");
+        map.insert("k2", "why not?");
+        map.insert("k1", "run");
+        map.insert("k2", "jump");
+        map.remove_all("k1");
+
+        assert_eq!(
+            [("k2", "why not?"), ("k2", "jump")],
+            map.iter().collect::<Vec<_>>().as_slice()
+        );
+    }
+
+    #[test]
+    fn retain() {
+        let mut map = Idotom::new();
+        map.insert("k1", "ok");
+        map.insert("k2", "why not?");
+        map.insert("k1", "run");
+        map.insert("k2", "uh");
+
+        map.retain(|key, val| {
+            assert!(key.len() == 2);
+            val.len() > 2
+        });
+
+        assert_eq!(
+            [("k2", "why not?"), ("k1", "run")],
+            map.iter().collect::<Vec<_>>().as_slice()
+        );
+    }
+
+    #[test]
+    fn retain_with_equal_pointers() {
+        let mut map = Idotom::new();
+        let v1 = arc_str("v1");
+        map.insert("k1", v1.clone());
+        map.insert("k2", v1.clone());
+        map.insert("k1", arc_str("v2"));
+        map.insert("k1", v1);
+
+        let mut rem_count = 0;
+        map.retain(|_key, val| {
+            if rem_count >= 2 { return true; }
+            if &**val == "v1" {
+                rem_count += 1;
+                false
+            } else {
+                true
+            }
+        });
+
+        assert_eq!(
+            [("k1", "v2"), ("k1", "v1")],
+            map.iter().collect::<Vec<_>>().as_slice()
+        );
+    }
+
+
+}
