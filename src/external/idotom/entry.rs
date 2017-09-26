@@ -7,14 +7,15 @@ use stable_deref_trait::StableDeref;
 
 use utils::DebugIterableOpaque;
 
-use super::Idotom;
+use super::{ Idotom, Meta };
 
-
-impl<K, V> Idotom<K,V>
+//TODO add meta
+impl<K, V, M> Idotom<K, V, M>
     where K: Hash + Eq + Copy,
-          V: StableDeref
+          V: StableDeref,
+          M: Meta
 {
-    pub fn entry(&mut self, key: K) -> Entry<K, V> {
+    pub fn entry(&mut self, key: K) -> Entry<K, V, M> {
         let vec_data_ref = &mut self.vec_data;
         let map_access_entry = self.map_access.entry(key);
         Entry { vec_data_ref, map_access_entry }
@@ -22,16 +23,18 @@ impl<K, V> Idotom<K,V>
 }
 
 //NOTE: could implement Extend
-pub struct Entry<'a, K: 'a, V: 'a>
-    where V: StableDeref
+pub struct Entry<'a, K, V, M>
+    where K: 'a,
+          V: StableDeref + 'a,
+          M: 'a
 {
     vec_data_ref: &'a mut Vec<(K, V)>,
     map_access_entry: hash_map::Entry<'a, K, Vec<*const V::Target>>
 }
 
-impl<'a, K: 'a, V: 'a> Debug for Entry<'a, K, V>
-    where K: Hash + Eq + Copy + Debug,
-          V: StableDeref,
+impl<'a, K, V, M> Debug for Entry<'a, K, V, M>
+    where K: Hash + Eq + Copy + Debug + 'a,
+          V: StableDeref + 'a,
           V::Target: Debug
 {
     fn fmt(&self, fter: &mut fmt::Formatter) -> fmt::Result {
@@ -52,12 +55,29 @@ impl<'a, K: 'a, V: 'a> Debug for Entry<'a, K, V>
 
 
 
-impl<'a, K: 'a, V: 'a> Entry<'a, K, V>
-    where K: Hash + Eq + Copy,
-          V: StableDeref
+impl<'a, K, V, M> Entry<'a, K, V, M>
+    where K: Hash + Eq + Copy + 'a,
+          V: StableDeref + 'a,
+          M: Meta
 {
     pub fn key(&self) -> K {
         *self.map_access_entry.key()
+    }
+
+    pub fn meta(&self) -> Option<&M> {
+        use self::hash_map::Entry::*;
+        match self.map_access_entry {
+            Occupied(ref o) => Some(&o.get().0),
+            Vacant(..) => None
+        }
+    }
+
+    pub fn meta_mut(&self) -> Option<&mut M> {
+        use self::hash_map::Entry::*;
+        match self.map_access_entry {
+            Occupied(ref mut o) => Some(&mut o.get_mut().0),
+            Vacant(..) => None
+        }
     }
 
     pub fn value_count(&self) -> usize {
@@ -68,11 +88,28 @@ impl<'a, K: 'a, V: 'a> Entry<'a, K, V>
         }
     }
 
-    pub fn insert(self, val: V) {
+    pub fn insert(mut self, val: V, meta: M) -> Result<(), M::MergeError>{
         let Entry { vec_data_ref, map_access_entry } = self;
+        // 1. see if we can update and if so update the meta
+        // 2. update vec_data
+        // 3. only then insert ptr
+        use self::hash_map::Entry::*;
         let ptr: *const V::Target = &*val;
-        vec_data_ref.push((*map_access_entry.key(), val));
-        map_access_entry.or_insert(Vec::new()).push(ptr);
+        let key = *map_access_entry.key();
+        match map_access_entry {
+            Occupied(mut oe) => {
+                let pair = oe.get_mut();
+                pair.0.try_update(meta)?;
+                vec_data_ref.push((key, val));
+                pair.1.push(ptr);
+                Ok(())
+            },
+            Vacant(ve) => {
+                vec_data_ref.push((key, val));
+                ve.insert((meta, vec![ptr]));
+                Ok(())
+            }
+        }
     }
 
 

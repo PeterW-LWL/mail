@@ -9,9 +9,10 @@ use stable_deref_trait::StableDeref;
 
 use super::Idotom;
 
-impl<K,V> Idotom<K,V>
+impl<K, V, M> Idotom<K, V, M>
     where K: Hash + Eq + Copy,
-          V: StableDeref
+          V: StableDeref,
+          M: Meta
 {
     pub fn iter(&self) -> Iter<K, V> {
         Iter {
@@ -68,9 +69,10 @@ impl<'a, K, V> ExactSizeIterator for Iter<'a, K, V>
 }
 
 
-impl<K,V> Idotom<K,V>
+impl<K, V, M> Idotom<K, V, M>
     where K: Hash + Eq + Copy,
-          V: StableDeref + DerefMut
+          V: StableDeref + DerefMut,
+          M: Meta
 {
     pub fn iter_mut(&mut self) -> IterMut<K, V> {
         IterMut {

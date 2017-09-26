@@ -13,7 +13,7 @@ use utils::DebugIterableOpaque;
 use super::Idotom;
 
 
-impl<K,V> Idotom<K,V>
+impl<K,V, M> Idotom<K,V, M>
     where K: Hash+Eq+Copy,
           V: StableDeref
 {
@@ -22,7 +22,7 @@ impl<K,V> Idotom<K,V>
     }
 
     /// Returns a iterator over all values grouped by key
-    pub fn grouped_iter(&self) -> GroupedValues<K, V::Target> {
+    pub fn group_iter(&self) -> GroupedValues<K, V::Target, M> {
         GroupedValues(self.map_access.iter())
     }
 
@@ -77,38 +77,48 @@ impl<'a, K, T> ExactSizeIterator for Keys<'a, K, T>
 /// a iterator over `&V::Target` values returned by `GroupedValues`
 /// It will iterate over all values accociated with a specific key
 /// in the order they where inserted.
-pub struct Group<'a, K, T>
+pub struct Group<'a, K, T, M>
     where K: Copy + 'a,
-          T: ?Sized + 'a
+          T: ?Sized + 'a,
+          M: 'a
 {
     inner_iter: slice::Iter<'a, *const T>,
+    meta: &'a M,
     key: K
 }
 
-impl<'a, K, T> Clone for Group<'a, K, T>
+impl<'a, K, T, M> Clone for Group<'a, K, T, M>
     where K: Copy + 'a,
-          T: ?Sized + 'a
+          T: ?Sized + 'a,
+          M: 'a
 {
     fn clone(&self) -> Self {
         Group {
             key: self.key.clone(),
+            meta: self.meta,
             inner_iter: self.inner_iter.clone(),
         }
     }
 }
 
-impl<'a, K, T> Group<'a, K, T>
+impl<'a, K, T, M> Group<'a, K, T, M>
     where K: Copy + 'a,
-          T: ?Sized + 'a
+          T: ?Sized + 'a,
+          M: 'a
 {
     pub fn key(&self) -> K {
         self.key
     }
+
+    pub fn meta(&self) -> &'a M {
+        self.meta
+    }
 }
 
-impl<'a, K, T> Iterator for Group<'a, K, T>
+impl<'a, K, T, M> Iterator for Group<'a, K, T, M>
     where K: Copy + 'a,
-          T: ?Sized + 'a
+          T: ?Sized + 'a,
+          M: 'a
 {
     type Item = &'a T;
 
@@ -124,9 +134,10 @@ impl<'a, K, T> Iterator for Group<'a, K, T>
     }
 }
 
-impl<'a, K, T> ExactSizeIterator for Group<'a, K, T>
+impl<'a, K, T, M> ExactSizeIterator for Group<'a, K, T, M>
     where K: Copy + 'a,
-          T: ?Sized + 'a
+          T: ?Sized + 'a,
+          M: 'a
 {
     #[inline]
     fn len(&self) -> usize {
@@ -134,14 +145,16 @@ impl<'a, K, T> ExactSizeIterator for Group<'a, K, T>
     }
 }
 
-impl<'a, K, T> Debug for Group<'a, K, T>
-    where K: Copy + Debug + 'a,
-          T: ?Sized + Debug + 'a
+impl<'a, K, T, M> Debug for Group<'a, K, T, M>
+    where K: Debug + Copy + 'a,
+          T: Debug + ?Sized + 'a,
+          M: Debug + 'a
 {
     fn fmt(&self, fter: &mut fmt::Formatter) -> fmt::Result {
         let values = DebugIterableOpaque::new(self.clone());
         fter.debug_struct("Group")
             .field("key", &self.key())
+            .field("meta", self.meta())
             .field("values", &values)
             .finish()
     }
@@ -149,9 +162,18 @@ impl<'a, K, T> Debug for Group<'a, K, T>
 
 
 /// an iterator of Groups (no fixed iteration order)
-pub struct GroupedValues<'a, K: 'a, T: ?Sized + 'a>(hash_map::Iter<'a, K, Vec<*const T>>);
+pub struct GroupedValues<
+    'a,
+    K: Copy + 'a,
+    T: ?Sized + 'a,
+    M: 'a
+>(hash_map::Iter<'a, K, (M, Vec<*const T>)>);
 
-impl<'a, K: 'a, T: 'a> Clone for GroupedValues<'a, K, T> {
+impl<'a, K, T, M> Clone for GroupedValues<'a, K, T, M>
+    where K: Copy + 'a,
+          T: ?Sized + 'a,
+          M: 'a
+{
     #[inline]
     fn clone(&self) -> Self {
         GroupedValues(self.0.clone())
@@ -159,9 +181,10 @@ impl<'a, K: 'a, T: 'a> Clone for GroupedValues<'a, K, T> {
 
 }
 
-impl<'a, K, T> Debug for GroupedValues<'a, K, T>
-    where T: Debug + ?Sized + 'a,
-          K: 'a
+impl<'a, K, T, M> Debug for GroupedValues<'a, K, T, M>
+    where K: Copy + 'a,
+          T: Debug + ?Sized + 'a,
+          M: 'a
 {
     fn fmt(&self, fter: &mut fmt::Formatter) -> fmt::Result {
         fter.debug_list()
@@ -170,17 +193,19 @@ impl<'a, K, T> Debug for GroupedValues<'a, K, T>
     }
 }
 
-impl<'a, K, T> Iterator for GroupedValues<'a, K, T>
+impl<'a, K, T, M> Iterator for GroupedValues<'a, K, T, M>
     where K: Copy + 'a,
-          T: ?Sized + 'a
+          T: ?Sized + 'a,
+          M: 'a
 {
-    type Item = Group<'a, K, T>;
+    type Item = Group<'a, K, T, M>;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
-        self.0.next().map(|(k, vec)| {
+        self.0.next().map(|(k, pair)| {
             Group {
-                inner_iter: vec.iter(),
+                inner_iter: pair.1.iter(),
+                meta: &pair.0,
                 key: *k,
             }
         })
