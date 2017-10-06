@@ -84,12 +84,7 @@ impl<E> BuilderShared<E> where E: MailEncoder {
         // 2. store current len befor extending
         // 3. pop until the stored length is reached again
         check_multiple_headers( &headers, is_multipart )?;
-        if let Err(errors) = self.headers.extend( headers ) {
-            let errs = errors.into_iter().map(|(hn, _comp, _meta, error)| {
-                error.chain_err(||ErrorKind::FailedToAddHeader(hn.as_str()))
-            }).collect::<Vec<_>>();
-            bail!(ErrorKind::MultipleErrors(errs.into()))
-        }
+        self.headers.extend( headers )?;
         Ok( () )
     }
 

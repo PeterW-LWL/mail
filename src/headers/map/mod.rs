@@ -163,6 +163,10 @@ impl<E> HeaderMap<E>
         Default::default()
     }
 
+    pub fn len(&self) -> usize {
+        self.inner_map.len()
+    }
+
     /// call each unique contextual validator exactly once with this map as parameter
     ///
     /// If multiple Headers provide the same contextual validator (e.g. the resent headers)
@@ -282,15 +286,34 @@ impl<E> HeaderMap<E>
             })
     }
 
-    //TODO error description from TotalOrderMultiMap::extend
     /// # Error
     ///
+    /// Returns a MultopleErrors error containing all errors for
+    /// each header which in `other` which could not be added to
+    /// `self`. Note that if an error does occure it is assured that
+    /// any header added to `self` during this call to `extend` is
+    /// removed again before `extend` returns.
+    ///
     pub fn extend( &mut self, other: HeaderMap<E> )
-        -> StdResult<&mut Self, Vec<(HeaderName, Box<MailEncodable<E>>, HeaderMeta<E>, Error)>>
+        -> Result<&mut Self>
     {
-        self.inner_map
-            .extend(other.into_iter_with_meta())
-            .map(|()| self)
+        let prev_len = self.len();
+        let res = self.inner_map.extend(other.into_iter_with_meta());
+        match res {
+            Ok(()) => Ok(self),
+            Err(errs) => {
+                //combine errors
+                let errs = errs.into_iter().map(|(hn, _comp, _meta, error)| {
+                    error.chain_err(||ErrorKind::FailedToAddHeader(hn.as_str()))
+                }).collect::<Vec<_>>();
+                let error = ErrorKind::MultipleErrors(errs.into());
+
+                while self.len() > prev_len {
+                    let _ = self.inner_map.pop();
+                }
+                Err(error.into())
+            }
+        }
     }
 
     /// remove all headers with the given header name
@@ -757,5 +780,17 @@ mod test {
         typed(&map);
 
         assert_err!(map.use_contextual_validators());
+    }
+
+    #[test]
+    fn has_len() {
+        let map = headers! {
+            XComment: "yay",
+            Comments: "oh no",
+            Subject: "soso"
+        }.unwrap();
+        typed(&map);
+
+        assert_eq!(3, map.len());
     }
 }

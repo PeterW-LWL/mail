@@ -90,12 +90,7 @@ impl<E> Mail<E>
 
     pub fn set_headers( &mut self, headers: HeaderMap<E> ) -> Result<()> {
         check_multiple_headers( &headers, self.body.is_multipart() )?;
-        if let Err(errs) = self.headers.extend( headers ) {
-            let errors = errs.into_iter().map(|(hn,_,_,err)| {
-                err.chain_err(||ErrorKind::FailedToAddHeader(hn.as_str()))
-            }).collect::<Vec<_>>();
-            bail!(ErrorKind::MultipleErrors(errors.into()));
-        }
+        self.headers.extend( headers )?;
         Ok( () )
     }
 

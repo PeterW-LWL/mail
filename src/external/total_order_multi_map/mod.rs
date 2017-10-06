@@ -226,6 +226,28 @@ impl<K, V, M> TotalOrderMultiMap<K, V, M>
         Ok(meta_updated_data.1.len())
     }
 
+    pub fn pop(&mut self) -> Option<(K, V)> {
+        if self.vec_data.is_empty() {
+            None
+        } else {
+            {
+                let &(k, ref val) = &self.vec_data[self.vec_data.len()-1];
+                let val_ptr: *const V::Target = &**val;
+                let vec = &mut self.map_access.get_mut(&k)
+                    .expect("[BUG] key in vec_data but not map_access")
+                    .1;
+                let to_remove = vec.iter().rposition(|ptr| {
+                    *ptr == val_ptr
+                }).expect("[BUG] no ptr for value in map_access");
+                vec.remove(to_remove);
+            }
+            let res = self.vec_data.pop();
+            //unessesary sanity check
+            debug_assert!(res.is_some());
+            res
+        }
+    }
+
     //FIXME(UPSTREAM): use drain_filter instead of retain once stable then return Vec<V>
     // currently it returns true as long as at last one element is removed
     // once `drain_where` (or `drain_filter`) is stable it should be changed
@@ -719,6 +741,20 @@ mod test {
             [ ("k1", "a"), ("k1", "a"), ("k1", "a"), ("k2", "a"),
                 ("k3", "y"), ("k4", "z"), ("k4", "a"), ("k1", "e")],
             map.iter().collect::<Vec<_>>().as_slice()
+        );
+    }
+
+    #[test]
+    fn pop() {
+        let mut map = TotalOrderMultiMap::new();
+        assert_ok!(map.insert("k1", "hy", NoMeta));
+        assert_ok!(map.insert("k2", "ho", NoMeta));
+        assert_ok!(map.insert("k1", "last", NoMeta));
+
+        let last = map.pop();
+        assert_eq!(
+            Some(("k1", "last")),
+            last
         );
     }
 
