@@ -7,7 +7,7 @@ use std::iter::ExactSizeIterator;
 
 use stable_deref_trait::StableDeref;
 
-use super::Idotom;
+use super::{ Meta, Idotom };
 
 impl<K, V, M> Idotom<K, V, M>
     where K: Hash + Eq + Copy,

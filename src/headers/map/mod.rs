@@ -1,15 +1,24 @@
-use std::fmt;
 use std::marker::PhantomData;
-use std::collections::{ HashMap as Map, HashMap, hash_map };
-use std::iter::{ self as std_iter, Iterator};
-use std::slice::{ Iter as SliceIter };
+use std::iter::ExactSizeIterator;
+use std::fmt::{self, Debug};
+use std::result::{ Result as StdResult };
+use std::mem;
+use std::collections::HashSet;
 
-//reexport for headers macro
-pub use ascii::{ AsciiStr as _AsciiStr };
+
+use external::idotom::{
+    self,
+    Idotom, Meta,
+    EntryValues
+};
 
 use error::*;
+
 use utils::HeaderTryInto;
-use codec::{ MailEncoder, MailEncodable };
+use codec::{
+    MailEncoder,
+    MailEncodable
+};
 
 use super::{
     HeaderName,
@@ -18,84 +27,161 @@ use super::{
     HasHeaderName
 };
 
-mod into_iter;
 pub use self::into_iter::*;
-mod iter;
-pub use self::iter::*;
+mod into_iter;
 
-pub struct HeaderMap<E: MailEncoder> {
-    // the only header which is allowed/meant to appear more than one time is
-    // Trace!/Comment?, we _could_ consider using a Name->SingleEncodable mapping and
-    // make the multie occurence aspect of Trace part of the trace type,
-    // but this could get annoying wrt. to parsing and other custom header
-    // which allow this
-    //
-    // Idea have some kind of wrapper and move this property into the type system
-    // we are already abstracting with Trait objects, so why not?
-    //headers: Map<HeaderName, HeaderBodies<E>>,
-    // we want to keep and reproduce the insertion order of
-    // all headers
-    header_vec: Vec<(HeaderName, Box<MailEncodable<E>>)>,
-    // we don't want to search for a header when accessing it,
-    // we also have to kow if such a header is set etc.
-    header_map: Map<HeaderName, HeaderBodies<E>>,
-
-    //OTPIMIZE: I think there are optional hashers better suited for a set of functions
-    //WORKAROUND: for rust limitations? bug? we cast the function pointer
-    // to usize and use it as key
-    contextual_validators: HashMap<usize, fn(&HeaderMap<E>) -> Result<()>>
+/// A runtime representations of a `Header` types meta
+/// properties like `MAX_COUNT_EQ_1` or `CONTEXTUAL_VALIDATOR`
+pub struct HeaderMeta<E: MailEncoder> {
+    pub max_count_eq_1: bool,
+    pub contextual_validator: Option<fn(&HeaderMap<E>) -> Result<()>>
 }
+//TODO imple PartialEq, Eq and Hash per hand as derive does not work as it adds a wher E: XXX bound
 
-
-
-struct HeaderBodies<E: MailEncoder> {
-    first: *mut MailEncodable<E>,
-    other: Option<Vec<*mut MailEncodable<E>>>
-}
-
-type ValidatorIter<'a, E> = std_iter::Map<
-    hash_map::Iter<'a,usize, fn(&HeaderMap<E>)->Result<()>>,
-    fn((&'a usize, &'a fn(&HeaderMap<E>)->Result<()>)) -> fn(&HeaderMap<E>)->Result<()>
->;
-
-
-impl<E: MailEncoder> HeaderMap<E> {
-
-    pub fn new() -> Self {
-        HeaderMap {
-            header_vec: Vec::new(),
-            header_map: Map::new(),
-            contextual_validators: HashMap::new()
+impl<E> Clone for HeaderMeta<E>
+    where E: MailEncoder
+{
+    fn clone(&self) -> Self {
+        HeaderMeta {
+            max_count_eq_1: self.max_count_eq_1,
+            contextual_validator: self.contextual_validator.clone()
         }
     }
 
-    /// remove all contextual validators
-    pub fn clear_contextual_validators(&mut self) {
-        self.contextual_validators.clear()
+}
+impl<E> Debug for HeaderMeta<E>
+    where E: MailEncoder
+{
+    fn fmt(&self, fter: &mut fmt::Formatter) -> fmt::Result {
+        let usized = self.contextual_validator.clone().map(|x|x as usize);
+        fter.debug_struct("HeaderMeta")
+            .field("max_count_eq_1", &self.max_count_eq_1)
+            .field("contextual_validator", &usized)
+            .finish()
     }
+}
 
-    /// add an additional contextual validator
-    pub fn add_contextual_validator(&mut self, vfn: fn(&Self) -> Result<()>) {
-        self.contextual_validators.insert(vfn as usize, vfn);
-    }
 
-    pub fn iter_contextual_validators(&self) -> ValidatorIter<E> {
-        fn map_fn<'a, E: MailEncoder>(
-            key_val: (
-                &'a usize,
-                &'a for<'b> fn(&'b HeaderMap<E>)-> Result<()>
-            )
-        ) -> for<'b> fn(&'b HeaderMap<E>)->Result<()> {
-            *key_val.1
+impl<E> HeaderMeta<E>
+    where E: MailEncoder
+{
+    pub fn from_header_type<H: Header>() -> Self {
+        HeaderMeta {
+            max_count_eq_1: H::MAX_COUNT_EQ_1,
+            contextual_validator: H::get_contextual_validator()
         }
-        self.contextual_validators.iter().map(map_fn)
     }
 
-    pub fn use_contextual_validators(&self) -> Result<()> {
-        for validator in self.iter_contextual_validators() {
-            (validator)(self)?;
+    #[inline]
+    pub fn is_compatible(&self, other: &HeaderMeta<E>) -> bool {
+        self.check_update(other).is_ok()
+    }
+
+    #[inline]
+    fn cmp_validator_eq(&self, other: &Self) -> bool {
+        let thisone = self.contextual_validator.map(|fnptr| fnptr as usize).unwrap_or(0);
+        let thatone = other.contextual_validator.map(|fptr| fptr as usize).unwrap_or(0);
+        thisone == thatone
+    }
+}
+
+impl<E> Meta for HeaderMeta<E>
+    where E: MailEncoder
+{
+    type MergeError = Error;
+
+    fn check_update(&self, other: &Self) -> StdResult<(), Self::MergeError> {
+        if self.max_count_eq_1 != other.max_count_eq_1 {
+            bail!("trying to mix up Headers with the same name but different quantity limitations");
+        }
+
+        if !self.cmp_validator_eq(other) {
+            bail!("trying to mix up Headers with same name but different contextual validator");
         }
         Ok(())
+    }
+
+    fn update(&mut self, other: Self) {
+        //as we don't allow values with different meta no update needed
+        mem::drop(other)
+    }
+}
+
+
+///
+/// # Note
+///
+/// a number of methods implemented on HeaderMap appear in two variations,
+/// one which accepts a type hint (a normally zero sized struct implementing
+/// Header) and on which just accepts the type and needs to be called with
+/// the turbofish operator. The later one is prefixed by a `_` as the former
+/// one is more nice to use, but in some siturations, e.g. when wrapping
+/// `HeaderMap` in custom code the only type accepting variations are more
+/// usefull.
+///
+/// ```rust,ignore
+/// let _ = map.get(Subject);
+/// //is equivalent to
+/// let _ = map._get::<Subject>();
+/// ```
+///
+pub struct HeaderMap<E: MailEncoder> {
+    inner_map: Idotom<HeaderName, Box<MailEncodable<E>>, HeaderMeta<E>>,
+}
+
+pub type Iter<'a, E> = idotom::Iter<'a, HeaderName, Box<MailEncodable<E>>>;
+pub type IterMut<'a, E> = idotom::IterMut<'a, HeaderName, Box<MailEncodable<E>>>;
+pub type IntoIterWithMeta<E> =
+    idotom::IntoIterWithMeta<HeaderName, Box<MailEncodable<E>>, HeaderMeta<E>>;
+
+impl<E> Debug for HeaderMap<E>
+    where E: MailEncoder
+{
+    fn fmt(&self, fter: &mut fmt::Formatter) -> fmt::Result {
+        write!(fter, "HeaderMap {{ ")?;
+        for (key, val_cont) in self.iter() {
+            write!(fter, "{}: {:?},", key.as_str(), val_cont)?;
+        }
+        write!(fter, " }}")
+    }
+}
+
+impl<E> Default for HeaderMap<E>
+    where E: MailEncoder
+{
+    fn default() -> Self {
+        HeaderMap {
+            inner_map: Default::default()
+        }
+    }
+}
+
+impl<E> HeaderMap<E>
+    where E: MailEncoder
+{
+    pub fn new() -> Self {
+        Default::default()
+    }
+
+    /// call each unique contextual validator exactly once with this map as parameter
+    ///
+    /// If multiple Headers provide the same contextual validator (e.g. the resent headers)
+    /// it's still only called once.
+    pub fn use_contextual_validators(&self) -> Result<()> {
+        let mut already_called = HashSet::new();
+        for group in self.inner_map.group_iter() {
+            if let Some(validator) = group.meta().contextual_validator {
+                if already_called.insert(validator as usize) {
+                    (validator)(self)?;
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// returns true if the headermap contains a header with the same name
+    pub fn contains_header<H: HasHeaderName>(&self, name: H ) -> bool {
+        self.inner_map.contains_key(name.get_name())
     }
 
     #[inline(always)]
@@ -118,85 +204,45 @@ impl<E: MailEncoder> HeaderMap<E> {
         where H: Header + SingularHeaderMarker,
               H::Component: MailEncodable<E>
     {
-        self.get_bodies( H::name() )
-            .map( |body| {
-                //SAFE: all pointers are always valid and borrowing rules are
-                //  indirectly enforced by the `&self` borrow
-                let as_ref = unsafe { &*body.first };
-                as_ref.downcast_ref::<H::Component>()
+        self.get_untyped(H::name())
+            .map( |mut bodies| {
+                //TODO: possible make this a debug only check
+                HeaderMeta::from_header_type::<H>()
+                    .check_update(bodies.meta())?;
+                //UNWRAP_SAFE: we have at last one element
+                let untyped = bodies.next().unwrap();
+                untyped.downcast_ref::<H::Component>()
                     .ok_or_else( ||->Error {
                         "use of different header types with same header name".into() } )
-            })
+            } )
     }
 
+    ///
+    /// Accepts both `HeaderName` or a type implementing `Header`.
+    ///
+    #[inline]
+    pub fn get_untyped<H: HasHeaderName>( &self, name: H ) -> Option<UntypedBodies<E>> {
+        self.inner_map.get( name.get_name() )
+    }
 
     #[inline(always)]
-    pub fn get<H>( &self, _type_hint: H) -> Option<TypedMultiBodyIter<E, H>>
+    pub fn get<H>( &self, _type_hint: H) -> Option<TypedBodies<E, H>>
         where H: Header, H::Component: MailEncodable<E>
     {
         self._get::<H>()
     }
 
-    pub fn _get<H>( &self ) -> Option<TypedMultiBodyIter<E, H>>
+    pub fn _get<H>( &self ) -> Option<TypedBodies<E, H>>
         where H: Header, H::Component: MailEncodable<E>
     {
         self.get_untyped( H::name() )
-            .map( |untyped| untyped.with_typing() )
+            .map( |untyped| untyped.into() )
     }
 
-    pub fn get_untyped<H: HasHeaderName>( &self, name: H ) -> Option<UntypedMultiBodyIter<E>> {
-        if let Some( body ) = self.get_bodies( name.get_name() ) {
-            Some( UntypedMultiBodyIter::new(
-                //SAFE: all pointers always point to valid data, and the
-                // borrow aspects (no mut borrow) are archived through the
-                // &self borrow
-                unsafe { &*body.first },
-                body.other.as_ref().map( |o| o.iter() )
-            ) )
-        } else {
-            None
-        }
-    }
-
-    /// As this method requires a `&self` borrow it
-    /// assures that there won't be any `&mut` borrows,
-    /// neither based on `header_vec` nor `header_map`
-    /// through there _could_ be other non-mut borrows
-    fn get_bodies( &self, name: HeaderName ) -> Option<&HeaderBodies<E>> {
-        self.header_map.get( &name )
-    }
-
-    /// returns true if the headermap contains a header with the same name
-    pub fn contains<H: HasHeaderName>(&self, name: H ) -> bool {
-        self.header_map.contains_key(&name.get_name())
-    }
-
-
-    /// # Note
-    /// If `extend` fails some values of `other` might already have
-    /// been added to this map but non of the contextual validator have
-    /// been added yet.
-    pub fn extend( &mut self, other: HeaderMap<E> ) -> Result<&mut Self> {
-        let HeaderMap { header_vec, header_map, contextual_validators } = other;
-
-        let multi_state = header_map.iter()
-            .map( |(name, bodies)| (name, bodies.other.is_some()) )
-            .collect::<Map<_,_>>();
-
-        for (name, body) in header_vec.into_iter() {
-            //UNWRAP_SAFE: any header in header_vec also appears in header_map
-            let is_multi = *multi_state.get(&name).unwrap();
-            self.insert_trait_object( name, body, is_multi)?;
-        }
-
-        self.contextual_validators.extend(contextual_validators);
-        Ok( self )
-    }
-
-    /// Inserts given header into the header map,
-    /// including the contextual validator which
-    /// might be returned by the `Header::get_contextual_validator`
-    /// function
+    /// Inserts given header into the header map.
+    ///
+    /// Returns the count of headers with the given name after inserting
+    /// this header
     ///
     /// Note:
     /// the original signature did not take the header as a
@@ -207,7 +253,7 @@ impl<E: MailEncoder> HeaderMap<E> {
     /// is usefull for some circumstances where it is bothersome to
     /// create a (normally zero-sized) Header instance as type hint
     #[inline(always)]
-    pub fn insert<H, C>( &mut self, _htype_hint: H, hbody: C ) -> Result<()>
+    pub fn insert<H, C>( &mut self, _htype_hint: H, hbody: C ) -> Result<usize>
         where H: Header,
               H::Component: MailEncodable<E>,
               C: HeaderTryInto<H::Component>
@@ -215,217 +261,158 @@ impl<E: MailEncoder> HeaderMap<E> {
         self._insert::<H, C>( hbody )
     }
 
-    /// works like `HeaderMap::insert` except that no header instance as
+    /// works like `HeaderMap::insert`, except that no header instance as
     /// type hint has to (nor can) be passed in
+    ///
+    /// Returns the count of headers with the given name after inserting
+    /// this header.
     #[inline]
-    pub fn _insert<H, C>( &mut self,  hbody: C ) -> Result<()>
+    pub fn _insert<H, C>( &mut self,  hbody: C ) -> Result<usize>
         where H: Header,
               H::Component: MailEncodable<E>,
               C: HeaderTryInto<H::Component>
     {
         let hbody: H::Component = hbody.try_into()?;
-        if let Some(validator) = H::get_contextual_validator() {
-            self.add_contextual_validator(validator);
-        }
         let tobj: Box<MailEncodable<E>> = Box::new( hbody );
-        self.insert_trait_object( H::name(), tobj, H::CAN_APPEAR_MULTIPLE_TIMES )
+        let name = H::name();
+        let meta = HeaderMeta::from_header_type::<H>();
+        self.inner_map.insert(name, tobj, meta)
+            .map_err(|(hn,_,_,err)| {
+                err.chain_err(||ErrorKind::FailedToAddHeader(hn.as_str()))
+            })
     }
 
-    fn insert_trait_object(
-        &mut self,
-        name: HeaderName,
-        mut tobj: Box<MailEncodable<E>>,
-        can_appear_multiple_times: bool
-    ) -> Result<()> {
-        //SAFTY: we get a second pointer, while using two at a time is unsafe
-        //  the mere existence is not a problem
-
-        let obj_ptr = (&mut *tobj) as *mut MailEncodable<E>;
-        self._insert_trait_object_to_map(name, obj_ptr, can_appear_multiple_times)?;
-        //only if we succesfull inserted it to the map can we insert it to the vec
-        self.header_vec.push( (name, tobj) );
-        Ok( () )
+    //TODO error description from Idotom::extend
+    /// # Error
+    ///
+    pub fn extend( &mut self, other: HeaderMap<E> )
+        -> StdResult<&mut Self, Vec<(HeaderName, Box<MailEncodable<E>>, HeaderMeta<E>, Error)>>
+    {
+        self.inner_map
+            .extend(other.into_iter_with_meta())
+            .map(|()| self)
     }
 
-    fn _insert_trait_object_to_map(
-        &mut self,
-        name: HeaderName,
-        obj_ptr: *mut MailEncodable<E>,
-        can_appear_multiple_times: bool
-    ) -> Result<()> {
-        {
-            if let Some( body ) = self.header_map.get_mut( &name ) {
-                if !can_appear_multiple_times {
-                    bail!( "field already set and field can appear at most one time" );
-                }
-                if let Some( other ) = body.other.as_mut() {
-                    other.push( obj_ptr );
-                    return Ok(())
-                } else {
-                    bail!( concat!( "multi appearance header combined with single ",
-                        "apparence header with same name" ) );
-                }
-            }
-        }
-
-        let empty_other = if can_appear_multiple_times {
-            Some( Vec::new() )
-        } else {
-            None
-        };
-
-        self.header_map.insert( name, HeaderBodies {
-            first: obj_ptr,
-            other: empty_other
-        } );
-
-        Ok( () )
-    }
-
-    //FIXME use SmallVac/StackVac or whaterver provides the smal vec optimization
-    //TODO once drain_filter is stable (rust #43244) use it and return a Vector
-    // of removed trait objects
     /// remove all headers with the given header name
     ///
     /// returns true, if at last one element was removed
     ///
     /// # Example
     ///
-    /// # Note
-    ///
-    /// because of the way the insertion order
-    /// is stored/remembered removing element is,
-    /// in comparsion to e.g. an hash map, not
-    /// a cheap operation
-    ///
-    /// also it does not remove `contextual_validators`
-    /// implicitly added when adding values, normally
-    /// this should not be a problem, as validators are
-    /// not supposed to error if the header they are meant
-    /// for is not there or is there but has a different
-    /// component type. Only if you remove a header and
-    /// replace it by a alternate implementation of the
-    /// same header which only differs in the contextual
-    /// validator, in a way that  the new validator allows
-    /// thinks the other does not _and_ you relay on it
-    /// allowing this things it can cause an validation
-    /// error.
-    pub fn remove_by_name(&mut self, name: HeaderName ) -> bool {
-        if let Some( HeaderBodies { first, other } ) = self.header_map.remove(&name) {
-            //FIXME use HashSet once *mut T,T:?Sized impl Hash (rust #???)
-            let mut to_remove_from_vec = Vec::<*const MailEncodable<E>>::new();
-            to_remove_from_vec.push( first );
-            if let Some( other ) = other {
-                to_remove_from_vec.extend( other.into_iter().map(|x| x as *const _) )
-            }
+    #[inline]
+    pub fn remove_by_name<H: HasHeaderName>(&mut self, name: H ) -> bool {
+        self.inner_map.remove_all(name.get_name())
+    }
 
-            self.header_vec.retain(|&(_name, ref boxed)| {
-                let as_ptr = (&**boxed) as *const _;
-                let keep_it = !to_remove_from_vec.contains(&as_ptr);
-                keep_it
-            });
-            true
-        } else {
-            false
-        }
+
+    #[inline]
+    pub fn iter(&self) -> Iter<E> {
+        self.inner_map.iter()
+    }
+
+    #[inline]
+    pub fn iter_mut(&mut self) -> IterMut<E> {
+        self.inner_map.iter_mut()
+    }
+
+    #[inline]
+    pub fn into_iter_with_meta(self) -> IntoIterWithMeta<E> {
+        self.inner_map.into_iter_with_meta()
     }
 }
 
 
-impl<E> fmt::Debug for HeaderMap<E>
-    where E: MailEncoder
+pub type UntypedBodies<'a, E> = EntryValues<'a, MailEncodable<E>, HeaderMeta<E>>;
+
+
+pub struct TypedBodies<'a, E, H>
+    where E: MailEncoder,
+          H: Header,
+          H::Component: MailEncodable<E>
 {
-    fn fmt(&self, fter: &mut fmt::Formatter) -> fmt::Result {
-        write!(fter, "HeaderMap {{ ")?;
-        for (name, component) in self.iter() {
-            write!(fter, "{}: {:?},", name, component)?;
-        }
-        write!(fter, " }}")
-    }
+    inner: UntypedBodies<'a, E>,
+    _marker: PhantomData<H>
 }
 
-
-pub struct UntypedMultiBodyIter<'a, E: 'a> {
-    first: Option<&'a MailEncodable<E>>,
-    other: Option<SliceIter<'a, *mut MailEncodable<E>>>,
-}
-
-impl<'a, E> UntypedMultiBodyIter<'a, E>
-    where E: MailEncoder
+impl<'a, E, H> From<UntypedBodies<'a, E>> for TypedBodies<'a, E, H>
+    where E: MailEncoder,
+          H: Header,
+          H::Component: MailEncodable<E>
 {
-    fn new(
-        first: &'a MailEncodable<E>,
-        other: Option<SliceIter<'a, *mut MailEncodable<E>>>
-    ) -> Self {
-        UntypedMultiBodyIter {
-            first: Some(first),
-            other: other,
-        }
-    }
-
-    fn with_typing<H>(self) -> TypedMultiBodyIter<'a, E, H>
-        where H: Header, H::Component: MailEncodable<E>
-    {
-        TypedMultiBodyIter {
-            untyped_iter: self,
-            _header_type: PhantomData
-        }
+    fn from(untyped: UntypedBodies<'a, E>) -> Self {
+        TypedBodies { inner: untyped, _marker: PhantomData }
     }
 }
 
-impl<'a, E> Iterator for UntypedMultiBodyIter<'a, E>
-    where E: MailEncoder
+impl<'a, E, H> TypedBodies<'a, E, H>
+    where E: MailEncoder,
+          H: Header,
+          H::Component: MailEncodable<E>
 {
-    type Item = &'a MailEncodable<E>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.first
-            .take()
-            .or_else( || {
-                self.other.as_mut()
-                    .and_then( |other| other.next() )
-                    //SAFE: all pointers in HeaderMap are always valid and
-                    //  borrowing rules are indirectly enforced by borrowing
-                    //  `&self` in `HeaderMap::get_untyped`
-                    .map( |val| unsafe { &**val } )
-            })
-    }
-
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        let offset = if self.first.is_some() { 1 } else { 0 };
-        if let Some( other ) = self.other.as_ref() {
-            let (min, max) = other.size_hint();
-            (min+offset, max.map(|v|v+offset))
-        } else {
-            (offset, Some(offset))
+    pub fn new(inner: UntypedBodies<'a, E>) -> Self {
+        TypedBodies {
+            inner,
+            _marker: PhantomData
         }
     }
+    pub fn meta(&self) -> &HeaderMeta<E> {
+        self.inner.meta()
+    }
 }
 
-
-pub struct TypedMultiBodyIter<'a, E: 'a, H> {
-    untyped_iter: UntypedMultiBodyIter<'a, E>,
-    _header_type: PhantomData<H>
-}
-
-impl<'a, E, H> Iterator for TypedMultiBodyIter<'a, E, H>
-    where E: MailEncoder, H: Header, H::Component: MailEncodable<E>
+impl<'a, E, H> Iterator for TypedBodies<'a, E, H>
+    where E: MailEncoder,
+          H: Header,
+          H::Component: MailEncodable<E>
 {
     type Item = Result<&'a H::Component>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let tobj_item = self.untyped_iter.next();
-        tobj_item.map( |tobj| {
-            tobj.downcast_ref::<H::Component>()
-                .ok_or_else( ||->Error {
-                    "use of different header types with same header name".into() } )
-        })
+        self.inner.next()
+            .map( |tobj| {
+                tobj.downcast_ref::<H::Component>()
+                    .ok_or_else( || -> Error {
+                        "use of different header types with same header name".into() } )
+            } )
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
-        self.untyped_iter.size_hint()
+        self.inner.size_hint()
     }
 }
+
+impl<'a, E, H> ExactSizeIterator for TypedBodies<'a, E, H>
+    where E: MailEncoder,
+          H: Header,
+          H::Component: MailEncodable<E>
+{
+    fn len(&self) -> usize {
+        self.inner.len()
+    }
+}
+
+impl<'a, E, H> Clone for TypedBodies<'a, E, H>
+    where E: MailEncoder,
+          H: Header,
+          H::Component: MailEncodable<E>
+{
+    fn clone(&self) -> Self {
+        TypedBodies::new(self.inner.clone())
+    }
+}
+
+impl<'a, E, H> Debug for TypedBodies<'a, E, H>
+    where E: MailEncoder,
+          H: Header,
+          H::Component: MailEncodable<E>
+{
+    fn fmt(&self, fter: &mut fmt::Formatter) -> fmt::Result {
+        fter.debug_struct("TypedBodies")
+            .field("inner", &self.inner)
+            .finish()
+    }
+}
+
 
 #[macro_export]
 macro_rules! headers {
@@ -441,6 +428,9 @@ macro_rules! headers {
     });
 }
 
+
+
+
 #[cfg(test)]
 mod test {
     use codec::MailEncoderImpl;
@@ -453,14 +443,15 @@ mod test {
         From, To,
         Comments
     };
+
     use super::*;
 
-    use self::collision_headers::{
+    use self::bad_headers::{
         Subject as BadSubject,
         Comments as BadComments
     };
 
-    mod collision_headers {
+    mod bad_headers {
         use components;
         def_headers! {
             test_name: validate_header_names,
@@ -711,7 +702,7 @@ mod test {
 
     struct XComment;
     impl Header for XComment {
-        const CAN_APPEAR_MULTIPLE_TIMES: bool = true;
+        const MAX_COUNT_EQ_1: bool = false;
         type Component = Unstructured;
 
         fn name() -> HeaderName {
@@ -739,21 +730,10 @@ mod test {
         }.unwrap();
         typed(&map);
 
-        assert_eq!( true, map.contains(Subject::name()) );
-        assert_eq!( true, map.contains(Subject) );
-        assert_eq!( false, map.contains(Comments::name()) );
-        assert_eq!( false, map.contains(Comments) );
-    }
-
-    #[test]
-    fn insert_does_insert_validator() {
-        let map = headers! {
-            XComment: "yay",
-            Subject: "soso"
-        }.unwrap();
-        typed(&map);
-
-        assert_eq!(1, map.iter_contextual_validators().count());
+        assert_eq!( true, map.contains_header(Subject::name()) );
+        assert_eq!( true, map.contains_header(Subject) );
+        assert_eq!( false, map.contains_header(Comments::name()) );
+        assert_eq!( false, map.contains_header(Comments) );
     }
 
     #[test]

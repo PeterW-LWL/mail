@@ -22,26 +22,26 @@ impl<K, V, M> Idotom<K, V, M>
     }
 }
 
-//NOTE: could implement Extend
 pub struct Entry<'a, K, V, M>
     where K: 'a,
           V: StableDeref + 'a,
           M: 'a
 {
     vec_data_ref: &'a mut Vec<(K, V)>,
-    map_access_entry: hash_map::Entry<'a, K, Vec<*const V::Target>>
+    map_access_entry: hash_map::Entry<'a, K, (M, Vec<*const V::Target>)>
 }
 
 impl<'a, K, V, M> Debug for Entry<'a, K, V, M>
     where K: Hash + Eq + Copy + Debug + 'a,
           V: StableDeref + 'a,
-          V::Target: Debug
+          V::Target: Debug,
+          M: Meta
 {
     fn fmt(&self, fter: &mut fmt::Formatter) -> fmt::Result {
         use self::hash_map::Entry::*;
         let dio: Box<Debug> = match self.map_access_entry {
             Occupied(ref o) => {
-                Box::new(DebugIterableOpaque::new(o.get().iter().map(|&ptr| unsafe { &*ptr })))
+                Box::new(DebugIterableOpaque::new(o.get().1.iter().map(|&ptr| unsafe { &*ptr })))
             },
             //SAFE because of Idotom safty constraints the pointer is always valid
             Vacant(..) => Box::new("[]")
@@ -72,7 +72,7 @@ impl<'a, K, V, M> Entry<'a, K, V, M>
         }
     }
 
-    pub fn meta_mut(&self) -> Option<&mut M> {
+    pub fn meta_mut(&mut self) -> Option<&mut M> {
         use self::hash_map::Entry::*;
         match self.map_access_entry {
             Occupied(ref mut o) => Some(&mut o.get_mut().0),
@@ -83,12 +83,12 @@ impl<'a, K, V, M> Entry<'a, K, V, M>
     pub fn value_count(&self) -> usize {
         use self::hash_map::Entry::*;
         match self.map_access_entry {
-            Occupied(ref o) => o.get().len(),
+            Occupied(ref o) => o.get().1.len(),
             Vacant(..) => 0
         }
     }
 
-    pub fn insert(mut self, val: V, meta: M) -> Result<(), M::MergeError>{
+    pub fn insert(self, val: V, meta: M) -> Result<(), M::MergeError>{
         let Entry { vec_data_ref, map_access_entry } = self;
         // 1. see if we can update and if so update the meta
         // 2. update vec_data
@@ -99,7 +99,8 @@ impl<'a, K, V, M> Entry<'a, K, V, M>
         match map_access_entry {
             Occupied(mut oe) => {
                 let pair = oe.get_mut();
-                pair.0.try_update(meta)?;
+                pair.0.check_update(&meta)?;
+                pair.0.update(meta);
                 vec_data_ref.push((key, val));
                 pair.1.push(ptr);
                 Ok(())
@@ -120,20 +121,21 @@ impl<'a, K, V, M> Entry<'a, K, V, M>
 #[cfg(test)]
 mod test {
     use super::*;
+    use super::super::NoMeta;
 
     #[test]
     fn entry() {
         let mut map = Idotom::new();
-        map.insert("k1", "v1");
-        map.insert("k2", "b");
-        map.insert("k1", "v2");
+        assert_ok!(map.insert("k1", "v1", NoMeta));
+        assert_ok!(map.insert("k2", "b", NoMeta));
+        assert_ok!(map.insert("k1", "v2", NoMeta));
 
 
         {
             let entry = map.entry("k1");
             assert_eq!("k1", entry.key());
             assert_eq!(2, entry.value_count());
-            entry.insert("vX");
+            assert_ok!(entry.insert("vX", NoMeta));
         }
 
         assert_eq!(
@@ -156,7 +158,7 @@ mod test {
             let entry = map.entry("k88");
             assert_eq!("k88", entry.key());
             assert_eq!(0, entry.value_count());
-            entry.insert("end.")
+            assert_ok!(entry.insert("end.", NoMeta));
         }
 
         assert_eq!(

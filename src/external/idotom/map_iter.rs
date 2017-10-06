@@ -13,11 +13,11 @@ use utils::DebugIterableOpaque;
 use super::Idotom;
 
 
-impl<K,V, M> Idotom<K,V, M>
+impl<K, V, M> Idotom<K, V, M>
     where K: Hash+Eq+Copy,
           V: StableDeref
 {
-    pub fn keys(&self) -> Keys<K, V::Target> {
+    pub fn keys(&self) -> Keys<K, V::Target, M> {
         Keys(self.map_access.keys())
     }
 
@@ -41,15 +41,15 @@ impl<K,V, M> Idotom<K,V, M>
 }
 
 #[derive(Clone)]
-pub struct Keys<'a, K: 'a, T: ?Sized + 'a>(hash_map::Keys<'a, K, Vec<*const T>>);
+pub struct Keys<'a, K: 'a, T: ?Sized + 'a, M: 'a>(hash_map::Keys<'a, K, (M, Vec<*const T>)>);
 
-impl<'a, K: Debug+'a, T: 'a> Debug for Keys<'a, K, T> {
+impl<'a, K: Debug+'a, T: 'a, M: 'a> Debug for Keys<'a, K, T, M> {
     fn fmt(&self, fter: &mut fmt::Formatter) -> fmt::Result {
         self.0.fmt(fter)
     }
 }
 
-impl<'a, K: 'a, T: 'a> Iterator for Keys<'a, K, T>
+impl<'a, K: 'a, T: 'a, M: 'a> Iterator for Keys<'a, K, T, M>
     where K: Copy
 {
     type Item = K;
@@ -65,7 +65,7 @@ impl<'a, K: 'a, T: 'a> Iterator for Keys<'a, K, T>
     }
 }
 
-impl<'a, K, T> ExactSizeIterator for Keys<'a, K, T>
+impl<'a, K, T, M> ExactSizeIterator for Keys<'a, K, T, M>
     where K: Copy + 'a, T: 'a
 {
     #[inline]
@@ -188,7 +188,7 @@ impl<'a, K, T, M> Debug for GroupedValues<'a, K, T, M>
 {
     fn fmt(&self, fter: &mut fmt::Formatter) -> fmt::Result {
         fter.debug_list()
-            .entry(self.clone())
+            .entry(&self.clone())
             .finish()
     }
 }

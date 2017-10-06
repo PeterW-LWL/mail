@@ -5,6 +5,27 @@ use mime::FromStrError as MimeParsingErr;
 use base64;
 use quoted_printable;
 use idna::uts46::{ Errors as PunyCodeErrors };
+use std::fmt::{self, Display};
+
+#[derive(Debug)]
+pub struct MultipleErrorsWraper {
+    pub errors: Vec<Error>
+}
+
+impl From<Vec<Error>> for MultipleErrorsWraper {
+    fn from(errors: Vec<Error>) -> MultipleErrorsWraper {
+        MultipleErrorsWraper { errors }
+    }
+}
+
+impl Display for MultipleErrorsWraper {
+    fn fmt(&self, fter: &mut fmt::Formatter) -> fmt::Result {
+        fter.debug_list()
+            .entries(&self.errors)
+            .finish()
+    }
+}
+
 
 #[allow(unused_doc_comment)]
 error_chain! {
@@ -18,6 +39,15 @@ error_chain! {
 
     errors {
 
+        MultipleErrors(errors: MultipleErrorsWraper) {
+            description("multiple errors happened in the same operation")
+            display("multiple errors: {}", errors)
+        }
+
+        FailedToAddHeader(name: &'static str) {
+            description("failed to add a header filed to the header map")
+            display("failed to a the field {:?} to the header map", name)
+        }
         //mime_error does not impl (std)Error so no chaining possible
         ParsingMime( mime_error: MimeParsingErr ) {
             description( "parsing mime failed" )

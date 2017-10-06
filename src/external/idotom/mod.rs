@@ -50,26 +50,25 @@ pub trait Meta {
     fn check_update(&self, other: &Self) -> Result<(), Self::MergeError>;
     fn update(&mut self, other: Self);
 
-    /// has to guarantee that on a failed updated (returns an error) the
-    /// instances (self's) state is unchanged
-    fn try_update(&mut self, other: Self) -> Result<(), Self::MergeError> {
-        self.check_update(&other)?;
-        self.update(other);
-        Ok(())
-    }
-
 }
+
+
+// workaround for rust #35121 (`!` type)
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
+pub struct Unreachable { _noop: () }
 
 #[derive(Debug, Default, Clone, Copy, Eq, PartialEq, Hash)]
 pub struct NoMeta;
 impl Meta for NoMeta {
-    type MergeError = !;
+    //TODO(UPSTREAM): experimental/nightly (rustc #35121)
+    //type MergeError = !;
+    type MergeError = Unreachable;
 
 
-    fn check_update(&self, other: &Self) -> Result<(), Self::MergeError> {
+    fn check_update(&self, _other: &Self) -> Result<(), Self::MergeError> {
         Ok(())
     }
-    fn update(&mut self, other: Self) {}
+    fn update(&mut self, _other: Self) {}
 }
 
 // # SAFETY constraints (internal):
@@ -124,6 +123,7 @@ impl<K, V, M> Idotom<K, V, M>
     where K: Hash+Eq+Copy,
           V: StableDeref,
           M: Meta
+
 {
     pub fn new() -> Self {
         Default::default()
@@ -151,7 +151,7 @@ impl<K, V, M> Idotom<K, V, M>
     pub fn reverse(&mut self) {
         self.vec_data.reverse();
         for (_, val) in self.map_access.iter_mut() {
-            val.reverse()
+            val.1.reverse()
         }
     }
 
@@ -186,7 +186,10 @@ impl<K, V, M> Idotom<K, V, M>
 
     pub fn get(&self, k: K) -> Option<EntryValues<V::Target, M>>{
         self.map_access.get(&k)
-            .map(|vec| EntryValues(vec.iter()) )
+            .map(|vec| EntryValues {
+                inner_iter: vec.1.iter(),
+                meta: &vec.0,
+            } )
     }
 
 //    pub fn get_mut(&mut self, k: K) -> Option<EntryValuesMut<V::Target>> {
@@ -195,17 +198,20 @@ impl<K, V, M> Idotom<K, V, M>
 //    }
 
     /// inserts a key, value pair returns the new count of values for the given key
-    pub fn insert(&mut self, key: K, value: V, meta: M) -> Result<usize, M::MergeError> {
+    pub fn insert(&mut self, key: K, value: V, meta: M) -> Result<usize, (K, V, M, M::MergeError)> {
         use self::hash_map::Entry::*;
 
 
         let ptr: *const V::Target = &*value;
         let entry = self.map_access.entry(key);
         let meta_updated_data =
-            match list {
-                Occupied(mut oe) => {
+            match entry {
+                Occupied(oe) => {
                     let data = oe.into_mut();
-                    data.0.try_update(meta)?;
+                    if let Err(err) = data.0.check_update(&meta) {
+                        return Err((key, value, meta, err));
+                    }
+                    data.0.update(meta);
                     data
                 },
                 Vacant(ve) => {
@@ -217,13 +223,20 @@ impl<K, V, M> Idotom<K, V, M>
         // and then update the list we got from the 1st step.
         self.vec_data.push((key,value));
         meta_updated_data.1.push(ptr);
-        meta_updated_data.1.len()
+        Ok(meta_updated_data.1.len())
     }
 
     //FIXME(UPSTREAM): use drain_filter instead of retain once stable then return Vec<V>
-    pub fn remove_all(&mut self, key_to_remove: K) {
-        self.map_access.remove(&key_to_remove);
-        self.vec_data.retain(|&(key, _)| key != key_to_remove);
+    // currently it returns true as long as at last one element is removed
+    // once `drain_where` (or `drain_filter`) is stable it should be changed
+    // to returning the removed values
+    pub fn remove_all(&mut self, key_to_remove: K) -> bool {
+        if let Some(_) = self.map_access.remove(&key_to_remove) {
+            self.vec_data.retain(|&(key, _)| key != key_to_remove);
+            true
+        } else {
+            false
+        }
     }
 
     pub fn retain<FN>(&mut self, mut func: FN)
@@ -239,19 +252,64 @@ impl<K, V, M> Idotom<K, V, M>
             retrain
         });
         for (key, ptr) in to_remove.into_iter() {
-            if let Some(values) = self.map_access.get_mut(&key) {
-                //TODO use remove_item once stable (rustc #40062) [inlined unstable def]
-                match values.iter().position(|x| *x == ptr) {
-                    Some(idx) => {
-                        values.remove(idx);
-                    },
-                    None => unreachable!(
-                        "[BUG] inconsistent state, value is not in map_access but in vec_data")
+            {
+                if let Some(values) = self.map_access.get_mut(&key) {
+                    //TODO use remove_item once stable (rustc #40062) [inlined unstable def]
+                    match values.1.iter().position(|x| *x == ptr) {
+                        Some(idx) => {
+                            values.1.remove(idx);
+                        },
+                        None => unreachable!(
+                            "[BUG] inconsistent state, value is not in map_access but in vec_data")
+                    }
+                    //FIXME(TEST): test remove map entry if values.1.is_empty()
+                    if !values.1.is_empty() {
+                        continue
+                    }
                 }
+
             }
+            self.map_access.remove(&key);
         }
     }
 
+    ///
+    /// # Error
+    /// All k-v-pairs which can be added to this map, if one or
+    /// more errors occurred `Err(..)` is returned with a vector of
+    /// (K, V, Error)-tuples is returned.
+    ///
+    /// Note that even if `Err(..)` is returned all key-value pairs
+    /// which can be added to `self` are added.
+    pub fn extend<I>(&mut self, other: I) -> Result<(), Vec<(K, V, M, M::MergeError)>>
+        where I: IntoIterator<Item=(K, V, M)>
+    {
+        let mut errors = Vec::new();
+        for (key, val, meta) in other.into_iter() {
+            let res = self.insert(key, val, meta);
+            if let Err(err) = res {
+                errors.push(err)
+            }
+        }
+        if errors.len() == 0 {
+            Ok(())
+        } else {
+            Err(errors)
+        }
+    }
+}
+
+impl<K, V, M> Idotom<K, V, M>
+    where K: Hash+Eq+Copy,
+          V: StableDeref,
+          M: Meta + Clone
+{
+    pub fn into_iter_with_meta(self) -> IntoIterWithMeta<K, V, M> {
+        IntoIterWithMeta {
+            vec_data: self.vec_data.into_iter(),
+            map_access: self.map_access
+        }
+    }
 }
 
 impl<K, V, M> Debug for Idotom<K, V, M>
@@ -267,19 +325,36 @@ impl<K, V, M> Debug for Idotom<K, V, M>
     }
 }
 
-
 impl<K, V, M> Clone for Idotom<K, V, M>
     where K: Hash + Eq + Copy,
           V: StableDeref + Clone,
+          M: Meta + Clone
 {
     fn clone(&self) -> Self {
-        //Note: all pointers have to be recreated
-        //SPEZIALIZE: V: StableCloneDeref, as no pointer has to be recreated
-        let mut out = Self::with_capacity(self.len());
-        out.extend(self.vec_data.iter().map(|&(key, ref val)| {
-            (key, val.clone())
-        }));
-        out
+        use self::hash_map::Entry::*;
+
+        let mut vec_data = Vec::with_capacity(self.vec_data.len());
+        let mut map_access = HashMap::with_capacity(self.map_access.len());
+
+        for &(k, ref val) in self.vec_data.iter() {
+            let nval = val.clone();
+            let nptr: *const V::Target = &*nval;
+            vec_data.push((k, val.clone()));
+            match map_access.entry(k) {
+                Occupied(mut oe) => {
+                    let access: &mut (M, Vec<*const V::Target>) = oe.get_mut();
+                    access.1.push(nptr);
+                },
+                Vacant(ve) => {
+                    let new_meta = self.map_access
+                        .get(&k)
+                        .expect("[BUG] map entries have to exist")
+                        .0.clone();
+                    ve.insert((new_meta, vec![nptr]));
+                }
+            }
+        }
+        Idotom { map_access, vec_data }
     }
 }
 
@@ -296,7 +371,7 @@ impl<K, V, M> PartialEq<Self> for Idotom<K, V, M>
     }
 }
 
-impl<K, V, M> Eq<Self> for Idotom<K, V, M>
+impl<K, V, M> Eq for Idotom<K, V, M>
     where K: Hash + Eq + Copy,
           V: StableDeref + Eq,
           M: Eq
@@ -322,7 +397,7 @@ impl<K, V, M> IntoIterator for Idotom<K, V, M>
 impl<K, V, M> FromIterator<(K, V)> for Idotom<K, V, M>
     where K: Hash + Eq + Copy,
           V: StableDeref,
-          M: Default
+          M: Meta<MergeError=Unreachable> + Default
 {
 
     fn from_iter<I: IntoIterator<Item=(K,V)>>(src: I) -> Self {
@@ -336,40 +411,104 @@ impl<K, V, M> FromIterator<(K, V)> for Idotom<K, V, M>
                 Self::default()
             }
         };
-
-        out.extend(src_iter);
+        <Self as Extend<(K,V)>>::extend(&mut out, src_iter);
         out
     }
 }
 
+//TODO(UPSTREAM): use `!` experimental/nightly (rustc #35121)
 impl<K, V, M> Extend<(K, V)> for Idotom<K, V, M>
     where K: Hash + Eq + Copy,
           V: StableDeref,
-          M: Meta + Default
+          M: Meta<MergeError=Unreachable> + Default,
 {
     fn extend<I>(&mut self, src: I)
         where I: IntoIterator<Item=(K,V)>
     {
         for (key, value) in src.into_iter() {
-            self.insert(key, value, M::default());
+            let e = self.insert(key, value, M::default());
+            assert!(e.is_ok(), "Err(Unreachable) can not be created safely, but we still got it");
         }
     }
 }
 
+//TODO(UPSTREAM): use `!` experimental/nightly (rustc #35121)
 impl<K, V, M> Extend<(K, V, M)> for Idotom<K, V, M>
     where K: Hash + Eq + Copy,
           V: StableDeref,
-          M: Meta
+          M: Meta<MergeError=Unreachable>
 {
     fn extend<I>(&mut self, src: I)
         where I: IntoIterator<Item=(K,V,M)>
     {
         for (key, value, meta) in src.into_iter() {
-            self.insert(key, value, meta);
+            let e = self.insert(key, value, meta);
+            assert!(e.is_ok(), "Err(Unreachable) can not be created safely, but we still got it");
         }
     }
 }
 
+
+
+pub struct IntoIterWithMeta<K,V,M>
+    where K: Hash+Eq+Copy,
+          V: StableDeref,
+          M: Meta + Clone
+{
+    vec_data: vec::IntoIter<(K,V)>,
+    map_access: HashMap<K, (M, Vec<*const V::Target>)>
+}
+
+impl<K, V, M> Iterator for IntoIterWithMeta<K, V, M>
+    where K: Hash+Eq+Copy,
+          V: StableDeref,
+          M: Meta + Clone
+{
+    type Item = (K, V, M);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.vec_data.next()
+            .map(|(key, val)| {
+                let meta = self.map_access.get(&key)
+                    .expect("[BUG] key in `vec_data` but not `map_access`")
+                    .0.clone();
+                (key, val, meta)
+            })
+    }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.vec_data.size_hint()
+    }
+}
+
+impl<K, V, M> ExactSizeIterator for IntoIterWithMeta<K, V, M>
+    where K: Hash + Eq + Copy,
+          V: StableDeref,
+          M: Meta + Clone
+{
+    fn len(&self) -> usize {
+        self.vec_data.len()
+    }
+}
+
+impl<K, V, M> Debug for IntoIterWithMeta<K, V, M>
+    where K: Hash + Eq + Copy + Debug,
+          V: StableDeref + Debug,
+          M: Meta + Clone + Debug
+{
+    fn fmt(&self, fter: &mut fmt::Formatter) -> fmt::Result {
+        let meta = DebugIterableOpaque::new(
+            self.map_access.iter().map(|(&key, &(ref meta, _))| {
+                (key, meta)
+            })
+        );
+        fter.debug_struct("IntoIterWithMeta")
+            .field("key_value_iter", &self.vec_data)
+            .field("meta_data", &meta)
+            .finish()
+    }
+}
 
 
 pub struct EntryValues<'a, T: ?Sized+'a, M: 'a>{
@@ -377,7 +516,10 @@ pub struct EntryValues<'a, T: ?Sized+'a, M: 'a>{
     meta: &'a M
 }
 
-impl<'a, T: 'a, M: 'a> EntryValues<'a, T, M> {
+impl<'a, T, M> EntryValues<'a, T, M>
+    where T: ?Sized + 'a,
+          M: 'a
+{
     pub fn meta(&self) -> &'a M {
         self.meta
     }
@@ -403,12 +545,12 @@ impl<'a, T: ?Sized + 'a, M: 'a> Iterator for EntryValues<'a, T, M> {
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         //SAFE: the pointers are guaranteed to be valid, at last for lifetime 'a
-        self.0.next().map(|&ptr| unsafe { &*ptr })
+        self.inner_iter.next().map(|&ptr| unsafe { &*ptr })
     }
 
     #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
-        self.0.size_hint()
+        self.inner_iter.size_hint()
     }
 }
 
@@ -416,7 +558,7 @@ impl<'a, T: ?Sized + 'a, M: 'a> ExactSizeIterator for EntryValues<'a, T, M> {
 
     #[inline]
     fn len(&self) -> usize {
-        self.0.len()
+        self.inner_iter.len()
     }
 }
 
@@ -428,7 +570,7 @@ impl<'a, T, M> Debug for EntryValues<'a, T, M>
     fn fmt(&self, fter: &mut fmt::Formatter) -> fmt::Result {
         let metoo = DebugIterableOpaque::new(self.clone());
         fter.debug_struct("EntryValues")
-            .field("inner_iter", metoo)
+            .field("inner_iter", &metoo)
             .field("meta", self.meta)
             .finish()
     }
@@ -483,10 +625,10 @@ mod test {
 
         assert_eq!(true, map.is_empty());
 
-        map.insert("key1", Box::new(13u32), NoMeta);
+        assert_ok!(map.insert("key1", Box::new(13u32), NoMeta));
 
         assert_eq!(false, map.is_empty());
-        map.insert("key2", Box::new(1), NoMeta);
+        assert_ok!(map.insert("key2", Box::new(1), NoMeta));
 
         assert_eq!(10, map.capacity());
         assert_eq!(2, map.len());
@@ -501,8 +643,8 @@ mod test {
 
         assert!(map.capacity() >= 3);
 
-        map.insert("key1", Box::new(44), NoMeta);
-        map.insert("key1", Box::new(44), NoMeta);
+        assert_ok!(map.insert("key1", Box::new(44), NoMeta));
+        assert_ok!(map.insert("key1", Box::new(44), NoMeta));
 
         assert_eq!(4, map.len());
         assert!(map.capacity() >= 4);
@@ -514,16 +656,16 @@ mod test {
 
     #[test]
     fn works_with_trait_objects() {
-        use std::fmt::Display;
-        let mut map = Idotom::<&'static str, Box<Display>>::new();
-        map.insert("hy", Box::new("ho".to_owned()), NoMeta);
-        map.insert("hy", Box::new("ha".to_owned()), NoMeta);
-        map.insert("ho", Box::new("ho".to_owned()), NoMeta);
+        use std::fmt::Debug;
+        let mut map = Idotom::<&'static str, Box<Debug>, NoMeta>::new();
+        assert_ok!(map.insert("hy", Box::new("h".to_owned()), NoMeta));
+        assert_ok!(map.insert("hy", Box::new(2), NoMeta));
+        assert_ok!(map.insert("ho", Box::new("o".to_owned()), NoMeta));
 
         let view = map.values().collect::<Vec<_>>();
         assert_eq!(
-            "ho ha ho",
-            format!("{} {} {}", view[0], view[1], view[2])
+            "\"h\" 2 \"o\"",
+            format!("{:?} {:?} {:?}", view[0], view[1], view[2])
         )
     }
 
@@ -533,14 +675,14 @@ mod test {
         let a = arc_str("a");
         let co_a = a.clone();
         let eq_a = arc_str("a");
-        map.insert("k1", a, NoMeta);
-        map.insert("k1", co_a, NoMeta);
-        map.insert("k1", eq_a.clone(), NoMeta);
-        map.insert("k2", eq_a, NoMeta);
-        map.insert("k3", arc_str("y"), NoMeta);
-        map.insert("k4", arc_str("z"), NoMeta);
-        map.insert("k4", arc_str("a"), NoMeta);
-        map.insert("k1", arc_str("e"), NoMeta);
+        assert_ok!(map.insert("k1", a, NoMeta));
+        assert_ok!(map.insert("k1", co_a, NoMeta));
+        assert_ok!(map.insert("k1", eq_a.clone(), NoMeta));
+        assert_ok!(map.insert("k2", eq_a, NoMeta));
+        assert_ok!(map.insert("k3", arc_str("y"), NoMeta));
+        assert_ok!(map.insert("k4", arc_str("z"), NoMeta));
+        assert_ok!(map.insert("k4", arc_str("a"), NoMeta));
+        assert_ok!(map.insert("k1", arc_str("e"), NoMeta));
 
         let val_k1 = map.get("k1");
         assert_eq!(true, val_k1.is_some());
@@ -600,8 +742,8 @@ mod test {
     #[test]
     fn reverse() {
         let mut map = Idotom::new();
-        map.insert("k1", "ok", NoMeta);
-        map.insert("k2", "why not?", NoMeta);
+        assert_ok!(map.insert("k1", "ok", NoMeta));
+        assert_ok!(map.insert("k2", "why not?", NoMeta));
         map.reverse();
 
         assert_eq!(
@@ -614,11 +756,13 @@ mod test {
     #[test]
     fn remove_all() {
         let mut map = Idotom::new();
-        map.insert("k1", "ok", NoMeta);
-        map.insert("k2", "why not?", NoMeta);
-        map.insert("k1", "run", NoMeta);
-        map.insert("k2", "jump", NoMeta);
-        map.remove_all("k1");
+        assert_ok!(map.insert("k1", "ok", NoMeta));
+        assert_ok!(map.insert("k2", "why not?", NoMeta));
+        assert_ok!(map.insert("k1", "run", NoMeta));
+        assert_ok!(map.insert("k2", "jump", NoMeta));
+        let did_rm = map.remove_all("k1");
+        assert_eq!(true, did_rm);
+        assert_eq!(false, map.remove_all("not_a_key"));
 
         assert_eq!(
             [("k2", "why not?"), ("k2", "jump")],
@@ -629,10 +773,10 @@ mod test {
     #[test]
     fn retain() {
         let mut map = Idotom::new();
-        map.insert("k1", "ok", NoMeta);
-        map.insert("k2", "why not?", NoMeta);
-        map.insert("k1", "run", NoMeta);
-        map.insert("k2", "uh", NoMeta);
+        assert_ok!(map.insert("k1", "ok", NoMeta));
+        assert_ok!(map.insert("k2", "why not?", NoMeta));
+        assert_ok!(map.insert("k1", "run", NoMeta));
+        assert_ok!(map.insert("k2", "uh", NoMeta));
 
         map.retain(|key, val| {
             assert!(key.len() == 2);
@@ -649,10 +793,10 @@ mod test {
     fn retain_with_equal_pointers() {
         let mut map = Idotom::new();
         let v1 = arc_str("v1");
-        map.insert("k1", v1.clone(), NoMeta);
-        map.insert("k2", v1.clone(), NoMeta);
-        map.insert("k1", arc_str("v2"), NoMeta);
-        map.insert("k1", v1, NoMeta);
+        assert_ok!(map.insert("k1", v1.clone(), NoMeta));
+        assert_ok!(map.insert("k2", v1.clone(), NoMeta));
+        assert_ok!(map.insert("k1", arc_str("v2"), NoMeta));
+        assert_ok!(map.insert("k1", v1, NoMeta));
 
         let mut rem_count = 0;
         map.retain(|_key, val| {

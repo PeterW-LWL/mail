@@ -14,11 +14,11 @@ pub use self::default_header::*;
 
 #[macro_use]
 mod map;
-pub use self::map::{HeaderMap, TypedMultiBodyIter, UntypedMultiBodyIter};
+pub use self::map::*;
 
 
 pub trait Header {
-    const CAN_APPEAR_MULTIPLE_TIMES: bool;
+    const MAX_COUNT_EQ_1: bool;
     type Component;
 
     //FIXME turn this into a Accosiated constant once it is possible
@@ -50,7 +50,7 @@ pub trait Header {
 }
 
 /// all headers defined with `def_headers!` where
-/// `CAN_APPEAR_MULTIPLE_TIMES` is `false` do implement
+/// `MAX_COUNT_EQ_1` is `true` do implement
 /// `SingularHeaderMarker` which is required to use
 /// the `HeaderMap::get_single` functionality.
 pub trait SingularHeaderMarker {}

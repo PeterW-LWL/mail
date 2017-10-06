@@ -90,7 +90,12 @@ impl<E> Mail<E>
 
     pub fn set_headers( &mut self, headers: HeaderMap<E> ) -> Result<()> {
         check_multiple_headers( &headers, self.body.is_multipart() )?;
-        self.headers.extend( headers )?;
+        if let Err(errs) = self.headers.extend( headers ) {
+            let errors = errs.into_iter().map(|(hn,_,_,err)| {
+                err.chain_err(||ErrorKind::FailedToAddHeader(hn.as_str()))
+            }).collect::<Vec<_>>();
+            bail!(ErrorKind::MultipleErrors(errors.into()));
+        }
         Ok( () )
     }
 
@@ -190,13 +195,13 @@ impl<E> EncodableMail<E>
     fn from_loaded_mail(mut mail: Mail<E>) -> Result<Self> {
         Self::insert_generated_headers(&mut mail)?;
         mail.headers.use_contextual_validators()?;
-        if !mail.headers.contains(Date) {
+        if !mail.headers.contains_header(Date) {
             bail!("a mail must have a Date header field");
         }
-        if !mail.headers.contains(From) {
+        if !mail.headers.contains_header(From) {
             bail!("a mail must have a From header field");
         }
-        if !mail.headers.contains(MessageId) {
+        if !mail.headers.contains_header(MessageId) {
             //TODO warn
         }
         Ok(EncodableMail(mail))
@@ -211,7 +216,7 @@ impl<E> EncodableMail<E>
             mail.headers.insert(ContentTransferEncoding, file_buffer.transfer_encoding().clone())?;
         }
 
-        if !mail.headers.contains(Date) {
+        if !mail.headers.contains_header(Date) {
             mail.headers.insert(Date, DateTime::now())?;
         }
         Ok(())
