@@ -1,7 +1,9 @@
 use futures::Future;
 use std::marker::Send;
 use std::any::TypeId;
+use std::cell::RefCell;
 use std::mem;
+use std::fmt::{self, Debug};
 
 #[cfg(test)]
 use futures::sync::oneshot;
@@ -22,6 +24,25 @@ pub use self::date_time::DateTime;
 mod file_meta;
 pub use self::file_meta::FileMeta;
 
+
+pub struct DebugIterableOpaque<I> {
+    one_use_inner: RefCell<I>
+}
+
+impl<I> DebugIterableOpaque<I> {
+    pub fn new(one_use_inner: I) -> Self {
+        let one_use_inner = RefCell::new(one_use_inner);
+        DebugIterableOpaque { one_use_inner }
+    }
+}
+impl<I> Debug for DebugIterableOpaque<I>
+    where I: Iterator, I::Item: Debug
+{
+    fn fmt(&self, fter: &mut fmt::Formatter) -> fmt::Result {
+        let mut borrow = self.one_use_inner.borrow_mut();
+        fter.debug_list().entries(&mut *borrow).finish()
+    }
+}
 
 
 pub fn is_multipart_mime( mime: &Mime ) -> bool {
@@ -176,5 +197,6 @@ pub fn uneraser_mut<GOT: 'static, EXP: 'static>(inp: &mut GOT ) -> Option<&mut E
 //    out
 //}
 
-
 pub type SendBoxFuture<I, E> = Box<Future<Item=I, Error=E>+Send>;
+
+

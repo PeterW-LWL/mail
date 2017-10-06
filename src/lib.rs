@@ -10,6 +10,7 @@ extern crate serde;
 extern crate base64;
 extern crate rand;
 extern crate percent_encoding;
+extern crate stable_deref_trait;
 
 #[macro_use]
 extern crate serde_derive;

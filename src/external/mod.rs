@@ -4,3 +4,4 @@
 #[macro_use]
 pub mod vec1;
 
+pub mod total_order_multi_map;

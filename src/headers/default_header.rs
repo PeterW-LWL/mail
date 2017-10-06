@@ -21,7 +21,7 @@ macro_rules! def_headers {
             pub struct $name;
 
             impl $crate::headers::Header for  $name {
-                const CAN_APPEAR_MULTIPLE_TIMES: bool = def_headers!(_PRIV_boolify $multi);
+                const MAX_COUNT_EQ_1: bool = def_headers!(_PRIV_boolify $multi);
                 type Component = $scope::$component;
 
                 fn name() -> $crate::headers::HeaderName {
@@ -85,8 +85,8 @@ macro_rules! def_headers {
     );
     (_PRIV_mk_validator $E:ident, None) => ({ None });
     (_PRIV_mk_validator $E:ident, $validator:ident) => ({ Some($validator::<$E>) });
-    (_PRIV_boolify +) => ({ true });
-    (_PRIV_boolify 1) => ({ false });
+    (_PRIV_boolify +) => ({ false });
+    (_PRIV_boolify 1) => ({ true });
     (_PRIV_boolify $other:tt) => (
         compiler_error!( "only `1` (for singular) or `+` (for multiple) are valid" )
     );

@@ -1,4 +1,4 @@
-use std::{mem, vec};
+use std::vec;
 
 use codec::{ MailEncoder, MailEncodable };
 use headers::HeaderName;
@@ -12,9 +12,7 @@ impl<E> IntoIterator for HeaderMap<E>
     type IntoIter = vec::IntoIter<(HeaderName, Box<MailEncodable<E>>)>;
 
     fn into_iter(self) -> Self::IntoIter {
-        let HeaderMap { header_map, header_vec, .. } = self;
-        mem::drop(header_map);
-        header_vec.into_iter()
+        self.inner_map.into_iter()
     }
 }
 

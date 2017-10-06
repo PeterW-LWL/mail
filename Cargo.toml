@@ -17,6 +17,7 @@ branch = "master"
 repository = "1aim/mail-codec"
 
 [dependencies]
+stable_deref_trait = "1.0"
 ascii = "0.8.4"
 base64 = "0.6.0"
 chrono = "0.4.0"

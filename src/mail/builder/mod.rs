@@ -67,7 +67,7 @@ impl<E> BuilderShared<E> where E: MailEncoder {
         header: H,
         hbody: H::Component,
         is_multipart: bool
-    ) -> Result<()>
+    ) -> Result<usize>
         where H: Header,
               H::Component: MailEncodable<E>
     {
@@ -75,7 +75,14 @@ impl<E> BuilderShared<E> where E: MailEncoder {
         self.headers.insert( header, hbody )
     }
 
+    /// might already have added some headers even if it returns Err(...)
     fn headers( &mut self, headers: HeaderMap<E>, is_multipart: bool ) -> Result<()> {
+        //TODO CONSIDER:
+        // it is not impossible to make this function "transactional" for HeaderMap
+        // (it is impossible for TotalOrderMultiMap) by:
+        // 1. implement pop on TotalOrderMultiMap
+        // 2. store current len befor extending
+        // 3. pop until the stored length is reached again
         check_multiple_headers( &headers, is_multipart )?;
         self.headers.extend( headers )?;
         Ok( () )
@@ -164,7 +171,7 @@ impl<E> SinglepartBuilder<E>
         &mut self,
         header: H,
         hbody: C
-    ) -> Result<()>
+    ) -> Result<usize>
         where H: Header,
               H::Component: MailEncodable<E>,
               C: HeaderTryInto<H::Component>
