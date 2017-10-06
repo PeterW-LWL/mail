@@ -1,5 +1,5 @@
 
-# mail_codec &emsp; [![Build Status](https://travis-ci.org/dathinab/mail_codec.svg?branch=master)](https://travis-ci.org/dathinab/mail_codec)
+# mail-codec &emsp; [![Build Status](https://travis-ci.org/1aim/mail_codec.svg?branch=master)](https://travis-ci.org/1aim/mail_codec)
 
 **TODO**
 

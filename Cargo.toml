@@ -6,14 +6,15 @@ keywords = ["mail", "codec", "mime", "smtp"]
 license = "MIT OR Apache-2.0"
 name = "mail-codec"
 readme = "./README.md"
-repository = "https://github.com/dathinab/mail-codec"
+repository = "https://github.com/1aim/mail-codec"
 version = "0.1.0"
+documentation="https://docs.rs/mail-codec"
 
 [badges]
 
 [badges.travis-ci]
 branch = "master"
-repository = "dathinab/mail-codec"
+repository = "1aim/mail-codec"
 
 [dependencies]
 ascii = "0.8.4"
