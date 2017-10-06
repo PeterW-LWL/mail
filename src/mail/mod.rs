@@ -195,13 +195,13 @@ impl<E> EncodableMail<E>
     fn from_loaded_mail(mut mail: Mail<E>) -> Result<Self> {
         Self::insert_generated_headers(&mut mail)?;
         mail.headers.use_contextual_validators()?;
-        if !mail.headers.contains_header(Date) {
+        if !mail.headers.contains(Date) {
             bail!("a mail must have a Date header field");
         }
-        if !mail.headers.contains_header(From) {
+        if !mail.headers.contains(From) {
             bail!("a mail must have a From header field");
         }
-        if !mail.headers.contains_header(MessageId) {
+        if !mail.headers.contains(MessageId) {
             //TODO warn
         }
         Ok(EncodableMail(mail))
@@ -216,7 +216,7 @@ impl<E> EncodableMail<E>
             mail.headers.insert(ContentTransferEncoding, file_buffer.transfer_encoding().clone())?;
         }
 
-        if !mail.headers.contains_header(Date) {
+        if !mail.headers.contains(Date) {
             mail.headers.insert(Date, DateTime::now())?;
         }
         Ok(())

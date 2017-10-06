@@ -180,7 +180,7 @@ impl<E> HeaderMap<E>
     }
 
     /// returns true if the headermap contains a header with the same name
-    pub fn contains_header<H: HasHeaderName>(&self, name: H ) -> bool {
+    pub fn contains<H: HasHeaderName>(&self, name: H ) -> bool {
         self.inner_map.contains_key(name.get_name())
     }
 
@@ -730,10 +730,10 @@ mod test {
         }.unwrap();
         typed(&map);
 
-        assert_eq!( true, map.contains_header(Subject::name()) );
-        assert_eq!( true, map.contains_header(Subject) );
-        assert_eq!( false, map.contains_header(Comments::name()) );
-        assert_eq!( false, map.contains_header(Comments) );
+        assert_eq!( true, map.contains(Subject::name()) );
+        assert_eq!( true, map.contains(Subject) );
+        assert_eq!( false, map.contains(Comments::name()) );
+        assert_eq!( false, map.contains(Comments) );
     }
 
     #[test]

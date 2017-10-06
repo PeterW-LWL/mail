@@ -161,7 +161,7 @@ mod validators {
                 bodies.filter_map(|res| res.ok()).any(|list| list.len() > 1 )
             ).unwrap_or(false);
 
-        if needs_sender && !map.contains_header(Sender) {
+        if needs_sender && !map.contains(Sender) {
             bail!("if a multi-mailbox From is used Sender has to be specified");
         }
         Ok(())
