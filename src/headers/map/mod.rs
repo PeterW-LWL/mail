@@ -6,9 +6,9 @@ use std::mem;
 use std::collections::HashSet;
 
 
-use external::idotom::{
+use external::total_order_multi_map::{
     self,
-    Idotom, Meta,
+    TotalOrderMultiMap, Meta,
     EntryValues
 };
 
@@ -126,13 +126,13 @@ impl<E> Meta for HeaderMeta<E>
 /// ```
 ///
 pub struct HeaderMap<E: MailEncoder> {
-    inner_map: Idotom<HeaderName, Box<MailEncodable<E>>, HeaderMeta<E>>,
+    inner_map: TotalOrderMultiMap<HeaderName, Box<MailEncodable<E>>, HeaderMeta<E>>,
 }
 
-pub type Iter<'a, E> = idotom::Iter<'a, HeaderName, Box<MailEncodable<E>>>;
-pub type IterMut<'a, E> = idotom::IterMut<'a, HeaderName, Box<MailEncodable<E>>>;
+pub type Iter<'a, E> = total_order_multi_map::Iter<'a, HeaderName, Box<MailEncodable<E>>>;
+pub type IterMut<'a, E> = total_order_multi_map::IterMut<'a, HeaderName, Box<MailEncodable<E>>>;
 pub type IntoIterWithMeta<E> =
-    idotom::IntoIterWithMeta<HeaderName, Box<MailEncodable<E>>, HeaderMeta<E>>;
+    total_order_multi_map::IntoIterWithMeta<HeaderName, Box<MailEncodable<E>>, HeaderMeta<E>>;
 
 impl<E> Debug for HeaderMap<E>
     where E: MailEncoder
@@ -282,7 +282,7 @@ impl<E> HeaderMap<E>
             })
     }
 
-    //TODO error description from Idotom::extend
+    //TODO error description from TotalOrderMultiMap::extend
     /// # Error
     ///
     pub fn extend( &mut self, other: HeaderMap<E> )

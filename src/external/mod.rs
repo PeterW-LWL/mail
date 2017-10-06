@@ -4,4 +4,4 @@
 #[macro_use]
 pub mod vec1;
 
-pub mod idotom;
+pub mod total_order_multi_map;

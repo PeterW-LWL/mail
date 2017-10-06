@@ -7,9 +7,9 @@ use std::iter::ExactSizeIterator;
 
 use stable_deref_trait::StableDeref;
 
-use super::{ Meta, Idotom };
+use super::{ Meta, TotalOrderMultiMap };
 
-impl<K, V, M> Idotom<K, V, M>
+impl<K, V, M> TotalOrderMultiMap<K, V, M>
     where K: Hash + Eq + Copy,
           V: StableDeref,
           M: Meta
@@ -69,7 +69,7 @@ impl<'a, K, V> ExactSizeIterator for Iter<'a, K, V>
 }
 
 
-impl<K, V, M> Idotom<K, V, M>
+impl<K, V, M> TotalOrderMultiMap<K, V, M>
     where K: Hash + Eq + Copy,
           V: StableDeref + DerefMut,
           M: Meta

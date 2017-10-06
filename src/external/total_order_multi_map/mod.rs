@@ -14,7 +14,7 @@
 //! Currently limited to Copy types, could support clone types
 //! but would be often quite a bad idea (except for shepish
 //! clonable types like e.g. a `Rc`/`Arc`).
-// a version of Idotom can be build wich also relies on inner pointer
+// a version of TotalOrderMultiMap can be build wich also relies on inner pointer
 // address stability to cheaply share the keys (would also
 // work with `&'static str` as `&T` is `StableDeref`).
 // The problem is how to handle ownership in that case,
@@ -99,19 +99,19 @@ impl Meta for NoMeta {
 //
 // - reminder: implementing `StableDeref` for a trait which on a safty level
 //   relies on sideffects (e.g. using inner mutability) in deref is unsafe
-pub struct Idotom<K, V, M>
+pub struct TotalOrderMultiMap<K, V, M>
     where V: Deref, K: Hash + Eq + Copy
 {
     vec_data: Vec<(K, V)>,
     map_access: HashMap<K, (M, Vec<*const V::Target>)>,
 }
 
-impl<K, V, M> Default for Idotom<K, V, M>
+impl<K, V, M> Default for TotalOrderMultiMap<K, V, M>
     where K: Hash + Eq + Copy,
           V: StableDeref
 {
     fn default() -> Self {
-        Idotom {
+        TotalOrderMultiMap {
             vec_data: Default::default(),
             map_access: Default::default()
         }
@@ -119,7 +119,7 @@ impl<K, V, M> Default for Idotom<K, V, M>
 
 }
 
-impl<K, V, M> Idotom<K, V, M>
+impl<K, V, M> TotalOrderMultiMap<K, V, M>
     where K: Hash+Eq+Copy,
           V: StableDeref,
           M: Meta
@@ -130,7 +130,7 @@ impl<K, V, M> Idotom<K, V, M>
     }
 
     pub fn with_capacity(capacity: usize) -> Self {
-        Idotom {
+        TotalOrderMultiMap {
             vec_data: Vec::with_capacity(capacity),
             map_access: HashMap::with_capacity(capacity),
         }
@@ -299,7 +299,7 @@ impl<K, V, M> Idotom<K, V, M>
     }
 }
 
-impl<K, V, M> Idotom<K, V, M>
+impl<K, V, M> TotalOrderMultiMap<K, V, M>
     where K: Hash+Eq+Copy,
           V: StableDeref,
           M: Meta + Clone
@@ -312,12 +312,12 @@ impl<K, V, M> Idotom<K, V, M>
     }
 }
 
-impl<K, V, M> Debug for Idotom<K, V, M>
+impl<K, V, M> Debug for TotalOrderMultiMap<K, V, M>
     where K: Hash + Eq + Copy + Debug,
           V: StableDeref + Debug
 {
     fn fmt(&self, fter: &mut fmt::Formatter) -> fmt::Result {
-        write!(fter, "Idotom {{ ")?;
+        write!(fter, "TotalOrderMultiMap {{ ")?;
         for &(key, ref val_cont) in self.vec_data.iter() {
             write!(fter, "{:?} => {:?},", key, val_cont)?;
         }
@@ -325,7 +325,7 @@ impl<K, V, M> Debug for Idotom<K, V, M>
     }
 }
 
-impl<K, V, M> Clone for Idotom<K, V, M>
+impl<K, V, M> Clone for TotalOrderMultiMap<K, V, M>
     where K: Hash + Eq + Copy,
           V: StableDeref + Clone,
           M: Meta + Clone
@@ -354,12 +354,12 @@ impl<K, V, M> Clone for Idotom<K, V, M>
                 }
             }
         }
-        Idotom { map_access, vec_data }
+        TotalOrderMultiMap { map_access, vec_data }
     }
 }
 
 
-impl<K, V, M> PartialEq<Self> for Idotom<K, V, M>
+impl<K, V, M> PartialEq<Self> for TotalOrderMultiMap<K, V, M>
     where K: Hash + Eq + Copy,
           V: StableDeref + PartialEq<V>,
           M: PartialEq<M>
@@ -371,14 +371,14 @@ impl<K, V, M> PartialEq<Self> for Idotom<K, V, M>
     }
 }
 
-impl<K, V, M> Eq for Idotom<K, V, M>
+impl<K, V, M> Eq for TotalOrderMultiMap<K, V, M>
     where K: Hash + Eq + Copy,
           V: StableDeref + Eq,
           M: Eq
 {}
 
 
-impl<K, V, M> IntoIterator for Idotom<K, V, M>
+impl<K, V, M> IntoIterator for TotalOrderMultiMap<K, V, M>
     where K: Hash + Eq + Copy,
           V: StableDeref,
 {
@@ -388,13 +388,13 @@ impl<K, V, M> IntoIterator for Idotom<K, V, M>
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
-        let Idotom { vec_data, map_access } = self;
+        let TotalOrderMultiMap { vec_data, map_access } = self;
         drop(map_access);
         vec_data.into_iter()
     }
 }
 
-impl<K, V, M> FromIterator<(K, V)> for Idotom<K, V, M>
+impl<K, V, M> FromIterator<(K, V)> for TotalOrderMultiMap<K, V, M>
     where K: Hash + Eq + Copy,
           V: StableDeref,
           M: Meta<MergeError=Unreachable> + Default
@@ -417,7 +417,7 @@ impl<K, V, M> FromIterator<(K, V)> for Idotom<K, V, M>
 }
 
 //TODO(UPSTREAM): use `!` experimental/nightly (rustc #35121)
-impl<K, V, M> Extend<(K, V)> for Idotom<K, V, M>
+impl<K, V, M> Extend<(K, V)> for TotalOrderMultiMap<K, V, M>
     where K: Hash + Eq + Copy,
           V: StableDeref,
           M: Meta<MergeError=Unreachable> + Default,
@@ -433,7 +433,7 @@ impl<K, V, M> Extend<(K, V)> for Idotom<K, V, M>
 }
 
 //TODO(UPSTREAM): use `!` experimental/nightly (rustc #35121)
-impl<K, V, M> Extend<(K, V, M)> for Idotom<K, V, M>
+impl<K, V, M> Extend<(K, V, M)> for TotalOrderMultiMap<K, V, M>
     where K: Hash + Eq + Copy,
           V: StableDeref,
           M: Meta<MergeError=Unreachable>
@@ -621,7 +621,7 @@ mod test {
 
     #[test]
     fn aux_fns() {
-        let mut map = Idotom::with_capacity(10);
+        let mut map = TotalOrderMultiMap::with_capacity(10);
 
         assert_eq!(true, map.is_empty());
 
@@ -657,7 +657,7 @@ mod test {
     #[test]
     fn works_with_trait_objects() {
         use std::fmt::Debug;
-        let mut map = Idotom::<&'static str, Box<Debug>, NoMeta>::new();
+        let mut map = TotalOrderMultiMap::<&'static str, Box<Debug>, NoMeta>::new();
         assert_ok!(map.insert("hy", Box::new("h".to_owned()), NoMeta));
         assert_ok!(map.insert("hy", Box::new(2), NoMeta));
         assert_ok!(map.insert("ho", Box::new("o".to_owned()), NoMeta));
@@ -671,7 +671,7 @@ mod test {
 
     #[test]
     fn get_set() {
-        let mut map = Idotom::new();
+        let mut map = TotalOrderMultiMap::new();
         let a = arc_str("a");
         let co_a = a.clone();
         let eq_a = arc_str("a");
@@ -726,7 +726,7 @@ mod test {
 //    fn get_mut() {
 //        use std::sync::Arc;
 //        use std::cell::RefCell;
-//        let mut map = Idotom::new();
+//        let mut map = TotalOrderMultiMap::new();
 //        map.insert("k1", Arc::new(RefCell::new(12)));
 //
 //        let cell = map.get_mut("k1").unwrap().next().unwrap();
@@ -741,7 +741,7 @@ mod test {
 
     #[test]
     fn reverse() {
-        let mut map = Idotom::new();
+        let mut map = TotalOrderMultiMap::new();
         assert_ok!(map.insert("k1", "ok", NoMeta));
         assert_ok!(map.insert("k2", "why not?", NoMeta));
         map.reverse();
@@ -755,7 +755,7 @@ mod test {
 
     #[test]
     fn remove_all() {
-        let mut map = Idotom::new();
+        let mut map = TotalOrderMultiMap::new();
         assert_ok!(map.insert("k1", "ok", NoMeta));
         assert_ok!(map.insert("k2", "why not?", NoMeta));
         assert_ok!(map.insert("k1", "run", NoMeta));
@@ -772,7 +772,7 @@ mod test {
 
     #[test]
     fn retain() {
-        let mut map = Idotom::new();
+        let mut map = TotalOrderMultiMap::new();
         assert_ok!(map.insert("k1", "ok", NoMeta));
         assert_ok!(map.insert("k2", "why not?", NoMeta));
         assert_ok!(map.insert("k1", "run", NoMeta));
@@ -791,7 +791,7 @@ mod test {
 
     #[test]
     fn retain_with_equal_pointers() {
-        let mut map = Idotom::new();
+        let mut map = TotalOrderMultiMap::new();
         let v1 = arc_str("v1");
         assert_ok!(map.insert("k1", v1.clone(), NoMeta));
         assert_ok!(map.insert("k2", v1.clone(), NoMeta));

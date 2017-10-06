@@ -7,10 +7,10 @@ use stable_deref_trait::StableDeref;
 
 use utils::DebugIterableOpaque;
 
-use super::{ Idotom, Meta };
+use super::{ TotalOrderMultiMap, Meta };
 
 //TODO add meta
-impl<K, V, M> Idotom<K, V, M>
+impl<K, V, M> TotalOrderMultiMap<K, V, M>
     where K: Hash + Eq + Copy,
           V: StableDeref,
           M: Meta
@@ -43,7 +43,7 @@ impl<'a, K, V, M> Debug for Entry<'a, K, V, M>
             Occupied(ref o) => {
                 Box::new(DebugIterableOpaque::new(o.get().1.iter().map(|&ptr| unsafe { &*ptr })))
             },
-            //SAFE because of Idotom safty constraints the pointer is always valid
+            //SAFE because of TotalOrderMultiMap safty constraints the pointer is always valid
             Vacant(..) => Box::new("[]")
         } ;
         fter.debug_struct("Entry")
@@ -125,7 +125,7 @@ mod test {
 
     #[test]
     fn entry() {
-        let mut map = Idotom::new();
+        let mut map = TotalOrderMultiMap::new();
         assert_ok!(map.insert("k1", "v1", NoMeta));
         assert_ok!(map.insert("k2", "b", NoMeta));
         assert_ok!(map.insert("k1", "v2", NoMeta));

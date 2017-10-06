@@ -79,8 +79,8 @@ impl<E> BuilderShared<E> where E: MailEncoder {
     fn headers( &mut self, headers: HeaderMap<E>, is_multipart: bool ) -> Result<()> {
         //TODO CONSIDER:
         // it is not impossible to make this function "transactional" for HeaderMap
-        // (it is for Idotom) by:
-        // 1. implement pop on Idotom
+        // (it is impossible for TotalOrderMultiMap) by:
+        // 1. implement pop on TotalOrderMultiMap
         // 2. store current len befor extending
         // 3. pop until the stored length is reached again
         check_multiple_headers( &headers, is_multipart )?;

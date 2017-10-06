@@ -10,10 +10,10 @@ use stable_deref_trait::StableDeref;
 
 use utils::DebugIterableOpaque;
 
-use super::Idotom;
+use super::TotalOrderMultiMap;
 
 
-impl<K, V, M> Idotom<K, V, M>
+impl<K, V, M> TotalOrderMultiMap<K, V, M>
     where K: Hash+Eq+Copy,
           V: StableDeref
 {
@@ -124,7 +124,7 @@ impl<'a, K, T, M> Iterator for Group<'a, K, T, M>
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
-        //SAFE see Idotom safty guarantees/constraints
+        //SAFE see TotalOrderMultiMap safty guarantees/constraints
         self.inner_iter.next().map(|&ptr| unsafe { &*ptr } )
     }
 
