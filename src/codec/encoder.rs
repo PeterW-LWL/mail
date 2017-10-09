@@ -6,9 +6,9 @@ use ascii::{AsciiStr, AsciiChar};
 use error::Result;
 use grammar::{is_atext, MailType};
 
-/// as specified in RFC xxxx(822?) not including CRLF
+/// as specified in RFC 5322 not including CRLF
 const LINE_LEN_SOFT_LIMIT: usize = 78;
-/// as specified in RFC xxxx(822?) not including CRLF
+/// as specified in RFC 5322 (mail) + RFC 5321 (smtp) not including CRLF
 const LINE_LEN_HARD_LIMIT: usize = 998;
 
 #[cfg(test)]
@@ -69,19 +69,6 @@ pub trait Encodable {
     fn encode<R: BodyBuffer>( &self, encoder:  &mut Encoder<R>) -> Result<()>;
 }
 
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum OrphanMode {
-    Remove,
-    Complete
-}
-
-impl Default for OrphanMode {
-    fn default() -> Self {
-        OrphanMode::Complete
-    }
-}
-
 //TODO implement BodyBuffer for Resource removing one pointless copy
 pub trait BodyBuffer {
     // by making it take a closure it allows us to implement
@@ -123,7 +110,6 @@ impl<R> Section<R>
 // efficiently copying a encoder result into a bytevector
 pub struct Encoder<R: BodyBuffer> {
     mail_type: MailType,
-    orphan_mode: OrphanMode,
     sections: Vec<Section<R>>,
     #[cfg(test)]
     pub trace: Vec<Token>
@@ -136,8 +122,6 @@ pub mod trace_tools {
         MarkFWS,
         CRLF,
         TruncateToCRLF,
-        OrphanCompleted,
-        OrphanRemoved,
         Text(String),
         NowChar,
         NowStr,
@@ -151,13 +135,8 @@ pub mod trace_tools {
 impl<B: BodyBuffer> Encoder<B> {
 
     pub fn new(mail_type: MailType) -> Self {
-        Self::new_with_orphan_mode(mail_type, Default::default())
-    }
-
-    pub fn new_with_orphan_mode(mail_type: MailType, orphan_mode: OrphanMode) -> Self {
         Encoder {
             mail_type,
-            orphan_mode,
             sections: Default::default(),
             #[cfg(test)]
             trace: Vec::new()
@@ -168,10 +147,6 @@ impl<B: BodyBuffer> Encoder<B> {
         self.mail_type
     }
 
-    pub fn orphan_mode(&self) -> OrphanMode {
-        self.orphan_mode
-    }
-
     pub fn encode_header( &mut self ) -> EncodeHeaderHandle {
         if let Some(&Section::Header(..)) = self.sections.last() {}
         else {
@@ -180,9 +155,9 @@ impl<B: BodyBuffer> Encoder<B> {
 
         if let Some(&mut Section::Header(ref mut string)) = self.sections.last_mut() {
             #[cfg(not(test))]
-            { EncodeHeaderHandle::new(self.mail_type, self.orphan_mode, string) }
+            { EncodeHeaderHandle::new(self.mail_type,  string) }
             #[cfg(test)]
-            { EncodeHeaderHandle::new(self.mail_type, self.orphan_mode, string, &mut self.trace) }
+            { EncodeHeaderHandle::new(self.mail_type,  string, &mut self.trace) }
         } else {
             //REFACTOR(NLL): with NLL we can combine both if-else blocks not needing unreachable! anymore
             unreachable!("we already made sure the last is Section::Header")
@@ -204,7 +179,6 @@ pub struct EncodeHeaderHandle<'a> {
     #[cfg(test)]
     trace: &'a mut Vec<Token>,
     mail_type: MailType,
-    orphan_mode: OrphanMode,
     line_start_idx: usize,
     last_fws_idx: usize,
     skipped_cr: bool,
@@ -239,14 +213,12 @@ impl<'a> EncodeHeaderHandle<'a> {
     #[cfg(not(test))]
     fn new(
         mail_type: MailType,
-        orphan_mode: OrphanMode,
         buffer: &'a mut String,
     ) -> Self {
         let start_idx = buffer.len();
         EncodeHeaderHandle {
             buffer,
             mail_type,
-            orphan_mode,
             line_start_idx: start_idx,
             last_fws_idx: start_idx,
             skipped_cr: false,
@@ -259,7 +231,6 @@ impl<'a> EncodeHeaderHandle<'a> {
     #[cfg(test)]
     fn new(
         mail_type: MailType,
-        orphan_mode: OrphanMode,
         buffer: &'a mut String,
         trace: &'a mut Vec<Token>
     ) -> Self {
@@ -269,7 +240,6 @@ impl<'a> EncodeHeaderHandle<'a> {
             buffer,
             trace,
             mail_type,
-            orphan_mode,
             line_start_idx: start_idx,
             last_fws_idx: start_idx,
             skipped_cr: false,
@@ -440,21 +410,6 @@ impl<'a> EncodeHeaderHandle<'a> {
 
     }
 
-
-    fn handle_orphan(&mut self) {
-        match self.orphan_mode {
-            OrphanMode::Complete => {
-                #[cfg(test)]
-                { self.trace.push(Token::OrphanCompleted) }
-                self.start_new_line();
-            },
-            OrphanMode::Remove => {
-                #[cfg(test)]
-                { self.trace.push(Token::OrphanRemoved) }
-            }
-        }
-    }
-
     fn break_line_on_fws(&mut self) -> bool {
         if self.content_before_fws && self.last_fws_idx > self.line_start_idx {
             self.buffer.insert_str(self.last_fws_idx, "\r\n ");
@@ -475,13 +430,13 @@ impl<'a> EncodeHeaderHandle<'a> {
             if self.skipped_cr {
                 self.start_new_line()
             } else {
-                self.handle_orphan();
+                bail!("orphan '\n' in header");
             }
             self.skipped_cr = false;
             return Ok(());
         } else {
             if self.skipped_cr {
-                self.handle_orphan()
+                bail!("orphan '\r' in header");
             }
             if ch == '\r' {
                 self.skipped_cr = true;
@@ -564,29 +519,17 @@ mod test {
         }
     }
 
-    mod OrphanMode {
-        #![allow(non_snake_case)]
-        use super::*;
-        use super::super::OrphanMode;
-
-        #[test]
-        fn default_is_complete() {
-            assert_eq!(OrphanMode::default(), OrphanMode::Complete);
-        }
-    }
 
     mod Encoder {
         #![allow(non_snake_case)]
         use std::default::Default;
         use super::*;
         use super::{ _Encoder as Encoder };
-        use super::super::{ OrphanMode };
 
         #[test]
         fn new_encoder() {
             let encoder = Encoder::new(MailType::Internationalized);
             assert_eq!(encoder.mail_type(), MailType::Internationalized);
-            assert_eq!(encoder.orphan_mode(), OrphanMode::default());
         }
 
         #[test]
@@ -620,7 +563,7 @@ mod test {
 
         use super::*;
         use super::{ _Encoder as Encoder };
-        use super::super::{ EncodeHeaderHandle, OrphanMode };
+        use super::super::EncodeHeaderHandle;
 
         #[test]
         fn undo_does_undo() {
@@ -719,67 +662,48 @@ mod test {
 
 
         #[test]
-        fn orphan_correction_lf_complete() {
-            let mut encoder = Encoder::new_with_orphan_mode(MailType::Ascii, OrphanMode::Complete);
+        fn orphan_lf_error() {
+            let mut encoder = Encoder::new(MailType::Ascii);
             {
                 let mut henc = encoder.encode_header();
-                assert_ok!(henc.write_str(AsciiStr::from_ascii("H: \n a").unwrap()));
-                henc.finish();
+                assert_err!(henc.write_str(AsciiStr::from_ascii("H: \na").unwrap()));
+                henc.undo_header()
             }
-            assert_eq!(encoder.sections.len(), 1);
-            let last = encoder.sections.pop().unwrap().unwrap_header();
-            assert_eq!(last, String::from("H: \r\n a\r\n"));
         }
         #[test]
-        fn orphan_correction_lf_remove() {
-            let mut encoder = Encoder::new_with_orphan_mode(MailType::Ascii, OrphanMode::Remove);
+        fn orphan_cr_error() {
+            let mut encoder = Encoder::new(MailType::Ascii);
             {
                 let mut henc = encoder.encode_header();
-                assert_ok!(henc.write_str(AsciiStr::from_ascii("H: \n a").unwrap()));
-                henc.finish();
+                assert_err!(henc.write_str(AsciiStr::from_ascii("H: \ra").unwrap()));
+                henc.undo_header()
             }
-            assert_eq!(encoder.sections.len(), 1);
-            let last = encoder.sections.pop().unwrap().unwrap_header();
-            assert_eq!(last, String::from("H:  a\r\n"));
         }
 
         #[test]
-        fn orphan_correction_cr_complete() {
-            let mut encoder = Encoder::new_with_orphan_mode(MailType::Ascii, OrphanMode::Complete);
+        fn orphan_trailing_lf() {
+            let mut encoder = Encoder::new(MailType::Ascii);
             {
                 let mut henc = encoder.encode_header();
-                assert_ok!(henc.write_str(AsciiStr::from_ascii("H: \r a").unwrap()));
-                henc.finish();
+                assert_err!(henc.write_str(AsciiStr::from_ascii("H: a\n").unwrap()));
+                henc.undo_header();
             }
-            assert_eq!(encoder.sections.len(), 1);
-            let last = encoder.sections.pop().unwrap().unwrap_header();
-            assert_eq!(last, String::from("H: \r\n a\r\n"));
         }
 
         #[test]
-        fn orphan_correction_cr_remove() {
-            let mut encoder = Encoder::new_with_orphan_mode(MailType::Ascii, OrphanMode::Remove);
-            {
-                let mut henc = encoder.encode_header();
-                assert_ok!(henc.write_str(AsciiStr::from_ascii("H: \r a").unwrap()));
-                henc.finish();
-            }
-            assert_eq!(encoder.sections.len(), 1);
-            let last = encoder.sections.pop().unwrap().unwrap_header();
-            assert_eq!(last, String::from("H:  a\r\n"));
-        }
-
-        #[test]
-        fn orphan_correction_trailing_cr() {
+        fn orphan_trailing_cr() {
             let mut encoder = Encoder::new(MailType::Ascii);
             {
                 let mut henc = encoder.encode_header();
                 assert_ok!(henc.write_str(AsciiStr::from_ascii("H: a\r").unwrap()));
+                //it's fine not to error in the trailing \r case as we want to write
+                //a \r\n anyway
                 henc.finish();
             }
             assert_eq!(encoder.sections.len(), 1);
             let last = encoder.sections.pop().unwrap().unwrap_header();
             assert_eq!(last, String::from("H: a\r\n"));
+
         }
 
         #[test]
