@@ -30,8 +30,6 @@ pub trait EncodableInHeader: Any+Debug {
 /// Trait Implemented by mainly by structs representing a mail or
 /// a part of it
 pub trait Encodable {
-    //TODO figure out the body buffer zero-copy aspect
-    //can be generic as only EncodableInHeader has trait objects
     fn encode<R: BodyBuffer>( &self, encoder:  &mut Encoder<R>) -> Result<()>;
 }
 
@@ -325,8 +323,14 @@ impl<'a> EncodeHeaderHandle<'a> {
     ///   line can not be broken with soft line breaks
     /// - buffer would contain a orphan '\r' or '\n' after the write
     ///
+    /// Note that in case of an error part of the content might already
+    /// have been written to the buffer, therefore it is recommended
+    /// to call `undo_header` after an error (especially if the
+    /// handle is doped after this!)
+    ///
     /// # Trace (test build only)
     /// does push `NowStr` and then can push `Text`,`CRLF`
+    ///
     pub fn write_str(&mut self, s: &AsciiStr)  -> Result<()>  {
         #[cfg(test)]
         { self.trace.push(Token::NowStr) }
@@ -340,6 +344,11 @@ impl<'a> EncodeHeaderHandle<'a> {
     /// - fails if the underlying MailType is not Internationalized
     /// - fails if the hard line length limit is reached
     /// - buffer would contain a orphan '\r' or '\n' after the write
+    ///
+    /// Note that in case of an error part of the content might already
+    /// have been written to the buffer, therefore it is recommended
+    /// to call `undo_header` after an error (especially if the
+    /// handle is doped after this!)
     ///
     /// # Trace (test build only)
     /// does push `NowUtf8` and then can push `Text`,`CRLF`
@@ -369,8 +378,14 @@ impl<'a> EncodeHeaderHandle<'a> {
     ///   with soft line breaks
     /// - buffer would contain a orphan '\r' or '\n' after the write
     ///
+    /// Note that in case of an error part of the content might already
+    /// have been written to the buffer, therefore it is recommended
+    /// to call `undo_header` after an error (especially if the
+    /// handle is doped after this!)
+    ///
     /// # Trace (test build only)
     /// does push `NowAText` and then can push `Text`
+    ///
     pub fn try_write_atext(&mut self, s: &str) -> Result<()> {
         if s.chars().all( |ch| is_atext( ch, self.mail_type() ) ) {
             #[cfg(test)]
@@ -458,8 +473,11 @@ impl<'a> EncodeHeaderHandle<'a> {
     //---------------------------------------------------------------------------------------------/
     //-///////////////////////////          private methods               ////////////////////////-/
 
+    /// this might partial write some data and then fail.
+    /// while we could implement a undo option it makes
+    /// little sense for the use case the generally aviable
+    /// `undo_header` is enough.
     fn internal_write_str(&mut self, s: &str)  -> Result<()>  {
-        //TODO fix the partial write issue
         for ch in s.chars() {
             self.internal_write_char(ch)?
         }
