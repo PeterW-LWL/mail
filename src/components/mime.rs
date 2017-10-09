@@ -102,7 +102,7 @@ impl<E> MailEncodable<E> for mime::Mime where E: MailEncoder {
 
     fn encode(&self, encoder: &mut E) -> Result<()> {
         let res = self.to_string();
-        if !encoder.try_write_utf8(&*res).is_ok() {
+        if !encoder.try_write_utf8__(&*res).is_ok() {
             match AsciiStr::from_ascii(&*res) {
                 Ok(asciied) => encoder.write_str( asciied ),
                 Err(_err) => bail!("mime containining utf8 in ascii only mail")

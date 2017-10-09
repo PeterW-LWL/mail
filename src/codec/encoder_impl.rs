@@ -114,8 +114,8 @@ impl MailEncoder for MailEncoderImpl {
         self.write_data_unchecked( str.as_bytes() );
     }
 
-    fn try_write_utf8( &mut self, str: &str ) -> Result<()> {
-        if self.mail_type().supports_utf8() {
+    fn try_write_utf8__(&mut self, str: &str ) -> Result<()> {
+        if self.mail_type().is_internationalized() {
             self.write_data_unchecked( str.as_bytes() );
             Ok( ()  )
         } else {

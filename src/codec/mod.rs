@@ -16,7 +16,7 @@ pub use self::traits::*;
 
 mod encoder_impl;
 pub use self::encoder_impl::*;
-
+mod encoder;
 
 mod writer_impl;
 pub use self::writer_impl::*;

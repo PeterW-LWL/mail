@@ -126,8 +126,8 @@ impl MailEncoder for TestMailEncoder {
         self.current_line += str.as_str()
     }
 
-    fn try_write_utf8( &mut self, data: &str ) -> Result<()> {
-        if self.mail_type.supports_utf8() {
+    fn try_write_utf8__( &mut self, data: &str ) -> Result<()> {
+        if self.mail_type.is_internationalized() {
             self.current_line += data;
             Ok( () )
         } else {
@@ -162,7 +162,7 @@ impl MailEncoder for TestMailEncoder {
     fn write_body( &mut self, body: &[u8]) {
         use std::str;
         self.push_line_part();
-        let body: String = if self.mail_type.supports_utf8() {
+        let body: String = if self.mail_type.supports_8bit_bodies() {
             str::from_utf8( body )
                 .expect( "bodies to only contain utf8 for now" )
                 .into()
@@ -292,13 +292,13 @@ mod test {
     #[test]
     fn try_write_utf8__nok() {
         let mut ec = TestMailEncoder::new( MailType::Ascii );
-        assert_eq!( false, ec.try_write_utf8("").is_ok() )
+        assert_eq!( false, ec.try_write_utf8__("").is_ok() )
     }
 
     #[test]
     fn try_write_utf8__ok() {
         let mut ec = TestMailEncoder::new( MailType::Internationalized );
-        ec.try_write_utf8( "↑↓↑↓" ).unwrap();
+        ec.try_write_utf8__( "↑↓↑↓" ).unwrap();
         assert_eq!( vec![
             LinePart( "↑↓↑↓" ),
         ], ec.into_state_seq() )

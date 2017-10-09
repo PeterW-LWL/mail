@@ -45,7 +45,7 @@ impl<E> MailEncodable<E> for MessageID where E: MailEncoder {
         encoder.write_char( AsciiChar::LessThan );
         match self.message_id {
             SimpleItem::Ascii( ref ascii ) => encoder.write_str( ascii ),
-            SimpleItem::Utf8( ref utf8 ) => encoder.try_write_utf8( utf8 )?
+            SimpleItem::Utf8( ref utf8 ) => encoder.try_write_utf8__( utf8 )?
         }
         encoder.write_char( AsciiChar::GreaterThan );
         encoder.note_optional_fws();

@@ -106,7 +106,7 @@ impl FromInput for Domain {
         let input = input.into();
         let item =
             match Domain::check_domain( &*input )? {
-                MailType::Ascii => {
+                MailType::Ascii | MailType::Mime8BitEnabled => {
                     let asciied = unsafe { input.into_ascii_item_unchecked() };
                     SimpleItem::Ascii( asciied )
                 },
@@ -169,7 +169,7 @@ impl<E> MailEncodable<E> for Domain where E: MailEncoder {
                 encoder.write_str( ascii )
             },
             SimpleItem::Utf8( ref utf8 ) => {
-                if !encoder.try_write_utf8( utf8 ).is_ok() {
+                if !encoder.try_write_utf8__( utf8 ).is_ok() {
                     encoder.write_str( &*idna::puny_code_domain( utf8 )? )
                 }
             }

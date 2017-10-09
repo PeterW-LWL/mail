@@ -27,7 +27,7 @@ impl QuotedString {
                 encoder.write_str( &*inner );
             },
             Utf8( ref inner ) => {
-                encoder.try_write_utf8( &*inner )?
+                encoder.try_write_utf8__( &*inner )?
             }
         }
         Ok( () )
