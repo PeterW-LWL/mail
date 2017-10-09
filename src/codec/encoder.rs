@@ -13,46 +13,11 @@ const LINE_LEN_HARD_LIMIT: usize = 998;
 
 #[cfg(test)]
 use self::trace_tools::Token;
-//IDEA(1):
-// how to still have nice tests?
-// 1. store a vector of tokens , but well that's unessesary overhead
-// so which part of the test thing do we still need?
-// => the part about FWS,OptFWS
-//
-// ==> Store not just the last FWS/OptFWS but all
-// ==> Store if it was an FWS or an OptFWS
 
-//IDEA(2):
-// seperate header writes and body writes
-// header writes are at last string
-// body writes should be string but well we don't have a gurantee here in the type system
-//==>
-// buffer: Vec<Kind>
-// enum Kind { HeaderOut(String), BodyOut(Vec<u8>) }
-//
-// if we do not check Bodies at all (here) why not have some reference there instead of Vec<u8>?
-// BodyOut(dyn BodyRef) ??
-//
-// and we do not support the raw data extensions from SMPTUTF8 so
-// maybe use a String buffer for bodies too
-//
-
-//CONSIDER 8BITMIME:
-//  - allows us to e.g. have "text/plain; charset=utf8" in non-internationalized mails
-//  - does not allows usage of internationalized mail addresses or utf8 in mim header
-//  - but in the mime body
-//  - especially `text/html; charset=utf8` is of interest
-//  - so it is "just" relevant for the MIME bodies
-//  - be we should support it
-//  - through some gateways might mess it up, but most support it just fine
-//  - so make it an option alla:
-//          only transfer encode `text/plain` IF option is set AND mime8bit is supported
-
-//==> write an header only encoder
-//==> write and mime body sink
-//==> write a buffer combining it
-
-//use on all components
+/// Trait Implemented by "components" used in header field bodies
+///
+/// This trait can be turned into a trait object allowing runtime
+/// genericallity over the "components" if needed.
 pub trait EncodableInHeader: Any+Debug {
     fn encode(&self, encoder:  &mut EncodeHeaderHandle) -> Result<()>;
 
@@ -62,20 +27,28 @@ pub trait EncodableInHeader: Any+Debug {
     }
 }
 
-//use on EncodableMail/Mail/MailPart, maybe
+/// Trait Implemented by mainly by structs representing a mail or
+/// a part of it
 pub trait Encodable {
     //TODO figure out the body buffer zero-copy aspect
     //can be generic as only EncodableInHeader has trait objects
     fn encode<R: BodyBuffer>( &self, encoder:  &mut Encoder<R>) -> Result<()>;
 }
 
-//TODO implement BodyBuffer for Resource removing one pointless copy
+/// Trait Repesenting the buffer of a mime body payload
+///
+/// (e.g. a transfer encoded image or text)
 pub trait BodyBuffer {
-    // by making it take a closure it allows us to implement
-    // this on all kind of buffers, including such which need
-    // handled references like lock guards (which deref to
-    // &[u8] but have to be kept alive so are not usable for
-    // as_slice which just returns a slice)
+
+    /// Called to access the bytes in the buffer.
+    ///
+    /// By limiting the access to a closure passed in
+    /// it enables a number of properties for implementators:
+    /// - the byte slice has only to be valid for the duration of the closure,
+    ///   allowing implementations for data behind a Lock which has to keep
+    ///   a Guard alive during the access of the data
+    /// - the implementor can directly return a error if for some
+    ///   reason no data is available or the data was "somehow" corrupted
     fn with_slice<FN, R>(&self, func: FN) -> Result<R>
         where FN: FnOnce(&[u8]) -> Result<R>;
 }
@@ -106,8 +79,12 @@ impl<R> Section<R>
     }
 }
 
-//TODO implement a iter_slices(&self) -> impl Iterator<Item=&[u8]> for
-// efficiently copying a encoder result into a bytevector
+
+/// Encoder for a Mail providing a buffer for encodable traits
+///
+/// The buffer is a vector of section which either are string
+/// buffers used to mainly encode headers or buffers of type R:BodyBuffer
+/// which represent a valid body payload.
 pub struct Encoder<R: BodyBuffer> {
     mail_type: MailType,
     sections: Vec<Section<R>>,
@@ -117,6 +94,14 @@ pub struct Encoder<R: BodyBuffer> {
 
 #[cfg(test)]
 pub mod trace_tools {
+    /// If it is a test build the Encoder will
+    /// have an additional `pub trace` field,
+    /// which will contain a Vector of `Token`s
+    /// generated when writing to the string buffer.
+    ///
+    /// For example when calling `.write_utf8("hy")`
+    /// following tokens will be added:
+    /// `[NowUtf8, Text("hy")]`
     #[derive(Debug, Clone, Eq, PartialEq, Hash)]
     pub enum Token {
         MarkFWS,
@@ -128,6 +113,7 @@ pub mod trace_tools {
         NowAText,
         NowUtf8,
         NowUnchecked,
+        NewSection,
         End
     }
 }
@@ -147,10 +133,18 @@ impl<B: BodyBuffer> Encoder<B> {
         self.mail_type
     }
 
+    /// returns a new EncodeHeaderHandle which contains
+    /// a mutable reference to the current string buffer
+    ///
+    /// # Trace (test build only)
+    /// pushes a `NewSection` Token if the the returned
+    /// `EncodeHeaderHandle` refers to a new empty buffer
     pub fn encode_header( &mut self ) -> EncodeHeaderHandle {
         if let Some(&Section::Header(..)) = self.sections.last() {}
         else {
-            self.sections.push(Section::Header(String::new()))
+            self.sections.push(Section::Header(String::new()));
+            #[cfg(test)]
+            { self.trace.push(Token::NewSection) }
         }
 
         if let Some(&mut Section::Header(ref mut string)) = self.sections.last_mut() {
@@ -164,6 +158,9 @@ impl<B: BodyBuffer> Encoder<B> {
         }
     }
 
+    /// adds adds a body payload buffer to the encoder
+    /// without validating it, the encoder mainly provides
+    /// buffers it is not validating them.
     pub fn write_body( &mut self, body: B) {
         self.sections.push(Section::MIMEBody(body))
     }
@@ -174,6 +171,22 @@ impl<B: BodyBuffer> Encoder<B> {
 }
 
 
+/// A handle providing method to write to the underlying buffer
+/// keeping track of newlines the current line length and places
+/// where the line can be broken so that the soft line length
+/// limit (78) and the hard length limit (998) can be keept.
+///
+/// It's basically a string buffer which know how to brake
+/// lines at the right place.
+///
+/// Note any act of writing a header through `EncodeHeaderHandle`
+/// has to be concluded by either calling `finish` or `undo_header`.
+/// If not this handle will panic when being dropped (and the thread
+/// is not already panicing) as writes through the handle are directly
+/// writes to the underlying buffer which now contains malformed/incomplete
+/// data. (Note that this Handle does not own any Drop types so if realy
+/// needed `forget`-ing it won't leak any memory)
+///
 pub struct EncodeHeaderHandle<'a> {
     buffer: &'a mut String,
     #[cfg(test)]
@@ -277,6 +290,11 @@ impl<'a> EncodeHeaderHandle<'a> {
         self.buffer.len() - self.line_start_idx
     }
 
+    /// marks the current position a a place where a soft
+    /// line break (i.e. "\r\n ") can be inserted
+    ///
+    /// # Trace (test build only)
+    /// does push a `MarkFWS` Token
     pub fn mark_fws_pos(&mut self) {
         #[cfg(test)]
         { self.trace.push(Token::MarkFWS) }
@@ -285,12 +303,30 @@ impl<'a> EncodeHeaderHandle<'a> {
         self.last_fws_idx = self.buffer.len()
     }
 
+    /// writes a ascii char to the underlying buffer
+    ///
+    /// # Error
+    /// - fails if the hard line length limit is breached and the
+    ///   line can not be broken with soft line breaks
+    /// - buffer would contain a orphan '\r' or '\n' after the write
+    ///
+    /// # Trace (test build only)
+    /// does push `NowChar` and then can push `Text`,`CRLF`
     pub fn write_char(&mut self, ch: AsciiChar) -> Result<()>  {
         #[cfg(test)]
         { self.trace.push(Token::NowChar) }
         self.internal_write_char(ch.as_char())
     }
 
+    /// writes a ascii str to the underlying buffer
+    ///
+    /// # Error
+    /// - fails if the hard line length limit is breached and the
+    ///   line can not be broken with soft line breaks
+    /// - buffer would contain a orphan '\r' or '\n' after the write
+    ///
+    /// # Trace (test build only)
+    /// does push `NowStr` and then can push `Text`,`CRLF`
     pub fn write_str(&mut self, s: &AsciiStr)  -> Result<()>  {
         #[cfg(test)]
         { self.trace.push(Token::NowStr) }
@@ -298,6 +334,15 @@ impl<'a> EncodeHeaderHandle<'a> {
     }
 
 
+    /// writes a utf8 str into a buffer for an internationalized mail
+    ///
+    /// # Error
+    /// - fails if the underlying MailType is not Internationalized
+    /// - fails if the hard line length limit is reached
+    /// - buffer would contain a orphan '\r' or '\n' after the write
+    ///
+    /// # Trace (test build only)
+    /// does push `NowUtf8` and then can push `Text`,`CRLF`
     pub fn write_utf8(&mut self, s: &str) -> Result<()> {
         if self.mail_type().is_internationalized() {
             #[cfg(test)]
@@ -308,6 +353,24 @@ impl<'a> EncodeHeaderHandle<'a> {
         }
     }
 
+    /// Writes a str assumed to be atext if it is atext given the mail type
+    ///
+    /// This method is mainly an optimazation as the "is atext" and is
+    /// "is ascii if MailType is Ascii" aspects are checked at the same
+    /// time resulting in a str which you know is ascii _if_ the mail
+    /// type is Ascii and which might be non-us-ascii if the mail type
+    /// is Inernationalized.
+    ///
+    /// # Error
+    /// - if the text is not valid atext
+    /// - if the MailType is not Inernationalized but it is only atext if it is
+    ///   internationalized
+    /// - if the hard line length limit is reached and the line can't be broken
+    ///   with soft line breaks
+    /// - buffer would contain a orphan '\r' or '\n' after the write
+    ///
+    /// # Trace (test build only)
+    /// does push `NowAText` and then can push `Text`
     pub fn try_write_atext(&mut self, s: &str) -> Result<()> {
         if s.chars().all( |ch| is_atext( ch, self.mail_type() ) ) {
             #[cfg(test)]
@@ -333,14 +396,19 @@ impl<'a> EncodeHeaderHandle<'a> {
     /// finishes the writing of a header
     ///
     /// It makes sure the header ends in "\r\n".
+    /// If the header ends in a orphan '\r' this
+    /// method will just "use" it for the "\r\n".
+    ///
+    /// If the header ends in a CRLF/start of buffer
+    /// followed by only WS (' ' or '\t' ) the valid
+    /// header ending is reached by truncating away
+    /// the WS padding. This is needed as "blank" lines
+    /// are not allowed.
+    ///
+    /// # Trace (test build only)
+    /// can push 0-1 of `[CRLF, TruncateToCRLF]`
+    /// then does push `End`
     pub fn finish(&mut self) {
-        // if we have a tailing '\r' and would handle it
-        // it would not change anything as in the end
-        // only a "\r\n" will added ( e.g. '\r' become
-        // "\r\n" => start_new_line will trim it to the
-        // buffers len, '\r' becomes "" start_new_line
-        // will add "\r\n", etc. wrt. blank lines before
-        // the '\r')
         self.start_new_line();
         #[cfg(test)]
         { self.trace.push(Token::End) }
@@ -348,9 +416,14 @@ impl<'a> EncodeHeaderHandle<'a> {
     }
 
     /// undoes all writes to the internal buffer
-    /// since the last `finish` call or the
-    /// creation of this handle if there hasn't been
-    /// a `finish` call before
+    /// since the last `finish` or `undo_header` or
+    /// creation of this handle
+    ///
+    /// # Trace (test build only)
+    /// also removes tokens pushed since the last
+    /// `finish` or `undo_header` or creation of
+    /// this handle
+    ///
     pub fn undo_header(&mut self) {
         self.buffer.truncate(self.header_start_idx);
         #[cfg(test)]
@@ -363,11 +436,20 @@ impl<'a> EncodeHeaderHandle<'a> {
     //---------------------------------------------------------------------------------------------/
     //-/////////////////////////// methods only using the public iface   /////////////////////////-/
 
+    /// calls mark_fws_pos and then writes a space
+    ///
+    /// This method exists for convenience.
+    ///
+    /// Note that it can not fail a you just pushed
+    /// a place to breake the line befor writing a space.
+    ///
+    /// Note that currently soft line breaks will not
+    /// collapse whitespaces so if you use `write_fws`
+    /// and then the line is broken there it will start
+    /// with two spaces (one from `\r\n ` and one which
+    /// had been there before).
     pub fn write_fws(&mut self) {
         self.mark_fws_pos();
-        // this cant fail due to line limit as you just
-        // stated that the line can be cut the character
-        // before this write_char call
         let _ = self.write_char(AsciiChar::Space);
     }
 
@@ -377,6 +459,7 @@ impl<'a> EncodeHeaderHandle<'a> {
     //-///////////////////////////          private methods               ////////////////////////-/
 
     fn internal_write_str(&mut self, s: &str)  -> Result<()>  {
+        //TODO fix the partial write issue
         for ch in s.chars() {
             self.internal_write_char(ch)?
         }
@@ -975,7 +1058,7 @@ mod test {
                 assert_ok!(henc.write_utf8("<else>"));
                 henc.undo_header();
             }
-            assert_eq!(encoder.trace.len(), 0);
+            assert_eq!(encoder.trace.len(), 1);
         }
 
         #[test]
@@ -991,6 +1074,7 @@ mod test {
                 henc.undo_header();
             }
             assert_eq!(encoder.trace, vec![
+                NewSection,
                 NowUtf8,
                 Text("H: a".into()),
                 CRLF,
@@ -1013,6 +1097,7 @@ mod test {
                 henc.finish()
             }
             assert_eq!(encoder.trace, vec![
+                NewSection,
                 NowStr,
                 Text("Header".into()),
                 NowChar,
