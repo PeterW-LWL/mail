@@ -1,5 +1,5 @@
 use std::any::{Any, TypeId};
-use std::fmt::Debug;
+use std::fmt::{self, Debug};
 
 use ascii::{AsciiStr, AsciiChar};
 
@@ -11,9 +11,6 @@ const LINE_LEN_SOFT_LIMIT: usize = 78;
 /// as specified in RFC 5322 (mail) + RFC 5321 (smtp) not including CRLF
 const LINE_LEN_HARD_LIMIT: usize = 998;
 
-#[cfg(test)]
-use self::trace_tools::Token;
-
 /// Trait Implemented by "components" used in header field bodies
 ///
 /// This trait can be turned into a trait object allowing runtime
@@ -24,6 +21,22 @@ pub trait EncodableInHeader: Any+Debug {
     #[doc(hidden)]
     fn type_id( &self ) -> TypeId {
         TypeId::of::<Self>()
+    }
+}
+
+pub struct EncodableClosure<F>(pub F);
+impl<FN: 'static> EncodableInHeader for EncodableClosure<FN>
+    where FN: Fn(&mut EncodeHeaderHandle) -> Result<()>
+{
+    fn encode(&self, encoder:  &mut EncodeHeaderHandle) -> Result<()> {
+        (self.0)(encoder)
+    }
+}
+
+impl<FN> Debug for EncodableClosure<FN> {
+
+    fn fmt(&self, fter: &mut fmt::Formatter) -> fmt::Result {
+        write!(fter, "EncodableClosure(..)")
     }
 }
 
@@ -90,31 +103,31 @@ pub struct Encoder<R: BodyBuffer> {
     pub trace: Vec<Token>
 }
 
+
+/// If it is a test build the Encoder will
+/// have an additional `pub trace` field,
+/// which will contain a Vector of `Token`s
+/// generated when writing to the string buffer.
+///
+/// For example when calling `.write_utf8("hy")`
+/// following tokens will be added:
+/// `[NowUtf8, Text("hy")]`
 #[cfg(test)]
-pub mod trace_tools {
-    /// If it is a test build the Encoder will
-    /// have an additional `pub trace` field,
-    /// which will contain a Vector of `Token`s
-    /// generated when writing to the string buffer.
-    ///
-    /// For example when calling `.write_utf8("hy")`
-    /// following tokens will be added:
-    /// `[NowUtf8, Text("hy")]`
-    #[derive(Debug, Clone, Eq, PartialEq, Hash)]
-    pub enum Token {
-        MarkFWS,
-        CRLF,
-        TruncateToCRLF,
-        Text(String),
-        NowChar,
-        NowStr,
-        NowAText,
-        NowUtf8,
-        NowUnchecked,
-        NewSection,
-        End
-    }
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+pub enum Token {
+    MarkFWS,
+    CRLF,
+    TruncateToCRLF,
+    Text(String),
+    NowChar,
+    NowStr,
+    NowAText,
+    NowUtf8,
+    NowUnchecked,
+    NewSection,
+    End
 }
+
 
 impl<B: BodyBuffer> Encoder<B> {
 
@@ -591,7 +604,7 @@ mod test {
     use error::*;
     use grammar::MailType;
 
-    use super::trace_tools::Token::*;
+    use super::Token::*;
     use super::{
         BodyBuffer,
         Section
@@ -617,6 +630,35 @@ mod test {
             where FN: FnOnce(&[u8]) -> Result<R>
         {
             func(self.data.as_slice())
+        }
+    }
+
+    mod EncodableInHeader {
+        #![allow(non_snake_case)]
+        use super::super::*;
+        use super::VecBody;
+        use self::Token::*;
+
+        #[test]
+        fn is_implemented_for_closures() {
+            let text = "hy ho";
+            let closure = EncodableClosure(move |henc: &mut EncodeHeaderHandle| {
+                henc.write_utf8(text)
+            });
+
+            let mut encoder = Encoder::<VecBody>::new(MailType::Internationalized);
+            {
+                let mut henc = encoder.encode_header();
+                assert_ok!(closure.encode(&mut henc));
+                henc.finish();
+            }
+            assert_eq!(encoder.trace.as_slice(), &[
+                NewSection,
+                NowUtf8,
+                Text("hy ho".into()),
+                CRLF,
+                End
+            ])
         }
     }
 
