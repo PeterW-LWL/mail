@@ -597,6 +597,86 @@ impl<'a> EncodeHeaderHandle<'a> {
     }
 }
 
+/// A BodyBuf implementation based on a Vec<u8>
+///
+/// this is mainly used for having a simple
+/// BodyBuf implementation for testing.
+pub struct VecBodyBuf(pub Vec<u8>);
+
+impl BodyBuffer for VecBodyBuf {
+    fn with_slice<FN, R>(&self, func: FN) -> Result<R>
+        where FN: FnOnce(&[u8]) -> Result<R>
+    {
+        func(self.0.as_slice())
+    }
+}
+
+
+#[cfg(test)]
+#[macro_export]
+macro_rules! ec_test {
+    ( $name:ident, $inp:block => $mt:tt => [ $($tokens:tt)* ] ) => (
+        #[test]
+        fn $name() {
+            use $crate::codec::encoder::{
+                EncodableInHeader,
+                EncodeHeaderHandle,
+                Token, Encoder,
+                VecBodyBuf
+            };
+            use $crate::error::Result;
+
+            let mail_type = {
+                let mt_str = stringify!($mt).to_lowercase();
+                match mt_str.as_str() {
+                    "utf8" |
+                    "internationalized"
+                        => $crate::grammar::MailType::Internationalized,
+                    "ascii"
+                        =>  $crate::grammar::MailType::Ascii,
+                    "mime8" |
+                    "mime8bit" |
+                    "mime8bitenabled"
+                        => $crate::grammar::MailType::Mime8BitEnabled,
+                    other => panic!( "invalid name for mail type: {}", other)
+                }
+            };
+
+            let mut encoder = Encoder::<VecBodyBuf>::new(mail_type);
+            {
+                //REFACTOR(catch): use catch block once stable
+                let doit = |ec: &mut EncodeHeaderHandle| -> Result<()> {
+                    let input = $inp;
+                    let to_encode: &EncodableInHeader = &input;
+                    to_encode.encode(ec)?;
+                    Ok(())
+                };
+                let mut handle = encoder.encode_header();
+                doit(&mut handle).unwrap();
+                handle.finish();
+            }
+            let mut expected: Vec<Token> = Vec::new();
+            ec_test!{ __PRIV_TO_TOKEN_LIST expected $($tokens)* }
+            assert_eq!(encoder.trace, expected)
+        }
+    );
+
+    (__PRIV_TO_TOKEN_LIST $col:ident Text $e:expr, $($other:tt)*) => ({
+        $col.push($crate::codec::encoder::Token::Text({$e}.into()));
+        ec_test!{ __PRIV_TO_TOKEN_LIST $col $($other)* }
+    });
+    (__PRIV_TO_TOKEN_LIST $col:ident $token:ident, $($other:tt)*) => (
+        $col.push($crate::codec::encoder::Token::$token);
+        ec_test!{ __PRIV_TO_TOKEN_LIST $col $($other)* }
+    );
+    (__PRIV_TO_TOKEN_LIST $col:ident ) => ();
+    //conflict with nom due to it using a crate exposing compiler_error...
+//    (__PRIV_TO_TOKEN_LIST $col:ident $($other:tt)*) => (
+//        compiler_error!( concat!(
+//            "syntax error in token list: ", stringify!($($other:tt)*)
+//        ))
+//    )
+}
 
 #[cfg(test)]
 mod test {
@@ -607,7 +687,8 @@ mod test {
     use super::Token::*;
     use super::{
         BodyBuffer,
-        Section
+        Section,
+        EncodableClosure
     };
 
     type _Encoder = super::Encoder<VecBody>;
@@ -1213,5 +1294,37 @@ mod test {
         }
     }
 
+    ec_test! {
+        does_ec_test_work,
+        {
+            use super::EncodeHeaderHandle;
+            EncodableClosure(|x: &mut EncodeHeaderHandle| {
+                x.write_utf8("hy")
+            })
+        } => Utf8 => [
+            NewSection,
+            NowUtf8,
+            Text "hy",
+            CRLF,
+            End,
+        ]
+    }
 
+    ec_test! {
+        does_ec_test_allow_early_return,
+        {
+            use super::EncodeHeaderHandle;
+            // this is just a type system test, if it compiles it can bail
+            if false { bail!("if false..."); }
+            EncodableClosure(|x: &mut EncodeHeaderHandle| {
+                x.write_utf8("hy")
+            })
+        } => Utf8 => [
+            NewSection,
+            NowUtf8,
+            Text "hy",
+            CRLF,
+            End,
+        ]
+    }
 }
