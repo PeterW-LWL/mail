@@ -1007,6 +1007,42 @@ mod test {
         }
 
         #[test]
+        fn multiple_finish_calls_are_ok() {
+            let mut encoder = Encoder::new(MailType::Internationalized);
+            {
+                let mut henc = encoder.encode_header();
+                assert_ok!(henc.try_write_atext("hoho"));
+                assert_err!(henc.try_write_atext("a(b"));
+                assert_ok!(henc.try_write_atext("❤"));
+                henc.finish();
+                henc.finish();
+                henc.finish();
+                henc.finish();
+            }
+            assert_eq!(encoder.sections.len(), 1);
+            let last = encoder.sections.pop().unwrap().unwrap_header();
+            assert_eq!(last, String::from("hoho❤\r\n"));
+        }
+
+        #[test]
+        fn multiple_finish_and_undo_calls() {
+            let mut encoder = Encoder::new(MailType::Internationalized);
+            {
+                let mut henc = encoder.encode_header();
+                assert_ok!(henc.try_write_atext("hoho"));
+                assert_err!(henc.try_write_atext("a(b"));
+                assert_ok!(henc.try_write_atext("❤"));
+                henc.undo_header();
+                henc.finish();
+                henc.undo_header();
+                henc.undo_header();
+            }
+            assert_eq!(encoder.sections.len(), 1);
+            let last = encoder.sections.pop().unwrap().unwrap_header();
+            assert_eq!(last, String::from(""));
+        }
+
+        #[test]
         fn header_body_header() {
             let mut encoder = Encoder::new(MailType::Internationalized);
             {
