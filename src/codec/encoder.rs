@@ -150,7 +150,7 @@ impl<B: BodyBuffer> Encoder<B> {
     /// # Trace (test build only)
     /// pushes a `NewSection` Token if the the returned
     /// `EncodeHeaderHandle` refers to a new empty buffer
-    pub fn encode_header( &mut self ) -> EncodeHeaderHandle {
+    pub fn encode_header_handle( &mut self ) -> EncodeHeaderHandle {
         if let Some(&Section::Header(..)) = self.sections.last() {}
         else {
             self.sections.push(Section::Header(String::new()));
@@ -651,7 +651,7 @@ macro_rules! ec_test {
                     to_encode.encode(ec)?;
                     Ok(())
                 };
-                let mut handle = encoder.encode_header();
+                let mut handle = encoder.encode_header_handle();
                 doit(&mut handle).unwrap();
                 handle.finish();
             }
@@ -723,15 +723,15 @@ mod test {
         #[test]
         fn is_implemented_for_closures() {
             let text = "hy ho";
-            let closure = EncodableClosure(move |henc: &mut EncodeHeaderHandle| {
-                henc.write_utf8(text)
+            let closure = EncodableClosure(move |handle: &mut EncodeHeaderHandle| {
+                handle.write_utf8(text)
             });
 
             let mut encoder = Encoder::<VecBody>::new(MailType::Internationalized);
             {
-                let mut henc = encoder.encode_header();
-                assert_ok!(closure.encode(&mut henc));
-                henc.finish();
+                let mut handle = encoder.encode_header_handle();
+                assert_ok!(closure.encode(&mut handle));
+                handle.finish();
             }
             assert_eq!(encoder.trace.as_slice(), &[
                 NewSection,
@@ -793,9 +793,9 @@ mod test {
         fn undo_does_undo() {
             let mut encoder = Encoder::new(MailType::Ascii);
             {
-                let mut henc = encoder.encode_header();
-                assert_ok!(henc.write_str(AsciiStr::from_ascii("Header-One: 12").unwrap()));
-                henc.undo_header();
+                let mut handle = encoder.encode_header_handle();
+                assert_ok!(handle.write_str(AsciiStr::from_ascii("Header-One: 12").unwrap()));
+                handle.undo_header();
             }
             assert_eq!(encoder.sections.len(), 1);
             let last = encoder.sections.pop().unwrap().unwrap_header();
@@ -806,11 +806,11 @@ mod test {
         fn undo_does_not_undo_to_much() {
             let mut encoder = Encoder::new(MailType::Ascii);
             {
-                let mut henc = encoder.encode_header();
-                assert_ok!(henc.write_str(AsciiStr::from_ascii("Header-One: 12").unwrap()));
-                henc.finish();
-                assert_ok!(henc.write_str(AsciiStr::from_ascii("ups: sa").unwrap()));
-                henc.undo_header();
+                let mut handle = encoder.encode_header_handle();
+                assert_ok!(handle.write_str(AsciiStr::from_ascii("Header-One: 12").unwrap()));
+                handle.finish();
+                assert_ok!(handle.write_str(AsciiStr::from_ascii("ups: sa").unwrap()));
+                handle.undo_header();
             }
             assert_eq!(encoder.sections.len(), 1);
             let last = encoder.sections.pop().unwrap().unwrap_header();
@@ -821,9 +821,9 @@ mod test {
         fn finish_adds_crlf_if_needed() {
             let mut encoder = Encoder::new(MailType::Ascii);
             {
-                let mut henc = encoder.encode_header();
-                assert_ok!(henc.write_str(AsciiStr::from_ascii("Header-One: 12").unwrap()));
-                henc.finish();
+                let mut handle = encoder.encode_header_handle();
+                assert_ok!(handle.write_str(AsciiStr::from_ascii("Header-One: 12").unwrap()));
+                handle.finish();
             }
             assert_eq!(encoder.sections.len(), 1);
             let last = encoder.sections.pop().unwrap().unwrap_header();
@@ -834,9 +834,9 @@ mod test {
         fn finish_does_not_add_crlf_if_not_needed() {
             let mut encoder = Encoder::new(MailType::Ascii);
             {
-                let mut henc = encoder.encode_header();
-                assert_ok!(henc.write_str(AsciiStr::from_ascii("Header-One: 12\r\n").unwrap()));
-                henc.finish();
+                let mut handle = encoder.encode_header_handle();
+                assert_ok!(handle.write_str(AsciiStr::from_ascii("Header-One: 12\r\n").unwrap()));
+                handle.finish();
             }
             assert_eq!(encoder.sections.len(), 1);
             let last = encoder.sections.pop().unwrap().unwrap_header();
@@ -847,9 +847,9 @@ mod test {
         fn finish_does_truncat_if_needed() {
             let mut encoder = Encoder::new(MailType::Ascii);
             {
-                let mut henc = encoder.encode_header();
-                assert_ok!(henc.write_str(AsciiStr::from_ascii("Header-One: 12\r\n   ").unwrap()));
-                henc.finish();
+                let mut handle = encoder.encode_header_handle();
+                assert_ok!(handle.write_str(AsciiStr::from_ascii("Header-One: 12\r\n   ").unwrap()));
+                handle.finish();
             }
             assert_eq!(encoder.sections.len(), 1);
             let last = encoder.sections.pop().unwrap().unwrap_header();
@@ -861,9 +861,9 @@ mod test {
         fn finish_can_handle_fws() {
             let mut encoder = Encoder::new(MailType::Ascii);
             {
-                let mut henc = encoder.encode_header();
-                assert_ok!(henc.write_str(AsciiStr::from_ascii("Header-One: 12 +\r\n 4").unwrap()));
-                henc.finish();
+                let mut handle = encoder.encode_header_handle();
+                assert_ok!(handle.write_str(AsciiStr::from_ascii("Header-One: 12 +\r\n 4").unwrap()));
+                handle.finish();
             }
             assert_eq!(encoder.sections.len(), 1);
             let last = encoder.sections.pop().unwrap().unwrap_header();
@@ -874,10 +874,10 @@ mod test {
         fn finish_only_truncats_if_needed() {
             let mut encoder = Encoder::new(MailType::Ascii);
             {
-                let mut henc = encoder.encode_header();
-                assert_ok!(henc.write_str(
+                let mut handle = encoder.encode_header_handle();
+                assert_ok!(handle.write_str(
                     AsciiStr::from_ascii("Header-One: 12 +\r\n 4  ").unwrap()));
-                henc.finish();
+                handle.finish();
             }
             assert_eq!(encoder.sections.len(), 1);
             let last = encoder.sections.pop().unwrap().unwrap_header();
@@ -889,18 +889,18 @@ mod test {
         fn orphan_lf_error() {
             let mut encoder = Encoder::new(MailType::Ascii);
             {
-                let mut henc = encoder.encode_header();
-                assert_err!(henc.write_str(AsciiStr::from_ascii("H: \na").unwrap()));
-                henc.undo_header()
+                let mut handle = encoder.encode_header_handle();
+                assert_err!(handle.write_str(AsciiStr::from_ascii("H: \na").unwrap()));
+                handle.undo_header()
             }
         }
         #[test]
         fn orphan_cr_error() {
             let mut encoder = Encoder::new(MailType::Ascii);
             {
-                let mut henc = encoder.encode_header();
-                assert_err!(henc.write_str(AsciiStr::from_ascii("H: \ra").unwrap()));
-                henc.undo_header()
+                let mut handle = encoder.encode_header_handle();
+                assert_err!(handle.write_str(AsciiStr::from_ascii("H: \ra").unwrap()));
+                handle.undo_header()
             }
         }
 
@@ -908,9 +908,9 @@ mod test {
         fn orphan_trailing_lf() {
             let mut encoder = Encoder::new(MailType::Ascii);
             {
-                let mut henc = encoder.encode_header();
-                assert_err!(henc.write_str(AsciiStr::from_ascii("H: a\n").unwrap()));
-                henc.undo_header();
+                let mut handle = encoder.encode_header_handle();
+                assert_err!(handle.write_str(AsciiStr::from_ascii("H: a\n").unwrap()));
+                handle.undo_header();
             }
         }
 
@@ -918,11 +918,11 @@ mod test {
         fn orphan_trailing_cr() {
             let mut encoder = Encoder::new(MailType::Ascii);
             {
-                let mut henc = encoder.encode_header();
-                assert_ok!(henc.write_str(AsciiStr::from_ascii("H: a\r").unwrap()));
+                let mut handle = encoder.encode_header_handle();
+                assert_ok!(handle.write_str(AsciiStr::from_ascii("H: a\r").unwrap()));
                 //it's fine not to error in the trailing \r case as we want to write
                 //a \r\n anyway
-                henc.finish();
+                handle.finish();
             }
             assert_eq!(encoder.sections.len(), 1);
             let last = encoder.sections.pop().unwrap().unwrap_header();
@@ -934,10 +934,10 @@ mod test {
         fn break_line_on_fws() {
             let mut encoder = Encoder::new(MailType::Ascii);
             {
-                let mut henc = encoder.encode_header();
-                assert_ok!(henc.write_str(AsciiStr::from_ascii("A23456789:").unwrap()));
-                henc.mark_fws_pos();
-                assert_ok!(henc.write_str(AsciiStr::from_ascii(concat!(
+                let mut handle = encoder.encode_header_handle();
+                assert_ok!(handle.write_str(AsciiStr::from_ascii("A23456789:").unwrap()));
+                handle.mark_fws_pos();
+                assert_ok!(handle.write_str(AsciiStr::from_ascii(concat!(
                     "20_3456789",
                     "30_3456789",
                     "40_3456789",
@@ -946,7 +946,7 @@ mod test {
                     "70_3456789",
                     "12345678XX"
                 )).unwrap()));
-                henc.finish();
+                handle.finish();
             }
             assert_eq!(encoder.sections.len(), 1);
             let last = encoder.sections.pop().unwrap().unwrap_header();
@@ -966,10 +966,10 @@ mod test {
         fn to_long_unbreakable_line() {
             let mut encoder = Encoder::new(MailType::Ascii);
             {
-                let mut henc = encoder.encode_header();
-                assert_ok!(henc.write_str(AsciiStr::from_ascii("A23456789:").unwrap()));
-                henc.mark_fws_pos();
-                assert_ok!(henc.write_str(AsciiStr::from_ascii(concat!(
+                let mut handle = encoder.encode_header_handle();
+                assert_ok!(handle.write_str(AsciiStr::from_ascii("A23456789:").unwrap()));
+                handle.mark_fws_pos();
+                assert_ok!(handle.write_str(AsciiStr::from_ascii(concat!(
                     "10_3456789",
                     "20_3456789",
                     "30_3456789",
@@ -981,7 +981,7 @@ mod test {
                     "90_3456789",
                     "00_3456789",
                 )).unwrap()));
-                henc.finish();
+                handle.finish();
             }
             assert_eq!(encoder.sections.len(), 1);
             let last = encoder.sections.pop().unwrap().unwrap_header();
@@ -1004,10 +1004,10 @@ mod test {
         fn multiple_lines_breaks() {
             let mut encoder = Encoder::new(MailType::Ascii);
             {
-                let mut henc = encoder.encode_header();
-                assert_ok!(henc.write_str(AsciiStr::from_ascii("A23456789:").unwrap()));
-                henc.mark_fws_pos();
-                assert_ok!(henc.write_str(AsciiStr::from_ascii(concat!(
+                let mut handle = encoder.encode_header_handle();
+                assert_ok!(handle.write_str(AsciiStr::from_ascii("A23456789:").unwrap()));
+                handle.mark_fws_pos();
+                assert_ok!(handle.write_str(AsciiStr::from_ascii(concat!(
                     "10_3456789",
                     "20_3456789",
                     "30_3456789",
@@ -1016,14 +1016,14 @@ mod test {
                     "60_3456789",
                     "70_3456789",
                 )).unwrap()));
-                henc.mark_fws_pos();
-                assert_ok!(henc.write_str(AsciiStr::from_ascii(concat!(
+                handle.mark_fws_pos();
+                assert_ok!(handle.write_str(AsciiStr::from_ascii(concat!(
                     "10_3456789",
                     "20_3456789",
                     "30_3456789",
                     "40_3456789",
                 )).unwrap()));
-                henc.finish();
+                handle.finish();
             }
             assert_eq!(encoder.sections.len(), 1);
             let last = encoder.sections.pop().unwrap().unwrap_header();
@@ -1047,22 +1047,22 @@ mod test {
         fn hard_line_limit() {
             let mut encoder = Encoder::new(MailType::Ascii);
             {
-                let mut henc = encoder.encode_header();
+                let mut handle = encoder.encode_header_handle();
                 for x in 0..998 {
-                    if let Err(_) = henc.write_char(AsciiChar::X) {
+                    if let Err(_) = handle.write_char(AsciiChar::X) {
                         panic!("error when writing char nr.: {:?}", x+1)
                     }
                 }
                 let res = &[
-                    henc.write_char(AsciiChar::X).is_err(),
-                    henc.write_char(AsciiChar::X).is_err(),
-                    henc.write_char(AsciiChar::X).is_err(),
-                    henc.write_char(AsciiChar::X).is_err(),
+                    handle.write_char(AsciiChar::X).is_err(),
+                    handle.write_char(AsciiChar::X).is_err(),
+                    handle.write_char(AsciiChar::X).is_err(),
+                    handle.write_char(AsciiChar::X).is_err(),
                 ];
                 assert_eq!(
                     res, &[true, true, true, true]
                 );
-                henc.undo_header();
+                handle.undo_header();
             }
         }
 
@@ -1070,9 +1070,9 @@ mod test {
         fn write_utf8_fail_on_ascii_mail() {
             let mut encoder = Encoder::new(MailType::Ascii);
             {
-                let mut henc = encoder.encode_header();
-                assert_err!(henc.write_utf8("↓"));
-                henc.undo_header();
+                let mut handle = encoder.encode_header_handle();
+                assert_err!(handle.write_utf8("↓"));
+                handle.undo_header();
             }
         }
 
@@ -1080,9 +1080,9 @@ mod test {
         fn write_utf8_ascii_string_fail_on_ascii_mail() {
             let mut encoder = Encoder::new(MailType::Ascii);
             {
-                let mut henc = encoder.encode_header();
-                assert_err!(henc.write_utf8("just_ascii"));
-                henc.undo_header();
+                let mut handle = encoder.encode_header_handle();
+                assert_err!(handle.write_utf8("just_ascii"));
+                handle.undo_header();
             }
         }
 
@@ -1090,9 +1090,9 @@ mod test {
         fn write_utf8_ok_on_internationalized_mail() {
             let mut encoder = Encoder::new(MailType::Internationalized);
             {
-                let mut henc = encoder.encode_header();
-                assert_ok!(henc.write_utf8("❤"));
-                henc.finish();
+                let mut handle = encoder.encode_header_handle();
+                assert_ok!(handle.write_utf8("❤"));
+                handle.finish();
             }
             assert_eq!(encoder.sections.len(), 1);
             let last = encoder.sections.pop().unwrap().unwrap_header();
@@ -1103,11 +1103,11 @@ mod test {
         fn try_write_atext_ascii() {
             let mut encoder = Encoder::new(MailType::Ascii);
             {
-                let mut henc = encoder.encode_header();
-                assert_ok!(henc.try_write_atext("hoho"));
-                assert_err!(henc.try_write_atext("a(b"));
-                assert_ok!(henc.try_write_atext(""));
-                henc.finish();
+                let mut handle = encoder.encode_header_handle();
+                assert_ok!(handle.try_write_atext("hoho"));
+                assert_err!(handle.try_write_atext("a(b"));
+                assert_ok!(handle.try_write_atext(""));
+                handle.finish();
             }
             assert_eq!(encoder.sections.len(), 1);
             let last = encoder.sections.pop().unwrap().unwrap_header();
@@ -1118,11 +1118,11 @@ mod test {
         fn try_write_atext_internationalized() {
             let mut encoder = Encoder::new(MailType::Internationalized);
             {
-                let mut henc = encoder.encode_header();
-                assert_ok!(henc.try_write_atext("hoho"));
-                assert_err!(henc.try_write_atext("a(b"));
-                assert_ok!(henc.try_write_atext("❤"));
-                henc.finish();
+                let mut handle = encoder.encode_header_handle();
+                assert_ok!(handle.try_write_atext("hoho"));
+                assert_err!(handle.try_write_atext("a(b"));
+                assert_ok!(handle.try_write_atext("❤"));
+                handle.finish();
             }
             assert_eq!(encoder.sections.len(), 1);
             let last = encoder.sections.pop().unwrap().unwrap_header();
@@ -1133,14 +1133,14 @@ mod test {
         fn multiple_finish_calls_are_ok() {
             let mut encoder = Encoder::new(MailType::Internationalized);
             {
-                let mut henc = encoder.encode_header();
-                assert_ok!(henc.try_write_atext("hoho"));
-                assert_err!(henc.try_write_atext("a(b"));
-                assert_ok!(henc.try_write_atext("❤"));
-                henc.finish();
-                henc.finish();
-                henc.finish();
-                henc.finish();
+                let mut handle = encoder.encode_header_handle();
+                assert_ok!(handle.try_write_atext("hoho"));
+                assert_err!(handle.try_write_atext("a(b"));
+                assert_ok!(handle.try_write_atext("❤"));
+                handle.finish();
+                handle.finish();
+                handle.finish();
+                handle.finish();
             }
             assert_eq!(encoder.sections.len(), 1);
             let last = encoder.sections.pop().unwrap().unwrap_header();
@@ -1151,14 +1151,14 @@ mod test {
         fn multiple_finish_and_undo_calls() {
             let mut encoder = Encoder::new(MailType::Internationalized);
             {
-                let mut henc = encoder.encode_header();
-                assert_ok!(henc.try_write_atext("hoho"));
-                assert_err!(henc.try_write_atext("a(b"));
-                assert_ok!(henc.try_write_atext("❤"));
-                henc.undo_header();
-                henc.finish();
-                henc.undo_header();
-                henc.undo_header();
+                let mut handle = encoder.encode_header_handle();
+                assert_ok!(handle.try_write_atext("hoho"));
+                assert_err!(handle.try_write_atext("a(b"));
+                assert_ok!(handle.try_write_atext("❤"));
+                handle.undo_header();
+                handle.finish();
+                handle.undo_header();
+                handle.undo_header();
             }
             assert_eq!(encoder.sections.len(), 1);
             let last = encoder.sections.pop().unwrap().unwrap_header();
@@ -1169,16 +1169,16 @@ mod test {
         fn header_body_header() {
             let mut encoder = Encoder::new(MailType::Internationalized);
             {
-                let mut henc = encoder.encode_header();
-                assert_ok!(henc.write_utf8("H: yay"));
-                henc.finish();
+                let mut handle = encoder.encode_header_handle();
+                assert_ok!(handle.write_utf8("H: yay"));
+                handle.finish();
             }
             let body = VecBody::new(3);
             encoder.write_body(body.clone());
             {
-                let mut henc = encoder.encode_header();
-                assert_ok!(henc.write_utf8("❤"));
-                henc.finish();
+                let mut handle = encoder.encode_header_handle();
+                assert_ok!(handle.write_utf8("❤"));
+                handle.finish();
             }
             assert_eq!(encoder.sections.len(), 3);
             let last = encoder.sections.pop().unwrap().unwrap_header();
@@ -1194,46 +1194,46 @@ mod test {
         #[test]
         fn drop_without_write_is_ok() {
             let mut encoder = Encoder::new(MailType::Ascii);
-            let henc = encoder.encode_header();
-            mem::drop(henc)
+            let handle = encoder.encode_header_handle();
+            mem::drop(handle)
         }
 
         #[test]
         fn drop_after_undo_is_ok() {
             let mut encoder = Encoder::new(MailType::Ascii);
-            let mut henc = encoder.encode_header();
-            assert_ok!(henc.write_str(AsciiStr::from_ascii("Header-One").unwrap()));
-            henc.undo_header();
-            mem::drop(henc);
+            let mut handle = encoder.encode_header_handle();
+            assert_ok!(handle.write_str(AsciiStr::from_ascii("Header-One").unwrap()));
+            handle.undo_header();
+            mem::drop(handle);
         }
 
         #[test]
         fn drop_after_finish_is_ok() {
             let mut encoder = Encoder::new(MailType::Ascii);
-            let mut henc = encoder.encode_header();
-            assert_ok!(henc.write_str(AsciiStr::from_ascii("Header-One: 12").unwrap()));
-            henc.finish();
-            mem::drop(henc);
+            let mut handle = encoder.encode_header_handle();
+            assert_ok!(handle.write_str(AsciiStr::from_ascii("Header-One: 12").unwrap()));
+            handle.finish();
+            mem::drop(handle);
         }
 
         #[should_panic]
         #[test]
         fn drop_unfinished_panics() {
             let mut encoder = Encoder::new(MailType::Ascii);
-            let mut henc = encoder.encode_header();
-            assert_ok!(henc.write_str(AsciiStr::from_ascii("Header-One:").unwrap()));
-            mem::drop(henc);
+            let mut handle = encoder.encode_header_handle();
+            assert_ok!(handle.write_str(AsciiStr::from_ascii("Header-One:").unwrap()));
+            mem::drop(handle);
         }
 
         #[test]
         fn trace_and_undo() {
             let mut encoder = Encoder::new(MailType::Internationalized);
             {
-                let mut henc = encoder.encode_header();
-                assert_ok!(henc.write_utf8("something"));
-                henc.mark_fws_pos();
-                assert_ok!(henc.write_utf8("<else>"));
-                henc.undo_header();
+                let mut handle = encoder.encode_header_handle();
+                assert_ok!(handle.write_utf8("something"));
+                handle.mark_fws_pos();
+                assert_ok!(handle.write_utf8("<else>"));
+                handle.undo_header();
             }
             assert_eq!(encoder.trace.len(), 1);
         }
@@ -1242,13 +1242,13 @@ mod test {
         fn trace_and_undo_does_do_to_much() {
             let mut encoder = Encoder::new(MailType::Internationalized);
             {
-                let mut henc = encoder.encode_header();
-                assert_ok!(henc.write_utf8("H: a"));
-                henc.finish();
-                assert_ok!(henc.write_utf8("something"));
-                henc.mark_fws_pos();
-                assert_ok!(henc.write_utf8("<else>"));
-                henc.undo_header();
+                let mut handle = encoder.encode_header_handle();
+                assert_ok!(handle.write_utf8("H: a"));
+                handle.finish();
+                assert_ok!(handle.write_utf8("something"));
+                handle.mark_fws_pos();
+                assert_ok!(handle.write_utf8("<else>"));
+                handle.undo_header();
             }
             assert_eq!(encoder.trace, vec![
                 NewSection,
@@ -1263,15 +1263,15 @@ mod test {
         fn trace_traces() {
             let mut encoder = Encoder::new(MailType::Internationalized);
             {
-                let mut henc = encoder.encode_header();
-                assert_ok!(henc.write_str(AsciiStr::from_ascii("Header").unwrap()));
-                assert_ok!(henc.write_char(AsciiChar::Colon));
-                assert_err!(henc.try_write_atext("a(b)c"));
-                assert_ok!(henc.try_write_atext("abc"));
-                assert_ok!(henc.write_utf8("❤"));
-                assert_ok!(henc.write_str_unchecked("remove me\r\n"));
-                assert_ok!(henc.write_utf8("   "));
-                henc.finish()
+                let mut handle = encoder.encode_header_handle();
+                assert_ok!(handle.write_str(AsciiStr::from_ascii("Header").unwrap()));
+                assert_ok!(handle.write_char(AsciiChar::Colon));
+                assert_err!(handle.try_write_atext("a(b)c"));
+                assert_ok!(handle.try_write_atext("abc"));
+                assert_ok!(handle.write_utf8("❤"));
+                assert_ok!(handle.write_str_unchecked("remove me\r\n"));
+                assert_ok!(handle.write_utf8("   "));
+                handle.finish()
             }
             assert_eq!(encoder.trace, vec![
                 NewSection,
