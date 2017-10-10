@@ -1,16 +1,22 @@
 use std::any::{Any, TypeId};
 use std::fmt::{self, Debug};
+use std::result::{ Result as StdResult };
+use std::borrow::Cow;
 
 use ascii::{AsciiStr, AsciiChar};
 
 use error::Result;
 use grammar::{is_atext, MailType};
 
+use super::traits::BodyBuffer;
+
 /// as specified in RFC 5322 not including CRLF
 const LINE_LEN_SOFT_LIMIT: usize = 78;
 /// as specified in RFC 5322 (mail) + RFC 5321 (smtp) not including CRLF
 const LINE_LEN_HARD_LIMIT: usize = 998;
 
+// can not be moved to `super::traits` as it depends on the
+// EncodeHeaderHandle defined here
 /// Trait Implemented by "components" used in header field bodies
 ///
 /// This trait can be turned into a trait object allowing runtime
@@ -24,9 +30,72 @@ pub trait EncodableInHeader: Any+Debug {
     }
 }
 
+//TODO we now could use MOPA or similar crates
+impl EncodableInHeader {
+
+    #[inline(always)]
+    pub fn is<T: EncodableInHeader>(&self) -> bool {
+        self.type_id() == TypeId::of::<T>()
+    }
+
+
+    #[inline]
+    pub fn downcast_ref<T: EncodableInHeader>(&self) -> Option<&T> {
+        if self.is::<T>() {
+            Some( unsafe { &*( self as *const EncodableInHeader as *const T) } )
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    pub fn downcast_mut<T: EncodableInHeader>(&mut self) -> Option<&mut T> {
+        if self.is::<T>() {
+            Some( unsafe { &mut *( self as *mut EncodableInHeader as *mut T) } )
+        } else {
+            None
+        }
+    }
+}
+
+
+pub trait EncodableInHeaderBoxExt: Sized {
+    fn downcast<T: EncodableInHeader>(self) -> StdResult<Box<T>, Self>;
+}
+
+impl EncodableInHeaderBoxExt for Box<EncodableInHeader> {
+
+    fn downcast<T: EncodableInHeader>(self) -> StdResult<Box<T>, Self> {
+        if EncodableInHeader::is::<T>(&*self) {
+            let ptr: *mut EncodableInHeader = Box::into_raw(self);
+            Ok( unsafe { Box::from_raw(ptr as *mut T) } )
+        } else {
+            Err( self )
+        }
+    }
+}
+
+impl EncodableInHeaderBoxExt for Box<EncodableInHeader+Send> {
+
+    fn downcast<T: EncodableInHeader>(self) -> StdResult<Box<T>, Self> {
+        if EncodableInHeader::is::<T>(&*self) {
+            let ptr: *mut EncodableInHeader = Box::into_raw(self);
+            Ok( unsafe { Box::from_raw(ptr as *mut T) } )
+        } else {
+            Err( self )
+        }
+    }
+}
+
+/// Wrapper Struct to be able to use EncodableInHeader with Closures
+///
+/// Basically a workaround for Closures not implementing debug in all
+/// circumstances and therefore ok to be placed in the `traits` module
+/// as it is a replacement for a not so well working
+/// `impl<FN> EncodableInHeader for FN where FN: ...`
 pub struct EncodableClosure<F>(pub F);
 impl<FN: 'static> EncodableInHeader for EncodableClosure<FN>
-    where FN: Fn(&mut EncodeHeaderHandle) -> Result<()>
+    where FN: for<'a,'b: 'a> Fn(&'a mut EncodeHeaderHandle<'b>) -> Result<()>
 {
     fn encode(&self, encoder:  &mut EncodeHeaderHandle) -> Result<()> {
         (self.0)(encoder)
@@ -38,30 +107,6 @@ impl<FN> Debug for EncodableClosure<FN> {
     fn fmt(&self, fter: &mut fmt::Formatter) -> fmt::Result {
         write!(fter, "EncodableClosure(..)")
     }
-}
-
-/// Trait Implemented by mainly by structs representing a mail or
-/// a part of it
-pub trait Encodable {
-    fn encode<R: BodyBuffer>( &self, encoder:  &mut Encoder<R>) -> Result<()>;
-}
-
-/// Trait Repesenting the buffer of a mime body payload
-///
-/// (e.g. a transfer encoded image or text)
-pub trait BodyBuffer {
-
-    /// Called to access the bytes in the buffer.
-    ///
-    /// By limiting the access to a closure passed in
-    /// it enables a number of properties for implementators:
-    /// - the byte slice has only to be valid for the duration of the closure,
-    ///   allowing implementations for data behind a Lock which has to keep
-    ///   a Guard alive during the access of the data
-    /// - the implementor can directly return a error if for some
-    ///   reason no data is available or the data was "somehow" corrupted
-    fn with_slice<FN, R>(&self, func: FN) -> Result<R>
-        where FN: FnOnce(&[u8]) -> Result<R>;
 }
 
 
@@ -125,7 +170,14 @@ pub enum Token {
     NowUtf8,
     NowUnchecked,
     NewSection,
-    End
+    End,
+    /// used to seperate a header from a body
+    ///
+    /// be aware that `Section::BodyPaylod` just
+    /// contains the Payload, so e.g. headers from
+    /// mime bodies or mime multipart body boundaries
+    /// still get written into the string buffer
+    BlankLine
 }
 
 
@@ -169,6 +221,24 @@ impl<B: BodyBuffer> Encoder<B> {
         }
     }
 
+    pub fn add_blank_line(&mut self) {
+        if let Some(&Section::Header(..)) = self.sections.last() {}
+            else {
+                self.sections.push(Section::Header(String::new()));
+                #[cfg(test)]
+                { self.trace.push(Token::NewSection); }
+            }
+
+        if let Some(&mut Section::Header(ref mut string)) = self.sections.last_mut() {
+            string.push_str("\r\n");
+            #[cfg(test)]
+            { self.trace.push(Token::BlankLine); }
+        } else {
+            //REFACTOR(NLL): with NLL we can combine both if-else blocks not needing unreachable! anymore
+            unreachable!("we already made sure the last is Section::Header")
+        }
+    }
+
     /// adds adds a body payload buffer to the encoder
     /// without validating it, the encoder mainly provides
     /// buffers it is not validating them.
@@ -178,6 +248,29 @@ impl<B: BodyBuffer> Encoder<B> {
 
     pub fn into_sections(self) -> Vec<Section<B>> {
         self.sections
+    }
+
+    //TODO other "write out" methods (iterator over &[u8]?)
+    pub fn into_string_lossy(self) -> Result<String> {
+        let mut out = String::new();
+        for section in self.sections.into_iter() {
+            match section {
+                Section::Header(string) => {
+                    out.push_str(&*string)
+                },
+                Section::MIMEBody(body) => {
+                    body.with_slice(|slice| {
+                        let mut string = String::from_utf8_lossy(slice);
+                        out.push_str(&*string);
+                        if !string.ends_with("\r\n") {
+                            out.push_str("\r\n");
+                        }
+                        Ok(())
+                    })?;
+                }
+            }
+        }
+        Ok(out)
     }
 }
 
@@ -224,7 +317,7 @@ impl<'a> Drop for EncodeHeaderHandle<'a> {
 
     fn drop(&mut self) {
         use std::thread;
-        if !thread::panicking() && self.buffer.len() != self.header_start_idx {
+        if !thread::panicking() &&  self.has_unfinished_parts() {
             // we really should panic as the back buffer i.e. the mail will contain
             // some partially written header which definitely is a bug
             panic!("dropped Handle which partially wrote header to back buffer (use `finish` or `discard`)")
@@ -284,6 +377,11 @@ impl<'a> EncodeHeaderHandle<'a> {
         self.header_start_idx = start_idx;
         #[cfg(test)]
         { self.trace_start_idx = self.trace.len(); }
+    }
+
+    #[inline]
+    pub fn has_unfinished_parts(&self) -> bool {
+        self.buffer.len() != self.header_start_idx
     }
 
     #[inline]
@@ -611,6 +709,11 @@ impl BodyBuffer for VecBodyBuf {
     }
 }
 
+/// Trait Implemented by mainly by structs representing a mail or
+/// a part of it
+pub trait Encodable<B: BodyBuffer> {
+    fn encode( &self, encoder:  &mut Encoder<B>) -> Result<()>;
+}
 
 #[cfg(test)]
 #[macro_export]
@@ -618,12 +721,13 @@ macro_rules! ec_test {
     ( $name:ident, $inp:block => $mt:tt => [ $($tokens:tt)* ] ) => (
         #[test]
         fn $name() {
-            use $crate::codec::encoder::{
+            use $crate::codec::{
                 EncodableInHeader,
                 EncodeHeaderHandle,
                 Token, Encoder,
                 VecBodyBuf
             };
+            use std::mem;
             use $crate::error::Result;
 
             let mail_type = {
@@ -653,20 +757,29 @@ macro_rules! ec_test {
                 };
                 let mut handle = encoder.encode_header_handle();
                 doit(&mut handle).unwrap();
-                handle.finish();
+                // we do not want to finish writing as we might
+                // test just parts of headers
+                mem::forget(handle);
             }
             let mut expected: Vec<Token> = Vec::new();
             ec_test!{ __PRIV_TO_TOKEN_LIST expected $($tokens)* }
-            assert_eq!(encoder.trace, expected)
+            //skip over the NewSection part
+            assert_eq!(&encoder.trace[1..], &expected[..])
         }
     );
 
+    (__PRIV_TO_TOKEN_LIST $col:ident Text $e:expr) => (
+        $col.push($crate::codec::Token::Text({$e}.into()));
+    );
+    (__PRIV_TO_TOKEN_LIST $col:ident $token:ident) => (
+        $col.push($crate::codec::Token::$token);
+    );
     (__PRIV_TO_TOKEN_LIST $col:ident Text $e:expr, $($other:tt)*) => ({
-        $col.push($crate::codec::encoder::Token::Text({$e}.into()));
+        ec_test!{ __PRIV_TO_TOKEN_LIST $col Text $e }
         ec_test!{ __PRIV_TO_TOKEN_LIST $col $($other)* }
     });
     (__PRIV_TO_TOKEN_LIST $col:ident $token:ident, $($other:tt)*) => (
-        $col.push($crate::codec::encoder::Token::$token);
+        ec_test!{ __PRIV_TO_TOKEN_LIST $col $token }
         ec_test!{ __PRIV_TO_TOKEN_LIST $col $($other)* }
     );
     (__PRIV_TO_TOKEN_LIST $col:ident ) => ();
@@ -746,7 +859,6 @@ mod test {
 
     mod Encoder {
         #![allow(non_snake_case)]
-        use std::default::Default;
         use super::*;
         use super::{ _Encoder as Encoder };
 
@@ -787,7 +899,6 @@ mod test {
 
         use super::*;
         use super::{ _Encoder as Encoder };
-        use super::super::EncodeHeaderHandle;
 
         #[test]
         fn undo_does_undo() {
@@ -1302,11 +1413,8 @@ mod test {
                 x.write_utf8("hy")
             })
         } => Utf8 => [
-            NewSection,
             NowUtf8,
-            Text "hy",
-            CRLF,
-            End,
+            Text "hy"
         ]
     }
 
@@ -1320,11 +1428,67 @@ mod test {
                 x.write_utf8("hy")
             })
         } => Utf8 => [
-            NewSection,
             NowUtf8,
-            Text "hy",
-            CRLF,
-            End,
+            Text "hy"
         ]
+    }
+
+    mod trait_object {
+        use super::super::*;
+
+        #[derive(Default, PartialEq, Debug)]
+        struct TestType(&'static str);
+
+        impl EncodableInHeader for TestType {
+            fn encode( &self, encoder:  &mut EncodeHeaderHandle ) -> Result<()> {
+                encoder.write_utf8(self.0)
+            }
+        }
+
+        #[derive(Default, PartialEq, Debug)]
+        struct AnotherType(&'static str);
+
+        impl EncodableInHeader for AnotherType {
+            fn encode( &self, encoder:  &mut EncodeHeaderHandle ) -> Result<()> {
+                encoder.write_utf8(self.0)
+            }
+        }
+
+        #[test]
+        fn is() {
+            let tt = TestType::default();
+            let erased: &EncodableInHeader = &tt;
+            assert_eq!( true, erased.is::<TestType>() );
+            assert_eq!( false, erased.is::<AnotherType>());
+        }
+
+        #[test]
+        fn downcast_ref() {
+            let tt = TestType::default();
+            let erased: &EncodableInHeader = &tt;
+            let res: Option<&TestType> = erased.downcast_ref::<TestType>();
+            assert_eq!( Some(&tt), res );
+            assert_eq!( None, erased.downcast_ref::<AnotherType>() );
+        }
+
+        #[test]
+        fn downcast_mut() {
+            let mut tt_nr2 = TestType::default();
+            let mut tt = TestType::default();
+            let erased: &mut EncodableInHeader = &mut tt;
+            {
+                let res: Option<&mut TestType> = erased.downcast_mut::<TestType>();
+                assert_eq!( Some(&mut tt_nr2), res );
+            }
+            assert_eq!( None, erased.downcast_mut::<AnotherType>() );
+        }
+
+        #[test]
+        fn downcast() {
+            let tt = Box::new( TestType::default() );
+            let erased: Box<EncodableInHeader> = tt;
+            let erased = assert_err!(erased.downcast::<AnotherType>());
+            let _: Box<TestType> = assert_ok!(erased.downcast::<TestType>());
+        }
     }
 }

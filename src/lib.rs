@@ -50,12 +50,10 @@ pub mod composition;
 pub mod default_impl;
 
 pub mod mail_builder_prelude {
+    pub type Encoder = ::codec::Encoder<::mail::Resource>;
     pub use error::*;
     pub use grammar::MailType;
-    pub use codec::{
-        MailEncodable,
-        MailEncoderImpl
-    };
+    pub use codec::{EncodableInHeader, Encodable, EncodeHeaderHandle};
     pub use data::FromInput;
     pub use headers::*;
     pub use components::*;
@@ -72,6 +70,7 @@ pub mod resource_prelude {
 }
 
 pub mod composition_prelude {
+    pub type Encoder = ::codec::Encoder<::mail::Resource>;
     pub use error::*;
     pub use grammar::MailType;
     pub use data::FromInput;
@@ -81,8 +80,9 @@ pub mod composition_prelude {
         TransferEncoding
     };
     pub use codec::{
-        MailEncodable,
-        MailEncoderImpl
+        EncodableInHeader,
+        EncodeHeaderHandle,
+        Encodable
     };
     pub use composition::{
         Compositor,

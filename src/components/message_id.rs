@@ -5,7 +5,7 @@ use nom::IResult;
 
 use error::*;
 use external::vec1::Vec1;
-use codec::{ MailEncoder, MailEncodable };
+use codec::{EncodableInHeader, EncodeHeaderHandle};
 
 use data::{ FromInput, Input, SimpleItem };
 
@@ -38,17 +38,17 @@ impl FromInput for MessageID {
     }
 }
 
-impl<E> MailEncodable<E> for MessageID where E: MailEncoder {
+impl EncodableInHeader for  MessageID {
 
-    fn encode(&self, encoder: &mut E) -> Result<()> {
-        encoder.note_optional_fws();
-        encoder.write_char( AsciiChar::LessThan );
+    fn encode(&self, handle: &mut EncodeHeaderHandle) -> Result<()> {
+        handle.mark_fws_pos();
+        handle.write_char( AsciiChar::LessThan );
         match self.message_id {
-            SimpleItem::Ascii( ref ascii ) => encoder.write_str( ascii ),
-            SimpleItem::Utf8( ref utf8 ) => encoder.try_write_utf8__( utf8 )?
+            SimpleItem::Ascii( ref ascii ) => handle.write_str( ascii )?,
+            SimpleItem::Utf8( ref utf8 ) => handle.write_utf8( utf8 )?
         }
-        encoder.write_char( AsciiChar::GreaterThan );
-        encoder.note_optional_fws();
+        handle.write_char( AsciiChar::GreaterThan );
+        handle.mark_fws_pos();
         Ok( () )
     }
 }
@@ -58,11 +58,11 @@ pub struct MessageIDList( pub Vec1<MessageID> );
 
 deref0!{ +mut MessageIDList => Vec1<MessageID> }
 
-impl<E> MailEncodable<E> for MessageIDList where E: MailEncoder {
+impl EncodableInHeader for  MessageIDList {
 
-    fn encode(&self, encoder: &mut E) -> Result<()> {
+    fn encode(&self, handle: &mut EncodeHeaderHandle) -> Result<()> {
         for msg_id in self.iter() {
-            msg_id.encode( encoder )?;
+            msg_id.encode( handle )?;
         }
         Ok( () )
     }
@@ -74,47 +74,72 @@ impl<E> MailEncodable<E> for MessageIDList where E: MailEncoder {
 #[cfg(test)]
 mod test {
     use grammar::MailType;
-    use codec::test_utils::*;
+    use codec::{ Encoder, VecBodyBuf };
     use super::*;
 
     ec_test!{ simple, {
-        MessageID::from_input( "affen@haus" )
+        MessageID::from_input( "affen@haus" )?
     } => ascii => [
-        OptFWS,
-        LinePart( "<affen@haus>" ),
-        OptFWS
+        MarkFWS,
+        NowChar,
+        Text "<",
+        NowStr,
+        // there are two "context" one which allows FWS inside (defined = email)
+        // and one which doesn't for simplicity we use the later every where
+        // especially because message ids without a `@domain.part` are quite
+        // common
+        Text "affen@haus",
+        NowChar,
+        Text ">",
+        MarkFWS
     ]}
 
     ec_test!{ utf8, {
-        MessageID::from_input( "↓@↑.utf8")
+        MessageID::from_input( "↓@↑.utf8")?
     } => utf8 => [
-        OptFWS,
-        LinePart( "<↓@↑.utf8>" ),
-        OptFWS
+        MarkFWS,
+        NowChar,
+        Text "<",
+        NowUtf8,
+        Text "<↓@↑.utf8>",
+        NowChar,
+        Text ">",
+        MarkFWS
     ]}
 
     #[test]
     fn utf8_fails() {
-        let mut ec = TestMailEncoder::new( MailType::Ascii );
+        let mut encoder = Encoder::<VecBodyBuf>::new(MailType::Ascii);
+        let mut handle = encoder.encode_header_handle();
         let mid = MessageID::from_input( "abc@øpunny.code" ).unwrap();
-        let res = mid.encode( &mut ec );
-        assert_eq!( false, res.is_ok() );
+        assert_err!(mid.encode( &mut handle ));
+        handle.undo_header();
     }
 
     ec_test!{ multipls, {
-        let fst = MessageID::from_input( "affen@haus" ).unwrap();
-        let snd = MessageID::from_input( "obst@salat" ).unwrap();
-        Some( MessageIDList( vec1! [
+        let fst = MessageID::from_input( "affen@haus" )?;
+        let snd = MessageID::from_input( "obst@salat" )?;
+        MessageIDList( vec1! [
             fst,
             snd
-        ]))
+        ])
     } => ascii => [
-        OptFWS,
-        LinePart( "<affen@haus>" ),
-        OptFWS,
-        OptFWS,
-        LinePart( "<obst@salat>" ),
-        OptFWS
+        MarkFWS,
+        NowChar,
+        Text "<",
+        NowStr,
+        Text "affen@haus",
+        NowChar,
+        Text ">",
+        MarkFWS,
+        MarkFWS,
+        NowChar,
+        Text "<",
+        NowStr,
+        Text "obst@salat",
+        NowChar,
+        Text ">",
+        MarkFWS,
     ]}
 }
 

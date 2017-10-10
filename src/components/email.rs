@@ -1,7 +1,7 @@
 use ascii::{ AsciiChar };
 
 use error::*;
-use codec::{ self, MailEncoder, MailEncodable };
+use codec::{ self, EncodeHeaderHandle, EncodableInHeader };
 use codec::idna;
 
 use grammar::{
@@ -56,12 +56,12 @@ impl FromInput for Email {
     }
 }
 
-impl<E> MailEncodable<E> for Email where E: MailEncoder {
+impl EncodableInHeader for  Email {
 
-    fn encode( &self, encoder: &mut E ) -> Result<()> {
-        self.local_part.encode( encoder )?;
-        encoder.write_char( AsciiChar::At );
-        self.domain.encode( encoder )?;
+    fn encode(&self, handle: &mut EncodeHeaderHandle) -> Result<()> {
+        self.local_part.encode( handle )?;
+        handle.write_char( AsciiChar::At );
+        self.domain.encode( handle )?;
         Ok( () )
     }
 
@@ -75,11 +75,11 @@ impl FromInput for LocalPart {
 
 }
 
-impl<E> MailEncodable<E> for LocalPart where E: MailEncoder {
+impl EncodableInHeader  for LocalPart {
 
-    fn encode(&self, encoder: &mut E) -> Result<()> {
+    fn encode(&self, handle: &mut EncodeHeaderHandle) -> Result<()> {
         let input: &str = &*self.0;
-        let mail_type = encoder.mail_type();
+        let mail_type = handle.mail_type();
 
         let (got_mt, res) = codec::quoted_string::quote_if_needed(
             input,
@@ -89,12 +89,12 @@ impl<E> MailEncodable<E> for LocalPart where E: MailEncoder {
 
         debug_assert!(!(got_mt == MailType::Internationalized && mail_type == MailType::Ascii));
 
-        encoder.note_optional_fws();
+        handle.mark_fws_pos();
         // if mail_type == Ascii quote_if_needed already made sure this
         // is ascii (or returned an error if not)
         // it also made sure it is valid as it is either `dot-atom-text` or `quoted-string`
-        encoder.write_str_unchecked(&*res);
-        encoder.note_optional_fws();
+        handle.write_str_unchecked(&*res);
+        handle.mark_fws_pos();
         Ok( () )
     }
 }
@@ -160,21 +160,21 @@ impl Domain {
     }
 }
 
-impl<E> MailEncodable<E> for Domain where E: MailEncoder {
+impl EncodableInHeader for  Domain {
 
-    fn encode(&self, encoder: &mut E) -> Result<()> {
-        encoder.note_optional_fws();
+    fn encode(&self, handle: &mut EncodeHeaderHandle) -> Result<()> {
+        handle.mark_fws_pos();
         match self.0 {
             SimpleItem::Ascii( ref ascii ) => {
-                encoder.write_str( ascii )
+                handle.write_str( ascii )?;
             },
             SimpleItem::Utf8( ref utf8 ) => {
-                if !encoder.try_write_utf8__( utf8 ).is_ok() {
-                    encoder.write_str( &*idna::puny_code_domain( utf8 )? )
+                if !handle.write_utf8( utf8 ).is_ok() {
+                    handle.write_str( &*idna::puny_code_domain( utf8 )? )?;
                 }
             }
         }
-        encoder.note_optional_fws();
+        handle.mark_fws_pos();
         Ok( () )
     }
 }
@@ -185,10 +185,8 @@ impl<E> MailEncodable<E> for Domain where E: MailEncoder {
 
 #[cfg(test)]
 mod test {
+    use codec::{ Encoder, VecBodyBuf};
     use super::*;
-    use codec::test_utils::*;
-
-
 
     #[test]
     fn email_from_input() {
@@ -202,78 +200,86 @@ mod test {
         )
     }
 
-
-
     ec_test!{ local_part_simple, {
-        LocalPart::from_input(  "hans" )
+        LocalPart::from_input(  "hans" )?
     } => ascii => [
-        OptFWS,
-        LinePart("hans"),
-        OptFWS
+        MarkFWS,
+        NowStr,
+        Text "hans",
+        MarkFWS
     ]}
 
     //fails tries to write utf8
     ec_test!{ local_part_quoted, {
-        LocalPart::from_input(  "ha ns" )
+        LocalPart::from_input(  "ha ns" )?
     } => ascii => [
-        OptFWS,
-        LinePart("\"ha ns\""),
-        OptFWS
+        MarkFWS,
+        NowStr,
+        Text "\"ha ns\"",
+        MarkFWS
     ]}
 
 
     ec_test!{ local_part_utf8, {
-        LocalPart::from_input( "Jörn" )
+        LocalPart::from_input( "Jörn" )?
     } => utf8 => [
-        OptFWS,
-        LinePart( "Jörn" ),
-        OptFWS
+        MarkFWS,
+        NowStr,
+        Text "Jörn",
+        MarkFWS
     ]}
 
     #[test]
     fn local_part_utf8_on_ascii() {
-        let mut ec = TestMailEncoder::new( MailType::Ascii );
+        let mut encoder = Encoder::<VecBodyBuf>::new( MailType::Ascii );
+        let mut handle = encoder.encode_header_handle();
         let local = LocalPart::from_input( "Jörn" ).unwrap();
-        let res = local.encode( &mut ec );
-        assert_eq!( false, res.is_ok() );
+        assert_err!(local.encode( &mut handle ));
+        handle.undo_header();
     }
 
     ec_test!{ domain, {
-        Domain::from_input( "bad.at.domain" )
+        Domain::from_input( "bad.at.domain" )?
     } => ascii => [
-        OptFWS,
-        LinePart( "bad.at.domain" ),
-        OptFWS
+        MarkFWS,
+        NowStr,
+        Text "bad.at.domain",
+        MarkFWS
     ]}
 
     ec_test!{ domain_international, {
-        Domain::from_input( "dömain" )
+        Domain::from_input( "dömain" )?
     } => utf8 => [
-        OptFWS,
-        LinePart( "dömain" ),
-        OptFWS
+        MarkFWS,
+        NowUtf8,
+        Text "dömain",
+        MarkFWS
     ]}
 
 
     ec_test!{ domain_encoded, {
-        Domain::from_input( "dat.ü.dü" )
+        Domain::from_input( "dat.ü.dü" )?
     } => ascii => [
-        OptFWS,
-        LinePart("dat.xn--tda.xn--d-eha"),
-        OptFWS
+        MarkFWS,
+        NowStr,
+        Text "dat.xn--tda.xn--d-eha",
+        MarkFWS
     ]}
 
 
     ec_test!{ email_simple, {
-        Email::from_input( "simple@and.ascii" )
+        Email::from_input( "simple@and.ascii" )?
     } => ascii => [
-        OptFWS,
-        LinePart( "simple" ),
-        OptFWS,
-        LinePart( "@" ),
-        OptFWS,
-        LinePart( "and.ascii" ),
-        OptFWS
+        MarkFWS,
+        NowStr,
+        Text "simple",
+        MarkFWS,
+        NowChar,
+        Text "@",
+        MarkFWS,
+        NowStr,
+        Text "and.ascii",
+        MarkFWS
     ]}
 
 }

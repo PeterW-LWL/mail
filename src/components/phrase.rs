@@ -1,6 +1,6 @@
 use error::*;
 use external::vec1::Vec1;
-use codec::{ MailEncodable, MailEncoder };
+use codec::{EncodableInHeader, EncodeHeaderHandle};
 use grammar::encoded_word::EncodedWordContext;
 
 use data::{ FromInput, Input };
@@ -49,13 +49,13 @@ impl FromInput for Phrase {
 }
 
 
-impl<E> MailEncodable<E> for Phrase where E: MailEncoder {
+impl EncodableInHeader for  Phrase {
 
     //FEATURE_TODO(warn_on_bad_phrase): warn if the phrase contains chars it should not
     //  but can contain due to encoding, e.g. ascii CTL's
-    fn encode(&self, encoder: &mut E) -> Result<()> {
+    fn encode(&self, heandle: &mut EncodeHeaderHandle) -> Result<()> {
         for word in self.0.iter() {
-            do_encode_word( &*word, encoder, Some( EncodedWordContext::Phrase ) )?;
+            do_encode_word( &*word, heandle, Some( EncodedWordContext::Phrase ) )?;
         }
 
         Ok( () )
@@ -66,26 +66,30 @@ impl<E> MailEncodable<E> for Phrase where E: MailEncoder {
 #[cfg(test)]
 mod test {
     use data::FromInput;
-    use codec::test_utils::*;
     use super::Phrase;
 
     ec_test!{ simple, {
-        Phrase::from_input("simple think")
+        Phrase::from_input("simple think")?
     } => ascii => [
-        LinePart("simple"),
-        FWS,
-        LinePart("think")
+        NowStr,
+        Text "simple",
+        MarkFWS, NowChar, Text " ",
+        NowStr,
+        Text "think"
     ]}
 
     ec_test!{ with_encoding, {
-        Phrase::from_input(" hm nääds encoding")
+        Phrase::from_input(" hm nääds encoding")?
     } => ascii => [
-        FWS,
-        LinePart("hm"),
-        FWS,
-        LinePart( "=?utf8?Q?n=C3=A4=C3=A4ds?=" ),
-        FWS,
-        LinePart( "encoding" )
+        MarkFWS, NowChar, Text " ",
+        NowStr,
+        Text "hm",
+        MarkFWS, NowChar, Text " ",
+        NowStr,
+        Text "=?utf8?Q?n=C3=A4=C3=A4ds?=",
+        MarkFWS, NowChar, Text " ",
+        NowStr,
+        Text "encoding"
     ]}
 }
 

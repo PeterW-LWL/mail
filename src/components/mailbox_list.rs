@@ -2,7 +2,7 @@
 
 use error::*;
 use ascii::AsciiChar;
-use codec::{MailEncoder, MailEncodable };
+use codec::{EncodableInHeader, EncodeHeaderHandle};
 
 use external::vec1::Vec1;
 use utils::{ HeaderTryFrom, HeaderTryInto};
@@ -21,10 +21,10 @@ impl MailboxList {
 
 
 
-impl<E> MailEncodable<E> for OptMailboxList where E: MailEncoder {
+impl EncodableInHeader for  OptMailboxList {
 
-    fn encode(&self, encoder: &mut E) -> Result<()> {
-       encode_list( self.0.iter(), encoder )
+    fn encode(&self, handle: &mut EncodeHeaderHandle) -> Result<()> {
+       encode_list( self.0.iter(), handle )
     }
 }
 
@@ -218,23 +218,22 @@ impl<T> HeaderTryFrom<Vec<T>> for OptMailboxList
     }
 }
 
-impl<E> MailEncodable<E> for MailboxList where E: MailEncoder {
+impl EncodableInHeader for  MailboxList {
 
-    fn encode(&self, encoder: &mut E) -> Result<()> {
-        encode_list( self.0.iter(), encoder )
+    fn encode(&self, handle: &mut EncodeHeaderHandle) -> Result<()> {
+        encode_list( self.0.iter(), handle )
     }
 }
 
-fn encode_list<'a, E, I>( list_iter: I, encoder: &mut E ) -> Result<()>
-    where E: MailEncoder,
-          I: Iterator<Item=&'a Mailbox>
+fn encode_list<'a, I>( list_iter: I, handle: &mut EncodeHeaderHandle ) -> Result<()>
+    where I: Iterator<Item=&'a Mailbox>
 {
     sep_for!{ mailbox in list_iter;
         sep {
-            encoder.write_char( AsciiChar::Comma );
-            encoder.write_fws();
+            handle.write_char( AsciiChar::Comma );
+            handle.write_fws();
         };
-        mailbox.encode( encoder )?;
+        mailbox.encode( handle )?;
     }
     Ok( () )
 }
@@ -246,75 +245,85 @@ deref0!{ +mut MailboxList => Vec<Mailbox> }
 mod test {
     use data::FromInput;
     use components::{ Mailbox, Email, Phrase };
-    use codec::test_utils::*;
     use super::*;
 
 
     ec_test! { empty_list, {
-        Some( OptMailboxList( Vec::new() ) )
+        OptMailboxList( Vec::new() )
     } => ascii => [
 
     ]}
 
     ec_test! { single, {
-        Some( MailboxList( vec1![
+        MailboxList( vec1![
             Mailbox {
-                display_name: Some( Phrase::from_input( "hy ho" ).unwrap() ),
-                email: Email::from_input( "ran@dom" ).unwrap()
+                display_name: Some( Phrase::from_input( "hy ho" )? ),
+                email: Email::from_input( "ran@dom" )?
             },
-        ] ) )
+        ] )
     } => ascii => [
-        LinePart( "hy" ),
-        FWS,
-        LinePart( "ho" ),
-        FWS,
-        LinePart( "<" ),
-        OptFWS,
-        LinePart( "ran" ),
-        OptFWS,
-        LinePart( "@" ),
-        OptFWS,
-        LinePart( "dom" ),
-        OptFWS,
-        LinePart( ">")
+        NowStr,
+        Text "hy",
+        MarkFWS, NowChar, Text " ",
+        Text "ho",
+        MarkFWS, NowChar, Text " ",
+        Text "<",
+        MarkFWS,
+        Text "ran",
+        MarkFWS,
+        Text "@",
+        MarkFWS,
+        Text "dom",
+        MarkFWS,
+        Text ">"
     ]}
 
     ec_test! { multiple, {
-         Some( MailboxList( vec1![
+         MailboxList( vec1![
             Mailbox {
-                display_name: Some( Phrase::from_input( "hy ho" ).unwrap() ),
-                email: Email::from_input( "nar@mod" ).unwrap()
+                display_name: Some( Phrase::from_input( "hy ho" )? ),
+                email: Email::from_input( "nar@mod" )?
             },
             Mailbox {
                 display_name: None,
-                email: Email::from_input( "ran@dom" ).unwrap()
+                email: Email::from_input( "ran@dom" )?
             }
-        ] ) )
+        ] )
     } => ascii => [
-        LinePart( "hy" ),
-        FWS,
-        LinePart( "ho" ),
-        FWS,
-        LinePart( "<" ),
-        OptFWS,
-        LinePart( "nar" ),
-        OptFWS,
-        LinePart( "@" ),
-        OptFWS,
-        LinePart( "mod" ),
-        OptFWS,
-        LinePart( ">,"),
-        FWS,
-        LinePart( "<" ),
-        OptFWS,
-        LinePart( "ran" ),
-        OptFWS,
-        LinePart( "@" ),
-        OptFWS,
-        LinePart( "dom" ),
-        OptFWS,
-        LinePart( ">")
-
-
+        NowStr,
+        Text "hy",
+        MarkFWS, NowChar, Text " ",
+        NowStr,
+        Text "ho",
+        MarkFWS, NowChar, Text " ",
+        NowChar,
+        Text "<",
+        MarkFWS,
+        NowStr,
+        Text "nar",
+        MarkFWS,
+        NowChar,
+        Text "@",
+        MarkFWS,
+        NowStr,
+        Text "mod",
+        MarkFWS,
+        NowStr,
+        Text ">,",
+        MarkFWS, NowChar, Text " ",
+        NowChar,
+        Text "<",
+        MarkFWS,
+        NowStr,
+        Text "ran",
+        MarkFWS,
+        NowChar,
+        Text "@",
+        MarkFWS,
+        NowStr,
+        Text "dom",
+        MarkFWS,
+        NowChar,
+        Text ">"
     ]}
 }

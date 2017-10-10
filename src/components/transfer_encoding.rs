@@ -3,7 +3,7 @@ use std::ops::Deref;
 use ascii::{ AsciiString, AsciiStr };
 
 use error::*;
-use codec::{ MailEncoder, MailEncodable };
+use codec::{EncodableInHeader, EncodeHeaderHandle};
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum TransferEncoding {
@@ -33,10 +33,10 @@ impl TransferEncoding {
     }
 }
 
-impl<E> MailEncodable<E> for TransferEncoding where E: MailEncoder {
+impl EncodableInHeader for  TransferEncoding {
 
-    fn encode(&self, encoder: &mut E) -> Result<()> {
-        encoder.write_str( self.name() );
+    fn encode(&self, handle: &mut EncodeHeaderHandle) -> Result<()> {
+        handle.write_str( self.name() );
         Ok( () )
     }
 }
@@ -68,35 +68,39 @@ impl  Deref for Token {
 #[cfg(test)]
 mod test {
     use super::TransferEncoding;
-    use codec::test_utils::*;
 
     ec_test! {_7bit, {
-        Some( TransferEncoding::_7Bit )
+        TransferEncoding::_7Bit
     } => ascii => [
-        LinePart( "7bit" )
+        NowStr,
+        Text "7bit"
     ]}
 
     ec_test! {_8bit, {
-        Some( TransferEncoding::_8Bit )
+        TransferEncoding::_8Bit
     } => ascii => [
-        LinePart( "8bit" )
+        NowStr,
+        Text "8bit"
     ]}
 
     ec_test!{binary, {
-        Some( TransferEncoding::Binary )
+        TransferEncoding::Binary
     } => ascii => [
-        LinePart( "binary" )
+        NowStr,
+        Text "binary"
     ]}
 
     ec_test!{base64, {
-        Some( TransferEncoding::Base64 )
+        TransferEncoding::Base64
     } => ascii => [
-        LinePart( "base64" )
+        NowStr,
+        Text "base64"
     ]}
 
     ec_test!{quoted_printable, {
-        Some( TransferEncoding::QuotedPrintable )
+        TransferEncoding::QuotedPrintable
     } => ascii => [
-        LinePart( "quoted-printable" )
+        NowStr,
+        Text "quoted-printable"
     ]}
 }

@@ -1,16 +1,16 @@
 use ascii::AsciiStr;
 
 use error::*;
-use codec::{ MailEncoder, MailEncodable };
+use codec::{EncodableInHeader, EncodeHeaderHandle};
 
 pub use utils::DateTime;
 
-impl<E> MailEncodable<E> for DateTime where E: MailEncoder {
+impl EncodableInHeader for DateTime {
 
-    fn encode(&self, encoder: &mut E) -> Result<()> {
+    fn encode(&self, handle: &mut EncodeHeaderHandle) -> Result<()> {
         let as_str = self.to_rfc2822();
         let ascii = unsafe { AsciiStr::from_ascii_unchecked( &*as_str ) };
-        encoder.write_str( ascii );
+        handle.write_str( ascii );
         Ok( () )
     }
 }
@@ -18,11 +18,11 @@ impl<E> MailEncodable<E> for DateTime where E: MailEncoder {
 #[cfg(test)]
 mod test {
     use super::*;
-    use codec::test_utils::*;
 
     ec_test!{ simple, {
-        Some( DateTime::test_time( 45 ) )
+        DateTime::test_time( 45 )
     } => ascii => [
-        LinePart( "Tue,  6 Aug 2013 04:11:45 +0000" )
+        NowStr,
+        Text "Tue,  6 Aug 2013 04:11:45 +0000"
     ]}
 }

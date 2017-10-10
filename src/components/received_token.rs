@@ -1,7 +1,7 @@
 use ascii::AsciiChar;
 
 use error::*;
-use codec::{ MailEncoder, MailEncodable };
+use codec::{EncodableInHeader, EncodeHeaderHandle};
 use super::word::{ Word, do_encode_word };
 use super::{ Email, Domain };
 
@@ -13,23 +13,23 @@ pub enum ReceivedToken {
     Domain( Domain )
 }
 
-impl<E> MailEncodable<E> for ReceivedToken where E: MailEncoder {
+impl EncodableInHeader for  ReceivedToken {
 
-    fn encode(&self, encoder: &mut E) -> Result<()> {
+    fn encode(&self, handle: &mut EncodeHeaderHandle) -> Result<()> {
         use self::ReceivedToken::*;
         match *self {
             Word( ref word ) => {
-                do_encode_word( word, encoder, None )?;
+                do_encode_word( word, handle, None )?;
             },
             Address( ref addr ) => {
                 // we do not need to use <..> , but I think it's better and it is definitely
                 // not wrong
-                encoder.write_char( AsciiChar::LessThan );
-                addr.encode( encoder )?;
-                encoder.write_char( AsciiChar::GreaterThan );
+                handle.write_char( AsciiChar::LessThan );
+                addr.encode( handle )?;
+                handle.write_char( AsciiChar::GreaterThan );
             },
             Domain( ref domain ) => {
-                domain.encode( encoder )?;
+                domain.encode( handle )?;
             }
         }
         Ok( () )
@@ -40,58 +40,61 @@ impl<E> MailEncodable<E> for ReceivedToken where E: MailEncoder {
 mod test {
     use grammar::MailType;
     use data::FromInput;
-    use codec::test_utils::*;
+    use codec::{Encoder, VecBodyBuf};
     use super::*;
 
     ec_test!{ a_domain, {
-        Domain::from_input( "random.mailnot" )
+        Domain::from_input( "random.mailnot" )?
     } => ascii => [
-        OptFWS,
-        LinePart( "random.mailnot" ),
-        OptFWS
+        MarkFWS,
+        NowStr,
+        Text "random.mailnot",
+        MarkFWS
     ]}
 
     ec_test!{ a_address, {
-        Email::from_input( "modnar@random.mailnot").map( |mail| {
-            ReceivedToken::Address( mail )
-        })
+        let email = Email::from_input( "modnar@random.mailnot")?;
+        ReceivedToken::Address( email )
     } => ascii => [
-        LinePart( "<" ),
-        OptFWS,
-        LinePart( "modnar" ),
-        OptFWS,
-        LinePart( "@" ),
-        OptFWS,
-        LinePart( "random.mailnot" ),
-        OptFWS,
-        LinePart( ">" )
+        NowChar,
+        Text "<",
+        MarkFWS,
+        NowStr,
+        Text "modnar",
+        MarkFWS,
+        NowChar,
+        Text "@",
+        MarkFWS,
+        NowStr,
+        Text "random.mailnot",
+        MarkFWS,
+        NowChar,
+        Text ">"
     ]}
 
     ec_test!{ a_word, {
-        Word::from_input( "simple" ).map( |word| {
-            ReceivedToken::Word( word )
-        })
+        let word = Word::from_input( "simple" )?;
+        ReceivedToken::Word( word )
     } => ascii => [
-        LinePart( "simple" )
+        NowStr,
+        Text "simple"
     ]}
 
     ec_test!{ a_quoted_word, {
-        Word::from_input( "sim ple" ).map( |word|  {
-            ReceivedToken::Word( word )
-        } )
+        let word = Word::from_input( "sim ple" )?;
+        ReceivedToken::Word( word )
     } => ascii => [
-        LinePart( r#""sim ple""# )
+        NowStr,
+        Text r#""sim ple""#
     ]}
 
 
     #[test]
     fn no_encoded_word() {
-        use codec::MailEncodable;
-        use codec::test_utils::TestMailEncoder;
-
-        let mut ec = TestMailEncoder::new( MailType::Ascii );
+        let mut encoder = Encoder::<VecBodyBuf>::new( MailType::Ascii );
+        let mut handle = encoder.encode_header_handle();
         let input = ReceivedToken::Word( Word::from_input( "↓right" ).unwrap() );
-        let res = input.encode( &mut ec );
-        assert_eq!( false, res.is_ok() );
+        assert_err!(input.encode( &mut handle ));
+        handle.undo_header();
     }
 }

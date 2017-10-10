@@ -1,5 +1,4 @@
 use std::fmt;
-use codec::MailEncoder;
 
 use ascii::AsciiStr;
 pub use ascii::{  AsciiStr as _AsciiStr };
@@ -42,9 +41,7 @@ pub trait Header {
     /// there and the component is of the expected type
     /// and it is invalid in the context
     /// an error should be returned.
-    fn get_contextual_validator<E>() -> Option<fn(&HeaderMap<E>) -> Result<()>>
-        where E: MailEncoder
-    {
+    fn get_contextual_validator() -> Option<fn(&HeaderMap) -> Result<()>> {
         None
     }
 }

@@ -29,15 +29,12 @@ macro_rules! def_headers {
                     unsafe { $crate::headers::HeaderName::from_ascii_unchecked( as_str ) }
                 }
 
-                fn get_contextual_validator<E>()
-                    -> Option<fn(&$crate::headers::HeaderMap<E>) -> $crate::error::Result<()>>
-                    where E: $crate::codec::MailEncoder
+                fn get_contextual_validator()
+                    -> Option<fn(&$crate::headers::HeaderMap) -> $crate::error::Result<()>>
                 {
-                    def_headers!{ _PRIV_mk_validator E, $validator }
+                    def_headers!{ _PRIV_mk_validator $validator }
                 }
             }
-
-
         )+
 
         $(
@@ -59,7 +56,7 @@ macro_rules! def_headers {
         #[test]
         fn $tn() {
             use std::collections::HashSet;
-            use $crate::codec::{ MailEncoder, MailEncodable, MailEncoderImpl };
+            use $crate::codec::EncodableInHeader;
 
             let mut name_set = HashSet::new();
             for name in HEADER_NAMES {
@@ -67,11 +64,11 @@ macro_rules! def_headers {
                     panic!("name appears more than one time in same def_headers macro: {:?}", name);
                 }
             }
-            fn can_be_trait_object<E: MailEncoder, EN: MailEncodable<E>>( v: Option<&EN> ) {
-                let _ = v.map( |en| en as &MailEncodable<E> );
+            fn can_be_trait_object<EN: EncodableInHeader>( v: Option<&EN> ) {
+                let _ = v.map( |en| en as &EncodableInHeader );
             }
             $(
-                can_be_trait_object::<MailEncoderImpl, $scope::$component>( None );
+                can_be_trait_object::<$scope::$component>( None );
             )+
             for name in HEADER_NAMES {
                 let res = $crate::headers::HeaderName::validate_name(
@@ -83,8 +80,8 @@ macro_rules! def_headers {
             }
         }
     );
-    (_PRIV_mk_validator $E:ident, None) => ({ None });
-    (_PRIV_mk_validator $E:ident, $validator:ident) => ({ Some($validator::<$E>) });
+    (_PRIV_mk_validator None) => ({ None });
+    (_PRIV_mk_validator $validator:ident) => ({ Some($validator) });
     (_PRIV_boolify +) => ({ false });
     (_PRIV_boolify 1) => ({ true });
     (_PRIV_boolify $other:tt) => (
@@ -143,13 +140,11 @@ mod validators {
     use std::collections::HashMap;
 
     use error::*;
-    use codec::{ MailEncoder, MailEncodable};
+    use codec::EncodableInHeader;
     use headers::{ HeaderMap, Header, HeaderName };
     use super::{ From, ResentFrom, Sender, ResentSender, ResentDate };
 
-    pub fn from<E>(map: &HeaderMap<E>) -> Result<()>
-        where E: MailEncoder
-    {
+    pub fn from(map: &HeaderMap) -> Result<()> {
         // Note: we do not care about the quantity of From bodies,
         // nor "other" From bodies
         // (which do not use a MailboxList and we could
@@ -167,11 +162,9 @@ mod validators {
         Ok(())
     }
 
-    fn validate_resent_block<'a, E>(
-            block: &HashMap<HeaderName, &'a MailEncodable<E>>
-    ) -> Result<()>
-        where E: MailEncoder
-    {
+    fn validate_resent_block<'a>(
+            block: &HashMap<HeaderName, &'a EncodableInHeader>
+    ) -> Result<()> {
         if !block.contains_key(&ResentDate::name()) {
             bail!("each reasond block must have a Resent-Date field");
         }
@@ -189,9 +182,7 @@ mod validators {
         Ok(())
     }
 
-    pub fn resent_any<E>(map: &HeaderMap<E>) -> Result<()>
-        where E: MailEncoder
-    {
+    pub fn resent_any(map: &HeaderMap) -> Result<()> {
         let resents = map
             .iter()
             .filter(|&(name, _)| name.as_str().starts_with("Resent-"));
@@ -211,7 +202,6 @@ mod validators {
 
 #[cfg(test)]
 mod test {
-    use codec::MailEncoderImpl;
     use components::DateTime;
     use headers::{
         HeaderMap,
@@ -219,14 +209,11 @@ mod test {
         Sender, ResentSender, Subject
     };
 
-    fn typed(_: &HeaderMap<MailEncoderImpl>){}
-
     #[test]
     fn from_validation_normal() {
         let mut map = HeaderMap::new();
         map.insert(From, [("Mr. Peté", "pete@nixmail.nixdomain")]).unwrap();
         map.insert(Subject, "Ok").unwrap();
-        typed(&map);
 
         assert_ok!(map.use_contextual_validators());
     }
@@ -238,7 +225,6 @@ mod test {
             "a@b.c"
         )).unwrap();
         map.insert(Subject, "Ok").unwrap();
-        typed(&map);
 
         assert_err!(map.use_contextual_validators());
     }
@@ -252,7 +238,6 @@ mod test {
         )).unwrap();
         map.insert(Sender, "abx@d.e").unwrap();
         map.insert(Subject, "Ok").unwrap();
-        typed(&map);
 
         assert_ok!(map.use_contextual_validators());
     }
@@ -261,7 +246,6 @@ mod test {
     fn resent_no_date_err() {
         let mut map = HeaderMap::new();
         map.insert(ResentFrom,["a@b.c"]).unwrap();
-        typed(&map);
         assert_err!(map.use_contextual_validators());
     }
 
@@ -270,7 +254,6 @@ mod test {
         let mut map = HeaderMap::new();
         map.insert(ResentFrom,["a@b.c"]).unwrap();
         map.insert(ResentDate, DateTime::now()).unwrap();
-        typed(&map);
         assert_ok!(map.use_contextual_validators());
     }
 
@@ -282,7 +265,6 @@ mod test {
         map.insert(ResentTo, ["e@f.d"]).unwrap();
         map.insert(ResentFrom, ["ee@ee.e"]).unwrap();
 
-        typed(&map);
         assert_err!(map.use_contextual_validators());
     }
 
@@ -295,7 +277,6 @@ mod test {
         map.insert(ResentFrom, ["ee@ee.e"]).unwrap();
         map.insert(ResentDate, DateTime::now()).unwrap();
 
-        typed(&map);
         assert_ok!(map.use_contextual_validators());
     }
 
@@ -304,7 +285,7 @@ mod test {
         let mut map = HeaderMap::new();
         map.insert(ResentDate, DateTime::now()).unwrap();
         map.insert(ResentFrom, ["a@b.c","e@c.d"]).unwrap();
-        typed(&map);
+
         assert_err!(map.use_contextual_validators());
     }
 
@@ -314,7 +295,7 @@ mod test {
         map.insert(ResentDate, DateTime::now()).unwrap();
         map.insert(ResentFrom, ["a@b.c","e@c.d"]).unwrap();
         map.insert(ResentSender, "a@b.c").unwrap();
-        typed(&map);
+
         assert_ok!(map.use_contextual_validators());
     }
 }

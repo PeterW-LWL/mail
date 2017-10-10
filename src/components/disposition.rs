@@ -1,7 +1,7 @@
 use std::ascii::AsciiExt;
 
 use error::*;
-use codec::{ MailEncodable, MailEncoder };
+use codec::{EncodableInHeader, EncodeHeaderHandle};
 use utils::{ FileMeta, HeaderTryFrom };
 use components::mime::create_encoded_mime_parameter;
 
@@ -69,10 +69,10 @@ impl<'a> HeaderTryFrom<&'a str> for Disposition {
 //TODO provide a gnneral way for encoding header parameter ...
 //  which follow the scheme: <mainvalue> *(";" <key>"="<value> )
 //  this are: ContentType and ContentDisposition for now
-impl<E> MailEncodable<E> for DispositionParameters where E: MailEncoder {
+impl EncodableInHeader for DispositionParameters {
 
-    fn encode(&self, encoder: &mut E) -> Result<()> {
-        let mt = encoder.mail_type();
+    fn encode(&self, handle: &mut EncodeHeaderHandle) -> Result<()> {
+        let mt = handle.mail_type();
         let mut out = String::new();
         if let Some(filename) = self.file_name.as_ref() {
             create_encoded_mime_parameter(
@@ -94,25 +94,26 @@ impl<E> MailEncodable<E> for DispositionParameters where E: MailEncoder {
             create_encoded_mime_parameter(
                 "size", size.to_string(), &mut out, mt)?;
         }
-        encoder.write_str_unchecked(&*out);
+        //TODO this function will be removed so do it differently
+        handle.write_str_unchecked(&*out);
         Ok( () )
     }
 }
 
 
-impl<E> MailEncodable<E> for Disposition where E: MailEncoder {
+impl EncodableInHeader for Disposition {
 
-    fn encode(&self, encoder: &mut E) -> Result<()> {
+    fn encode(&self, handle: &mut EncodeHeaderHandle) -> Result<()> {
         use self::DispositionKind::*;
         match self.kind {
             Inline => {
-                encoder.write_str( ascii_str!{ i n l i n e } );
+                handle.write_str( ascii_str!{ i n l i n e } );
             },
             Attachment => {
-                encoder.write_str( ascii_str!{ a t t a c h m e n t } );
+                handle.write_str( ascii_str!{ a t t a c h m e n t } );
             }
         }
-        self.file_meta.encode( encoder )?;
+        self.file_meta.encode( handle )?;
         Ok( () )
     }
 }
@@ -125,45 +126,48 @@ mod test {
     use std::default::Default;
 
     use super::*;
-    use codec::test_utils::*;
     use components::DateTime;
 
     ec_test!{ no_params_inline, {
-        Some( Disposition::inline() )
+        Disposition::inline()
     } => ascii => [
-        LinePart("inline")
+        NowStr,
+        Text "inline"
     ]}
 
     ec_test!{ no_params_attachment, {
-        Some( Disposition::attachment() )
+        Disposition::attachment()
     } => ascii => [
-        LinePart("attachment")
+        NowStr,
+        Text "attachment"
     ]}
 
     ec_test!{ attachment_encode_file_name, {
-        Some( Disposition::new( DispositionKind::Attachment, FileMeta {
+        Disposition::new( DispositionKind::Attachment, FileMeta {
             file_name: Some("this is nice".to_owned()),
             ..Default::default()
-        }))
+        })
     } => ascii => [
-        LinePart("attachment;filename=\"this is nice\"")
+        NowStr,
+        Text "attachment;filename=\"this is nice\""
     ]}
 
     ec_test!{ attachment_all_params, {
-        Some( Disposition::new( DispositionKind::Attachment, FileMeta {
+        Disposition::new( DispositionKind::Attachment, FileMeta {
             file_name: Some( "random.png".to_owned() ),
             creation_date: Some( DateTime::test_time( 1 ) ),
             modification_date: Some( DateTime::test_time( 2 ) ),
             read_date: Some( DateTime::test_time( 3 ) ),
             size: Some( 4096 )
-        }) )
+        })
     } => ascii => [
-        LinePart( concat!( "attachment",
+        NowStr,
+        Text concat!( "attachment",
             ";filename=random.png",
             ";creation-date=\"Tue,  6 Aug 2013 04:11:01 +0000\"",
             ";modification-date=\"Tue,  6 Aug 2013 04:11:02 +0000\"",
             ";read-date=\"Tue,  6 Aug 2013 04:11:03 +0000\"",
-            ";size=4096" ) )
+            ";size=4096" ),
     ]}
 
     //TODO: (1 allow FWS or so in parameters) (2 utf8 file names)

@@ -3,7 +3,7 @@ use ascii::{ AsciiString, AsciiChar, AsciiStr };
 use external::vec1::Vec1;
 use grammar::encoded_word::{ MAX_ECW_LEN, ECW_SEP_OVERHEAD };
 use super::{ EncodedWordEncoding as Encoding };
-use super::traits::MailEncoder;
+use super::encoder::EncodeHeaderHandle;
 use super::traits::EncodedWordWriter;
 
 pub struct VecWriter<'a> {
@@ -52,34 +52,39 @@ impl<'a> EncodedWordWriter for VecWriter<'a> {
     }
 }
 
-pub struct WriterWrapper<'a, E:'a>{
+pub struct WriterWrapper<'a, 'b: 'a>{
     charset: &'a AsciiStr,
     encoding: Encoding,
-    encoder: &'a mut E
+    encoder_handle: &'a mut EncodeHeaderHandle<'b>
 }
 
-impl<'a, E> WriterWrapper<'a, E> where E: MailEncoder + 'a {
-    pub fn new( charset: &'a AsciiStr, encoding: Encoding, encoder: &'a mut E ) -> Self {
-        WriterWrapper { charset, encoding, encoder }
+impl<'a, 'b: 'a> WriterWrapper<'a, 'b> {
+    pub fn new( charset: &'a AsciiStr,
+                encoding: Encoding,
+                encoder: &'a mut EncodeHeaderHandle<'b> ) -> Self
+    {
+        WriterWrapper { charset, encoding, encoder_handle: encoder }
     }
 }
 
-impl<'a, E> EncodedWordWriter for WriterWrapper<'a, E> where E: MailEncoder + 'a {
+impl<'a, 'b: 'a> EncodedWordWriter for WriterWrapper<'a, 'b> {
 
     fn encoding( &self ) -> Encoding {
         self.encoding
     }
 
     fn write_charset( &mut self ) {
-        self.encoder.write_str( self.charset )
+        //TODO fix
+        let _ = self.encoder_handle.write_str( self.charset );
     }
 
     fn write_ecw_seperator( &mut self ) {
-        self.encoder.write_fws();
+        self.encoder_handle.write_fws();
     }
 
     fn write_char( &mut self, ch: AsciiChar ) {
-        self.encoder.write_char( ch )
+        //TODO fix
+        let _ = self.encoder_handle.write_char( ch );
     }
 
     fn max_payload_len( &self ) -> usize {

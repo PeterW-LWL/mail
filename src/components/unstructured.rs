@@ -5,10 +5,7 @@ use ascii::AsciiChar;
 use error::*;
 use grammar::is_vchar;
 use grammar::encoded_word::EncodedWordContext;
-use codec::{
-    MailEncoder, MailEncodable,
-    EncodedWordEncoding
-};
+use codec::{EncodeHeaderHandle, EncodableInHeader,EncodedWordEncoding};
 use data::{ FromInput, EncodedWord };
 
 use super::utils::text_partition::{partition, Partition};
@@ -41,9 +38,9 @@ impl FromInput for Unstructured {
 }
 
 
-impl<E> MailEncodable<E> for Unstructured where E: MailEncoder {
+impl EncodableInHeader for  Unstructured {
 
-    fn encode(&self, encoder: &mut E) -> Result<()> {
+    fn encode(&self, handle: &mut EncodeHeaderHandle) -> Result<()> {
         let text: &str = &*self.text;
         if text.len() == 0 {
             return Ok( () )
@@ -58,10 +55,10 @@ impl<E> MailEncodable<E> for Unstructured where E: MailEncoder {
                     had_word = true;
                     let needs_encoding = data
                         .chars()
-                        .any(|ch| !is_vchar( ch, encoder.mail_type() ) );
+                        .any(|ch| !is_vchar( ch, handle.mail_type() ) );
 
                     if needs_encoding {
-                        EncodedWord::write_into( encoder,
+                        EncodedWord::write_into( handle,
                                                  data,
                                                  EncodedWordEncoding::QuotedPrintable,
                                                  EncodedWordContext::Text );
@@ -70,7 +67,7 @@ impl<E> MailEncodable<E> for Unstructured where E: MailEncoder {
                         // type, therefore if the mail type is Ascii this can only be
                         // Ascii. Note that even writing Utf8 to a Ascii mail is safe
                         // wrt. rust, but incorrect nevertheless.
-                        encoder.write_str_unchecked( data )
+                        handle.write_str_unchecked( data )?;
                     }
                 },
                 Partition::SPACE( data ) => {
@@ -83,10 +80,10 @@ impl<E> MailEncodable<E> for Unstructured where E: MailEncoder {
                             continue;
                         } else if had_fws {
                             //OPTIMIZE: from_unchecked as char is always a char in this context
-                            encoder.write_char( AsciiChar::from( char ).unwrap() );
+                            handle.write_char( AsciiChar::from( char ).unwrap() );
                         } else {
                             //FIXME allow writing fws based on '\t'
-                            encoder.write_fws();
+                            handle.write_fws();
                             had_fws = true;
                         }
                     }
@@ -95,7 +92,7 @@ impl<E> MailEncodable<E> for Unstructured where E: MailEncoder {
                         //NOTE: space has to be at last one horizontal-white-space
                         // (required by the possibility of VCHAR partitions beeing
                         //  encoded words)
-                        encoder.write_fws();
+                        handle.write_fws();
                     }
                 }
             }
@@ -116,83 +113,103 @@ impl<E> MailEncodable<E> for Unstructured where E: MailEncoder {
 #[cfg(test)]
 mod test {
     use grammar::MailType;
-    use codec::test_utils::*;
+    use codec::{Encoder, VecBodyBuf};
+
     use super::*;
 
     ec_test! { simple_encoding, {
-        Unstructured::from_input( "this simple case" )
+        Unstructured::from_input( "this simple case" )?
     } => ascii => [
-        LinePart( "this"),
-        FWS,
-        LinePart( "simple" ),
-        FWS,
-        LinePart( "case" )
+        NowStr,
+        Text "this",
+        MarkFWS, NowChar, Text " ",
+        NowStr,
+        Text "simple",
+        MarkFWS, NowChar, Text " ",
+        NowStr,
+        Text "case"
     ]}
 
     ec_test!{ simple_utf8,  {
-         Unstructured::from_input( "thüs sümple cäse" )
+         Unstructured::from_input( "thüs sümple case" )?
     } => utf8 => [
-        LinePart( "thüs"),
-        FWS,
-        LinePart( "sümple" ),
-        FWS,
-        LinePart( "cäse" )
+        NowUtf8,
+        Text "thüs",
+        MarkFWS, NowChar, Text " ",
+        NowUtf8,
+        Text "sümple",
+        MarkFWS, NowChar, Text " ",
+        NowUtf8,
+        Text "case"
     ]}
 
     ec_test!{ encoded_words,  {
-         Unstructured::from_input( "↑ ↓ ←→ bA" )
+         Unstructured::from_input( "↑ ↓ ←→ bA" )?
     } => ascii => [
-        LinePart( "=?utf8?Q?=E2=86=91?=" ),
-        FWS,
-        LinePart( "=?utf8?Q?=E2=86=93?=" ),
-        FWS,
-        LinePart( "=?utf8?Q?=E2=86=90=E2=86=92?="),
-        FWS,
-        LinePart( "bA" )
+        NowStr,
+        Text "=?utf8?Q?=E2=86=91?=",
+        MarkFWS, NowChar, Text " ",
+        NowStr,
+        Text "=?utf8?Q?=E2=86=93?=",
+        MarkFWS, NowChar, Text " ",
+        NowStr,
+        Text "=?utf8?Q?=E2=86=90=E2=86=92?=",
+        MarkFWS, NowChar, Text " ",
+        NowStr,
+        Text "bA"
     ]}
 
     ec_test!{ eats_cr_lf, {
-        Unstructured::from_input( "a \rb\n c\r\n " )
+        Unstructured::from_input( "a \rb\n c\r\n " )?
     } => ascii => [
-        LinePart("a"),
-        FWS,
-        LinePart("b"),
-        FWS,
-        LinePart("c"),
-        FWS
+        NowStr,
+        Text "a",
+        MarkFWS, NowChar, Text " ",
+        NowStr,
+        Text "b",
+        MarkFWS, NowChar, Text " ",
+        NowStr,
+        Text "c",
+        MarkFWS, NowChar, Text " "
     ]}
 
     ec_test!{ at_last_one_fws, {
-        Unstructured::from_input( "a\rb\nc\r\n" )
+        Unstructured::from_input( "a\rb\nc\r\n" )?
     } => ascii => [
-        LinePart("a"),
-        FWS,
-        LinePart("b"),
-        FWS,
-        LinePart("c"),
-        FWS
+        NowStr,
+        Text "a",
+        MarkFWS, NowChar, Text " ",
+        NowStr,
+        Text "b",
+        MarkFWS, NowChar, Text " ",
+        NowStr,
+        Text "c",
+        MarkFWS, NowChar, Text " "
     ]}
 
     ec_test!{ kinda_keeps_wsp, {
-        Unstructured::from_input("\t\ta  b \t")
+        Unstructured::from_input("\t\ta  b \t")?
     } => ascii => [
-        FWS,
-        LinePart( "\ta" ),
-        FWS,
-        LinePart( " b" ),
-        FWS,
-        LinePart( "\t" )
+        MarkFWS, NowChar, Text " ",
+        NowStr,
+        Text "\ta",
+        MarkFWS, NowChar, Text " ",
+        NowStr,
+        Text " b",
+        MarkFWS, NowChar, Text " ",
+        NowStr,
+        Text "\t"
     ]}
 
 
     #[test]
     fn wsp_only_phrase_fails() {
-        use codec::MailEncodable;
-        use codec::test_utils::TestMailEncoder;
-
-        let mut ec = TestMailEncoder::new( MailType::Ascii );
-        let input = Unstructured::from_input( " \t " ).unwrap();
-        let res = input.encode( &mut ec );
-        assert_eq!( false, res.is_ok() );
+        let mut encoder = Encoder::<VecBodyBuf>::new(MailType::Ascii);
+        {
+            let mut handle = encoder.encode_header_handle();
+            let input = Unstructured::from_input( " \t " ).unwrap();
+            assert_err!(input.encode( &mut handle ));
+            handle.undo_header();
+        }
     }
 }

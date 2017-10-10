@@ -2,7 +2,7 @@ use ascii::AsciiChar;
 
 use error::*;
 use utils::{HeaderTryFrom, HeaderTryInto};
-use codec::{ MailEncoder, MailEncodable };
+use codec::{EncodableInHeader, EncodeHeaderHandle};
 use super::Email;
 
 
@@ -23,16 +23,16 @@ impl<T> HeaderTryFrom<T> for Path
     }
 }
 
-impl<E> MailEncodable<E> for Path where E: MailEncoder {
+impl EncodableInHeader for  Path {
 
-    fn encode(&self, encoder: &mut E) -> Result<()> {
-        encoder.note_optional_fws();
-        encoder.write_char( AsciiChar::LessThan );
+    fn encode(&self, handle: &mut EncodeHeaderHandle) -> Result<()> {
+        handle.mark_fws_pos();
+        handle.write_char( AsciiChar::LessThan );
         if let Some( mail ) = self.0.as_ref() {
-            mail.encode( encoder )?;
+            mail.encode( handle )?;
         }
-        encoder.write_char( AsciiChar::GreaterThan );
-        encoder.note_optional_fws();
+        handle.write_char( AsciiChar::GreaterThan );
+        handle.mark_fws_pos();
         Ok( () )
     }
 }
@@ -42,29 +42,36 @@ impl<E> MailEncodable<E> for Path where E: MailEncoder {
 mod test {
     use super::*;
     use data::FromInput;
-    use codec::test_utils::*;
 
     ec_test!{empty_path, {
-        Some( Path( None ) )
+        Path( None )
     } => ascii => [
-        OptFWS,
-        LinePart( "<>" ),
-        OptFWS
+        MarkFWS,
+        NowChar,
+        Text "<",
+        NowChar,
+        Text ">",
+        MarkFWS
     ]}
 
     ec_test!{simple_path, {
-        Some( Path( Some( Email::from_input( "abc@de.fg" ).unwrap() ) ) )
+        Path( Some( Email::from_input( "abc@de.fg" )? ) )
     } => ascii => [
-        OptFWS,
-        LinePart( "<" ),
-        OptFWS,
-        LinePart("abc"),
-        OptFWS,
-        LinePart("@"),
-        OptFWS,
-        LinePart("de.fg"),
-        OptFWS,
-        LinePart(">"),
-        OptFWS
+        MarkFWS,
+        NowChar,
+        Text "<",
+        MarkFWS,
+        NowStr,
+        Text "abc",
+        MarkFWS,
+        NowChar,
+        Text "@",
+        MarkFWS,
+        NowStr,
+        Text "de.fg",
+        MarkFWS,
+        NowChar,
+        Text ">",
+        MarkFWS
     ]}
 }

@@ -84,15 +84,6 @@ pub(crate) fn insert_bytes(vec: &mut Vec<u8> , idx: usize, bytes: &[u8]) {
     }
 }
 
-
-pub fn unbox_ref<E: ?Sized>( bxr: &Box<E> ) -> &E {
-    &**bxr
-}
-pub fn unbox_mut<E: ?Sized>( bxm: &mut Box<E> ) -> &mut E {
-    &mut **bxm
-}
-
-
 //TODO replace with std TryFrom once it is stable
 // (either a hard replace, or a soft replace which implements HeaderTryFrom if TryFrom exist)
 pub trait HeaderTryFrom<T>: Sized {

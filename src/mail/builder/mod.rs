@@ -13,7 +13,7 @@ use ascii::AsciiString;
 
 use utils::uneraser_ref;
 use error::*;
-use codec::{ MailEncoder, MailEncodable };
+use codec::EncodableInHeader;
 use utils::{ is_multipart_mime, HeaderTryInto };
 use headers::{
     HeaderMap, Header,
@@ -29,22 +29,22 @@ use super::{ MailPart, Mail };
 
 pub struct Builder;
 
-struct BuilderShared<E: MailEncoder> {
-    headers: HeaderMap<E>
+struct BuilderShared {
+    headers: HeaderMap
 }
 
-pub struct SinglepartBuilder<E: MailEncoder> {
-    inner: BuilderShared<E>,
+pub struct SinglepartBuilder {
+    inner: BuilderShared,
     body: Resource
 }
 
-pub struct MultipartBuilder<E: MailEncoder> {
-    inner: BuilderShared<E>,
+pub struct MultipartBuilder {
+    inner: BuilderShared,
     hidden_text: Option<AsciiString>,
-    bodies: Vec<Mail<E>>
+    bodies: Vec<Mail>
 }
 
-impl<E> BuilderShared<E> where E: MailEncoder {
+impl BuilderShared {
 
     fn new() -> Self {
         BuilderShared {
@@ -69,14 +69,14 @@ impl<E> BuilderShared<E> where E: MailEncoder {
         is_multipart: bool
     ) -> Result<usize>
         where H: Header,
-              H::Component: MailEncodable<E>
+              H::Component: EncodableInHeader
     {
-        check_header::<H, _>(&hbody, is_multipart)?;
+        check_header::<H>(&hbody, is_multipart)?;
         self.headers.insert( header, hbody )
     }
 
     /// might already have added some headers even if it returns Err(...)
-    fn headers( &mut self, headers: HeaderMap<E>, is_multipart: bool ) -> Result<()> {
+    fn headers( &mut self, headers: HeaderMap, is_multipart: bool ) -> Result<()> {
         //TODO CONSIDER:
         // it is not impossible to make this function "transactional" for HeaderMap
         // (it is impossible for TotalOrderMultiMap) by:
@@ -88,7 +88,7 @@ impl<E> BuilderShared<E> where E: MailEncoder {
         Ok( () )
     }
 
-    fn build( self, body: MailPart<E> ) -> Result<Mail<E>> {
+    fn build( self, body: MailPart ) -> Result<Mail> {
         Ok( Mail {
             headers: self.headers,
             body: body,
@@ -96,9 +96,7 @@ impl<E> BuilderShared<E> where E: MailEncoder {
     }
 }
 
-pub fn check_multiple_headers<E>( headers: &HeaderMap<E> , is_multipart: bool) -> Result<()>
-    where E: MailEncoder
-{
+pub fn check_multiple_headers( headers: &HeaderMap , is_multipart: bool) -> Result<()> {
     if let Some( .. ) = headers.get_single(ContentTransferEncoding) {
         bail!( concat!(
             "setting content transfer encoding through a header is not supported,",
@@ -113,13 +111,12 @@ pub fn check_multiple_headers<E>( headers: &HeaderMap<E> , is_multipart: bool) -
     Ok( () )
 }
 
-pub fn check_header<H, E>(
+pub fn check_header<H>(
     hbody: &H::Component,
     is_multipart: bool
 ) -> Result<()>
-    where E: MailEncoder,
-          H: Header,
-          H::Component: MailEncodable<E>
+    where H: Header,
+          H::Component: EncodableInHeader
 {
     match H::name().as_str() {
         "Content-Type" => {
@@ -142,7 +139,7 @@ pub fn check_header<H, E>(
 
 impl Builder {
 
-    pub fn multipart<E: MailEncoder>( mime: MultipartMime ) -> MultipartBuilder<E> {
+    pub fn multipart( mime: MultipartMime ) -> MultipartBuilder {
         let res = MultipartBuilder {
             inner: BuilderShared::new(),
             hidden_text: None,
@@ -154,7 +151,7 @@ impl Builder {
         res.header( ContentType, mime ).unwrap()
     }
 
-    pub fn singlepart<E: MailEncoder>( r: Resource ) -> SinglepartBuilder<E> {
+    pub fn singlepart( r: Resource ) -> SinglepartBuilder {
         SinglepartBuilder {
             inner: BuilderShared::new(),
             body: r,
@@ -163,9 +160,7 @@ impl Builder {
 
 }
 
-impl<E> SinglepartBuilder<E>
-    where E: MailEncoder
-{
+impl SinglepartBuilder {
 
     pub fn header<H, C>(
         &mut self,
@@ -173,27 +168,25 @@ impl<E> SinglepartBuilder<E>
         hbody: C
     ) -> Result<usize>
         where H: Header,
-              H::Component: MailEncodable<E>,
+              H::Component: EncodableInHeader,
               C: HeaderTryInto<H::Component>
     {
         let comp = hbody.try_into()?;
         self.inner.header( header, comp, false )
     }
 
-    pub fn headers( mut self, headers: HeaderMap<E> ) -> Result<Self> {
+    pub fn headers( mut self, headers: HeaderMap ) -> Result<Self> {
         self.inner.headers( headers, false )?;
         Ok( self )
     }
 
-    pub fn build( self ) -> Result<Mail<E>> {
+    pub fn build( self ) -> Result<Mail> {
 
         self.inner.build( MailPart::SingleBody { body: self.body } )
     }
 }
 
-impl<E> MultipartBuilder<E>
-    where E: MailEncoder
-{
+impl MultipartBuilder {
 
 
     ///
@@ -207,7 +200,7 @@ impl<E> MultipartBuilder<E>
         hbody: C
     ) -> Result<Self>
         where H: Header,
-              H::Component: MailEncodable<E>,
+              H::Component: EncodableInHeader,
               C: HeaderTryInto<H::Component>
     {
         let comp = hbody.try_into()?;
@@ -215,17 +208,17 @@ impl<E> MultipartBuilder<E>
         Ok( self )
     }
 
-    pub fn headers( mut self, headers: HeaderMap<E> ) -> Result<Self> {
+    pub fn headers( mut self, headers: HeaderMap ) -> Result<Self> {
         self.inner.headers( headers, true )?;
         Ok( self )
     }
 
-    pub fn body( mut self, body: Mail<E> ) -> Result<Self> {
+    pub fn body( mut self, body: Mail ) -> Result<Self> {
         self.bodies.push( body );
         Ok( self )
     }
 
-    pub fn build( self ) -> Result<Mail<E>> {
+    pub fn build( self ) -> Result<Mail> {
         if self.bodies.len() == 0 {
             Err( ErrorKind::NeedAtLastOneBodyInMultipartMail.into() )
         } else {

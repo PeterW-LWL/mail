@@ -15,10 +15,7 @@ use external::total_order_multi_map::{
 use error::*;
 
 use utils::HeaderTryInto;
-use codec::{
-    MailEncoder,
-    MailEncodable
-};
+use codec::EncodableInHeader;
 
 use super::{
     HeaderName,
@@ -32,15 +29,14 @@ mod into_iter;
 
 /// A runtime representations of a `Header` types meta
 /// properties like `MAX_COUNT_EQ_1` or `CONTEXTUAL_VALIDATOR`
-pub struct HeaderMeta<E: MailEncoder> {
+pub struct HeaderMeta {
     pub max_count_eq_1: bool,
-    pub contextual_validator: Option<fn(&HeaderMap<E>) -> Result<()>>
+    pub contextual_validator: Option<fn(&HeaderMap) -> Result<()>>
 }
 //TODO imple PartialEq, Eq and Hash per hand as derive does not work as it adds a wher E: XXX bound
 
-impl<E> Clone for HeaderMeta<E>
-    where E: MailEncoder
-{
+impl Clone for HeaderMeta {
+
     fn clone(&self) -> Self {
         HeaderMeta {
             max_count_eq_1: self.max_count_eq_1,
@@ -49,9 +45,8 @@ impl<E> Clone for HeaderMeta<E>
     }
 
 }
-impl<E> Debug for HeaderMeta<E>
-    where E: MailEncoder
-{
+impl Debug for HeaderMeta {
+
     fn fmt(&self, fter: &mut fmt::Formatter) -> fmt::Result {
         let usized = self.contextual_validator.clone().map(|x|x as usize);
         fter.debug_struct("HeaderMeta")
@@ -62,9 +57,8 @@ impl<E> Debug for HeaderMeta<E>
 }
 
 
-impl<E> HeaderMeta<E>
-    where E: MailEncoder
-{
+impl HeaderMeta {
+
     pub fn from_header_type<H: Header>() -> Self {
         HeaderMeta {
             max_count_eq_1: H::MAX_COUNT_EQ_1,
@@ -73,7 +67,7 @@ impl<E> HeaderMeta<E>
     }
 
     #[inline]
-    pub fn is_compatible(&self, other: &HeaderMeta<E>) -> bool {
+    pub fn is_compatible(&self, other: &HeaderMeta) -> bool {
         self.check_update(other).is_ok()
     }
 
@@ -85,9 +79,8 @@ impl<E> HeaderMeta<E>
     }
 }
 
-impl<E> Meta for HeaderMeta<E>
-    where E: MailEncoder
-{
+impl Meta for HeaderMeta {
+
     type MergeError = Error;
 
     fn check_update(&self, other: &Self) -> StdResult<(), Self::MergeError> {
@@ -125,18 +118,16 @@ impl<E> Meta for HeaderMeta<E>
 /// let _ = map._get::<Subject>();
 /// ```
 ///
-pub struct HeaderMap<E: MailEncoder> {
-    inner_map: TotalOrderMultiMap<HeaderName, Box<MailEncodable<E>>, HeaderMeta<E>>,
+pub struct HeaderMap {
+    inner_map: TotalOrderMultiMap<HeaderName, Box<EncodableInHeader>, HeaderMeta>,
 }
 
-pub type Iter<'a, E> = total_order_multi_map::Iter<'a, HeaderName, Box<MailEncodable<E>>>;
-pub type IterMut<'a, E> = total_order_multi_map::IterMut<'a, HeaderName, Box<MailEncodable<E>>>;
-pub type IntoIterWithMeta<E> =
-    total_order_multi_map::IntoIterWithMeta<HeaderName, Box<MailEncodable<E>>, HeaderMeta<E>>;
+pub type Iter<'a> = total_order_multi_map::Iter<'a, HeaderName, Box<EncodableInHeader>>;
+pub type IterMut<'a> = total_order_multi_map::IterMut<'a, HeaderName, Box<EncodableInHeader>>;
+pub type IntoIterWithMeta =
+    total_order_multi_map::IntoIterWithMeta<HeaderName, Box<EncodableInHeader>, HeaderMeta>;
 
-impl<E> Debug for HeaderMap<E>
-    where E: MailEncoder
-{
+impl Debug for HeaderMap {
     fn fmt(&self, fter: &mut fmt::Formatter) -> fmt::Result {
         write!(fter, "HeaderMap {{ ")?;
         for (key, val_cont) in self.iter() {
@@ -146,9 +137,7 @@ impl<E> Debug for HeaderMap<E>
     }
 }
 
-impl<E> Default for HeaderMap<E>
-    where E: MailEncoder
-{
+impl Default for HeaderMap {
     fn default() -> Self {
         HeaderMap {
             inner_map: Default::default()
@@ -156,9 +145,7 @@ impl<E> Default for HeaderMap<E>
     }
 }
 
-impl<E> HeaderMap<E>
-    where E: MailEncoder
-{
+impl HeaderMap {
     pub fn new() -> Self {
         Default::default()
     }
@@ -191,7 +178,7 @@ impl<E> HeaderMap<E>
     #[inline(always)]
     pub fn get_single<'a ,H>( &'a self, _type_hint: H ) -> Option<Result<&'a H::Component>>
         where H: Header + SingularHeaderMarker,
-              H::Component: MailEncodable<E>
+              H::Component: EncodableInHeader
     {
         self._get_single::<H>()
     }
@@ -206,7 +193,7 @@ impl<E> HeaderMap<E>
     /// same one
     pub fn _get_single<'a ,H>( &'a self ) -> Option<Result<&'a H::Component>>
         where H: Header + SingularHeaderMarker,
-              H::Component: MailEncodable<E>
+              H::Component: EncodableInHeader
     {
         self.get_untyped(H::name())
             .map( |mut bodies| {
@@ -225,19 +212,19 @@ impl<E> HeaderMap<E>
     /// Accepts both `HeaderName` or a type implementing `Header`.
     ///
     #[inline]
-    pub fn get_untyped<H: HasHeaderName>( &self, name: H ) -> Option<UntypedBodies<E>> {
+    pub fn get_untyped<H: HasHeaderName>( &self, name: H ) -> Option<UntypedBodies> {
         self.inner_map.get( name.get_name() )
     }
 
     #[inline(always)]
-    pub fn get<H>( &self, _type_hint: H) -> Option<TypedBodies<E, H>>
-        where H: Header, H::Component: MailEncodable<E>
+    pub fn get<H>( &self, _type_hint: H) -> Option<TypedBodies<H>>
+        where H: Header, H::Component: EncodableInHeader
     {
         self._get::<H>()
     }
 
-    pub fn _get<H>( &self ) -> Option<TypedBodies<E, H>>
-        where H: Header, H::Component: MailEncodable<E>
+    pub fn _get<H>( &self ) -> Option<TypedBodies<H>>
+        where H: Header, H::Component: EncodableInHeader
     {
         self.get_untyped( H::name() )
             .map( |untyped| untyped.into() )
@@ -259,7 +246,7 @@ impl<E> HeaderMap<E>
     #[inline(always)]
     pub fn insert<H, C>( &mut self, _htype_hint: H, hbody: C ) -> Result<usize>
         where H: Header,
-              H::Component: MailEncodable<E>,
+              H::Component: EncodableInHeader,
               C: HeaderTryInto<H::Component>
     {
         self._insert::<H, C>( hbody )
@@ -273,11 +260,11 @@ impl<E> HeaderMap<E>
     #[inline]
     pub fn _insert<H, C>( &mut self,  hbody: C ) -> Result<usize>
         where H: Header,
-              H::Component: MailEncodable<E>,
+              H::Component: EncodableInHeader,
               C: HeaderTryInto<H::Component>
     {
         let hbody: H::Component = hbody.try_into()?;
-        let tobj: Box<MailEncodable<E>> = Box::new( hbody );
+        let tobj: Box<EncodableInHeader> = Box::new( hbody );
         let name = H::name();
         let meta = HeaderMeta::from_header_type::<H>();
         self.inner_map.insert(name, tobj, meta)
@@ -294,7 +281,7 @@ impl<E> HeaderMap<E>
     /// any header added to `self` during this call to `extend` is
     /// removed again before `extend` returns.
     ///
-    pub fn extend( &mut self, other: HeaderMap<E> )
+    pub fn extend( &mut self, other: HeaderMap )
         -> Result<&mut Self>
     {
         let prev_len = self.len();
@@ -329,64 +316,60 @@ impl<E> HeaderMap<E>
 
 
     #[inline]
-    pub fn iter(&self) -> Iter<E> {
+    pub fn iter(&self) -> Iter {
         self.inner_map.iter()
     }
 
     #[inline]
-    pub fn iter_mut(&mut self) -> IterMut<E> {
+    pub fn iter_mut(&mut self) -> IterMut {
         self.inner_map.iter_mut()
     }
 
     #[inline]
-    pub fn into_iter_with_meta(self) -> IntoIterWithMeta<E> {
+    pub fn into_iter_with_meta(self) -> IntoIterWithMeta {
         self.inner_map.into_iter_with_meta()
     }
 }
 
 
-pub type UntypedBodies<'a, E> = EntryValues<'a, MailEncodable<E>, HeaderMeta<E>>;
+pub type UntypedBodies<'a> = EntryValues<'a, EncodableInHeader, HeaderMeta>;
 
 
-pub struct TypedBodies<'a, E, H>
-    where E: MailEncoder,
-          H: Header,
-          H::Component: MailEncodable<E>
+pub struct TypedBodies<'a, H>
+    where H: Header,
+          H::Component: EncodableInHeader
 {
-    inner: UntypedBodies<'a, E>,
+    inner: UntypedBodies<'a>,
     _marker: PhantomData<H>
 }
 
-impl<'a, E, H> From<UntypedBodies<'a, E>> for TypedBodies<'a, E, H>
-    where E: MailEncoder,
-          H: Header,
-          H::Component: MailEncodable<E>
+impl<'a, H> From<UntypedBodies<'a>> for TypedBodies<'a, H>
+    where H: Header,
+          H::Component: EncodableInHeader
 {
-    fn from(untyped: UntypedBodies<'a, E>) -> Self {
+    fn from(untyped: UntypedBodies<'a>) -> Self {
         TypedBodies { inner: untyped, _marker: PhantomData }
     }
 }
 
-impl<'a, E, H> TypedBodies<'a, E, H>
-    where E: MailEncoder,
-          H: Header,
-          H::Component: MailEncodable<E>
+impl<'a, H> TypedBodies<'a, H>
+    where H: Header,
+          H::Component: EncodableInHeader
 {
-    pub fn new(inner: UntypedBodies<'a, E>) -> Self {
+    pub fn new(inner: UntypedBodies<'a>) -> Self {
         TypedBodies {
             inner,
             _marker: PhantomData
         }
     }
-    pub fn meta(&self) -> &HeaderMeta<E> {
+    pub fn meta(&self) -> &HeaderMeta {
         self.inner.meta()
     }
 }
 
-impl<'a, E, H> Iterator for TypedBodies<'a, E, H>
-    where E: MailEncoder,
-          H: Header,
-          H::Component: MailEncodable<E>
+impl<'a, H> Iterator for TypedBodies<'a, H>
+    where H: Header,
+          H::Component: EncodableInHeader
 {
     type Item = Result<&'a H::Component>;
 
@@ -404,30 +387,27 @@ impl<'a, E, H> Iterator for TypedBodies<'a, E, H>
     }
 }
 
-impl<'a, E, H> ExactSizeIterator for TypedBodies<'a, E, H>
-    where E: MailEncoder,
-          H: Header,
-          H::Component: MailEncodable<E>
+impl<'a, H> ExactSizeIterator for TypedBodies<'a, H>
+    where H: Header,
+          H::Component: EncodableInHeader
 {
     fn len(&self) -> usize {
         self.inner.len()
     }
 }
 
-impl<'a, E, H> Clone for TypedBodies<'a, E, H>
-    where E: MailEncoder,
-          H: Header,
-          H::Component: MailEncodable<E>
+impl<'a, H> Clone for TypedBodies<'a, H>
+    where H: Header,
+          H::Component: EncodableInHeader
 {
     fn clone(&self) -> Self {
         TypedBodies::new(self.inner.clone())
     }
 }
 
-impl<'a, E, H> Debug for TypedBodies<'a, E, H>
-    where E: MailEncoder,
-          H: Header,
-          H::Component: MailEncodable<E>
+impl<'a, H> Debug for TypedBodies<'a, H>
+    where H: Header,
+          H::Component: EncodableInHeader
 {
     fn fmt(&self, fter: &mut fmt::Formatter) -> fmt::Result {
         fter.debug_struct("TypedBodies")
@@ -441,8 +421,8 @@ impl<'a, E, H> Debug for TypedBodies<'a, E, H>
 macro_rules! headers {
     ($($header:ty : $val:expr),*) => ({
         //FIXME use catch block once aviable
-        (|| -> $crate::error::Result<HeaderMap<_>> {
-            let mut map = $crate::headers::HeaderMap::<_>::new();
+        (|| -> $crate::error::Result<HeaderMap> {
+            let mut map = $crate::headers::HeaderMap::new();
             $(
                 map._insert::<$header, _>( $val )?;
             )*
@@ -456,7 +436,6 @@ macro_rules! headers {
 
 #[cfg(test)]
 mod test {
-    use codec::MailEncoderImpl;
     use components::{
         Mime, Unstructured,
         MailboxList
@@ -484,8 +463,6 @@ mod test {
         }
     }
 
-
-    fn typed(_v: &HeaderMap<MailEncoderImpl>) {}
 
     #[test]
     fn headers_macro() {
@@ -528,8 +505,6 @@ mod test {
             })
             .count();
         assert_eq!( 1, count );
-
-        typed(&headers);
     }
 
     #[test]
@@ -537,8 +512,6 @@ mod test {
         let headers = headers! {
             Subject: "abc"
         }.unwrap();
-
-        typed(&headers);
 
         assert_eq!( false, headers.get_single(From).is_some() );
         assert_eq!(
@@ -556,8 +529,6 @@ mod test {
             Subject: "abc"
         }.unwrap();
 
-        typed(&headers);
-
         let res = headers.get_single(BadSubject);
         assert_eq!( true, res.is_some() );
         assert_err!( res.unwrap() );
@@ -571,7 +542,6 @@ mod test {
             BadComments: "text/plain"
         }.unwrap();
 
-        typed(&headers);
 
         let mut res = headers.get(Comments)
             .unwrap();
@@ -597,7 +567,6 @@ mod test {
             BadComments: "text/plain"
         }.unwrap();
 
-        typed(&headers);
 
         let res = headers.get_untyped(Subject::name())
             .unwrap()
@@ -633,7 +602,6 @@ mod test {
         let headers = headers! {
             Subject: "hy there"
         }.unwrap();
-        typed(&headers);
 
         let res = format!("{:?}", headers);
         assert_eq!(
@@ -652,8 +620,6 @@ mod test {
             Subject: "hy there",
             From: [ "magic@spell" ]
         }.unwrap() ).unwrap();
-
-        typed(&headers);
 
         assert_eq!(
             &[
@@ -677,8 +643,6 @@ mod test {
             Comments: "c",
             Comments: "d"
         }.unwrap();
-
-        typed(&headers);
 
         assert_eq!( false, headers.remove_by_name( From::name() ) );
         assert_eq!( true, headers.remove_by_name( Subject::name() ) );
@@ -705,8 +669,6 @@ mod test {
             Comments: "d"
         }.unwrap();
 
-        typed(&headers);
-
         assert_eq!( true, headers.remove_by_name( Comments::name() ) );
         assert_eq!( false, headers.remove_by_name( Comments::name() ) );
 
@@ -732,17 +694,15 @@ mod test {
             HeaderName::new(ascii_str!(X Minus C o m m e n t )).unwrap()
         }
 
-        fn get_contextual_validator<E>() -> Option<fn(&HeaderMap<E>) -> Result<()>>
-            where E: MailEncoder
-        {
+        fn get_contextual_validator() -> Option<fn(&HeaderMap) -> Result<()>> {
             //some stupid but simple validator
-            fn validator<E: MailEncoder>(map: &HeaderMap<E>) -> Result<()> {
+            fn validator(map: &HeaderMap) -> Result<()> {
                 if map.get_untyped(Comments::name()).is_some() {
                     bail!("can't have X-Comment and Comments in same mail")
                 }
                 Ok(())
             }
-            Some(validator::<E>)
+            Some(validator)
         }
     }
 
@@ -751,7 +711,6 @@ mod test {
         let map = headers! {
             Subject: "soso"
         }.unwrap();
-        typed(&map);
 
         assert_eq!( true, map.contains(Subject::name()) );
         assert_eq!( true, map.contains(Subject) );
@@ -765,7 +724,6 @@ mod test {
             XComment: "yay",
             Subject: "soso"
         }.unwrap();
-        typed(&map);
 
         assert_ok!(map.use_contextual_validators());
     }
@@ -777,7 +735,6 @@ mod test {
             Comments: "oh no",
             Subject: "soso"
         }.unwrap();
-        typed(&map);
 
         assert_err!(map.use_contextual_validators());
     }
@@ -789,7 +746,6 @@ mod test {
             Comments: "oh no",
             Subject: "soso"
         }.unwrap();
-        typed(&map);
 
         assert_eq!(3, map.len());
     }
