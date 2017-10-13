@@ -108,24 +108,26 @@ fn encode_mail_part(mail: &Mail, encoder:  &mut Encoder<Resource> ) -> Result<()
                 .chain_err( || "non ascii boundary" )?;
 
             for mail in bodies.iter() {
-                {
-                    let mut handle = encoder.encode_handle();
+                encoder.with_handle(|handle| {
                     handle.write_char( AsciiChar::Minus )?;
                     handle.write_char( AsciiChar::Minus )?;
                     handle.write_str( &*boundary )?;
                     handle.finish_current();
-                }
+                    Ok(())
+                })?;
                 _encode_mail( mail, false, encoder )?;
             }
 
             if bodies.len() > 0 {
-                let mut handle = encoder.encode_handle();
-                handle.write_char( AsciiChar::Minus )?;
-                handle.write_char( AsciiChar::Minus )?;
-                handle.write_str( &*boundary )?;
-                handle.write_char( AsciiChar::Minus )?;
-                handle.write_char( AsciiChar::Minus )?;
-                handle.finish_current();
+                encoder.with_handle(|handle| {
+                    handle.write_char( AsciiChar::Minus )?;
+                    handle.write_char( AsciiChar::Minus )?;
+                    handle.write_str( &*boundary )?;
+                    handle.write_char( AsciiChar::Minus )?;
+                    handle.write_char( AsciiChar::Minus )?;
+                    handle.finish_current();
+                    Ok(())
+                })?;
             } else {
                 //TODO warn
             }
