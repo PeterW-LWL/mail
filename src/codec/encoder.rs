@@ -283,7 +283,7 @@ impl<B: BodyBuffer> Encoder<B> {
 /// lines at the right place.
 ///
 /// Note any act of writing a header through `EncodeHeaderHandle`
-/// has to be concluded by either calling `finish` or `undo_header`.
+/// has to be concluded by either calling `finish_current` or `undo_header`.
 /// If not this handle will panic when being dropped (and the thread
 /// is not already panicing) as writes through the handle are directly
 /// writes to the underlying buffer which now contains malformed/incomplete
@@ -319,7 +319,7 @@ impl<'a> Drop for EncodeHeaderHandle<'a> {
         if !thread::panicking() &&  self.has_unfinished_parts() {
             // we really should panic as the back buffer i.e. the mail will contain
             // some partially written header which definitely is a bug
-            panic!("dropped Handle which partially wrote header to back buffer (use `finish` or `discard`)")
+            panic!("dropped Handle which partially wrote header to back buffer (use `finish_current` or `discard`)")
         }
     }
 }
@@ -533,7 +533,7 @@ impl<'a> EncodeHeaderHandle<'a> {
     /// # Trace (test build only)
     /// can push 0-1 of `[CRLF, TruncateToCRLF]`
     /// then does push `End`
-    pub fn finish(&mut self) {
+    pub fn finish_current(&mut self) {
         self.start_new_line();
         #[cfg(test)]
         { self.trace.push(TraceToken::End) }
@@ -541,12 +541,12 @@ impl<'a> EncodeHeaderHandle<'a> {
     }
 
     /// undoes all writes to the internal buffer
-    /// since the last `finish` or `undo_header` or
+    /// since the last `finish_current` or `undo_header` or
     /// creation of this handle
     ///
     /// # Trace (test build only)
     /// also removes tokens pushed since the last
-    /// `finish` or `undo_header` or creation of
+    /// `finish_current` or `undo_header` or creation of
     /// this handle
     ///
     pub fn undo_header(&mut self) {
@@ -974,7 +974,7 @@ mod test {
             {
                 let mut handle = encoder.encode_header_handle();
                 assert_ok!(closure.encode(&mut handle));
-                handle.finish();
+                handle.finish_current();
             }
             assert_eq!(encoder.trace.as_slice(), &[
                 NewSection,
@@ -1049,7 +1049,7 @@ mod test {
             {
                 let mut handle = encoder.encode_header_handle();
                 assert_ok!(handle.write_str(AsciiStr::from_ascii("Header-One: 12").unwrap()));
-                handle.finish();
+                handle.finish_current();
                 assert_ok!(handle.write_str(AsciiStr::from_ascii("ups: sa").unwrap()));
                 handle.undo_header();
             }
@@ -1064,7 +1064,7 @@ mod test {
             {
                 let mut handle = encoder.encode_header_handle();
                 assert_ok!(handle.write_str(AsciiStr::from_ascii("Header-One: 12").unwrap()));
-                handle.finish();
+                handle.finish_current();
             }
             assert_eq!(encoder.sections.len(), 1);
             let last = encoder.sections.pop().unwrap().unwrap_header();
@@ -1077,7 +1077,7 @@ mod test {
             {
                 let mut handle = encoder.encode_header_handle();
                 assert_ok!(handle.write_str(AsciiStr::from_ascii("Header-One: 12\r\n").unwrap()));
-                handle.finish();
+                handle.finish_current();
             }
             assert_eq!(encoder.sections.len(), 1);
             let last = encoder.sections.pop().unwrap().unwrap_header();
@@ -1090,7 +1090,7 @@ mod test {
             {
                 let mut handle = encoder.encode_header_handle();
                 assert_ok!(handle.write_str(AsciiStr::from_ascii("Header-One: 12\r\n   ").unwrap()));
-                handle.finish();
+                handle.finish_current();
             }
             assert_eq!(encoder.sections.len(), 1);
             let last = encoder.sections.pop().unwrap().unwrap_header();
@@ -1104,7 +1104,7 @@ mod test {
             {
                 let mut handle = encoder.encode_header_handle();
                 assert_ok!(handle.write_str(AsciiStr::from_ascii("Header-One: 12 +\r\n 4").unwrap()));
-                handle.finish();
+                handle.finish_current();
             }
             assert_eq!(encoder.sections.len(), 1);
             let last = encoder.sections.pop().unwrap().unwrap_header();
@@ -1118,7 +1118,7 @@ mod test {
                 let mut handle = encoder.encode_header_handle();
                 assert_ok!(handle.write_str(
                     AsciiStr::from_ascii("Header-One: 12 +\r\n 4  ").unwrap()));
-                handle.finish();
+                handle.finish_current();
             }
             assert_eq!(encoder.sections.len(), 1);
             let last = encoder.sections.pop().unwrap().unwrap_header();
@@ -1163,7 +1163,7 @@ mod test {
                 assert_ok!(handle.write_str(AsciiStr::from_ascii("H: a\r").unwrap()));
                 //it's fine not to error in the trailing \r case as we want to write
                 //a \r\n anyway
-                handle.finish();
+                handle.finish_current();
             }
             assert_eq!(encoder.sections.len(), 1);
             let last = encoder.sections.pop().unwrap().unwrap_header();
@@ -1187,7 +1187,7 @@ mod test {
                     "70_3456789",
                     "12345678XX"
                 )).unwrap()));
-                handle.finish();
+                handle.finish_current();
             }
             assert_eq!(encoder.sections.len(), 1);
             let last = encoder.sections.pop().unwrap().unwrap_header();
@@ -1222,7 +1222,7 @@ mod test {
                     "90_3456789",
                     "00_3456789",
                 )).unwrap()));
-                handle.finish();
+                handle.finish_current();
             }
             assert_eq!(encoder.sections.len(), 1);
             let last = encoder.sections.pop().unwrap().unwrap_header();
@@ -1264,7 +1264,7 @@ mod test {
                     "30_3456789",
                     "40_3456789",
                 )).unwrap()));
-                handle.finish();
+                handle.finish_current();
             }
             assert_eq!(encoder.sections.len(), 1);
             let last = encoder.sections.pop().unwrap().unwrap_header();
@@ -1333,7 +1333,7 @@ mod test {
             {
                 let mut handle = encoder.encode_header_handle();
                 assert_ok!(handle.write_utf8("❤"));
-                handle.finish();
+                handle.finish_current();
             }
             assert_eq!(encoder.sections.len(), 1);
             let last = encoder.sections.pop().unwrap().unwrap_header();
@@ -1348,7 +1348,7 @@ mod test {
                 assert_ok!(handle.try_write_atext("hoho"));
                 assert_err!(handle.try_write_atext("a(b"));
                 assert_ok!(handle.try_write_atext(""));
-                handle.finish();
+                handle.finish_current();
             }
             assert_eq!(encoder.sections.len(), 1);
             let last = encoder.sections.pop().unwrap().unwrap_header();
@@ -1363,7 +1363,7 @@ mod test {
                 assert_ok!(handle.try_write_atext("hoho"));
                 assert_err!(handle.try_write_atext("a(b"));
                 assert_ok!(handle.try_write_atext("❤"));
-                handle.finish();
+                handle.finish_current();
             }
             assert_eq!(encoder.sections.len(), 1);
             let last = encoder.sections.pop().unwrap().unwrap_header();
@@ -1378,10 +1378,10 @@ mod test {
                 assert_ok!(handle.try_write_atext("hoho"));
                 assert_err!(handle.try_write_atext("a(b"));
                 assert_ok!(handle.try_write_atext("❤"));
-                handle.finish();
-                handle.finish();
-                handle.finish();
-                handle.finish();
+                handle.finish_current();
+                handle.finish_current();
+                handle.finish_current();
+                handle.finish_current();
             }
             assert_eq!(encoder.sections.len(), 1);
             let last = encoder.sections.pop().unwrap().unwrap_header();
@@ -1397,7 +1397,7 @@ mod test {
                 assert_err!(handle.try_write_atext("a(b"));
                 assert_ok!(handle.try_write_atext("❤"));
                 handle.undo_header();
-                handle.finish();
+                handle.finish_current();
                 handle.undo_header();
                 handle.undo_header();
             }
@@ -1412,14 +1412,14 @@ mod test {
             {
                 let mut handle = encoder.encode_header_handle();
                 assert_ok!(handle.write_utf8("H: yay"));
-                handle.finish();
+                handle.finish_current();
             }
             let body = VecBody::new(3);
             encoder.add_body(body.clone());
             {
                 let mut handle = encoder.encode_header_handle();
                 assert_ok!(handle.write_utf8("❤"));
-                handle.finish();
+                handle.finish_current();
             }
             assert_eq!(encoder.sections.len(), 3);
             let last = encoder.sections.pop().unwrap().unwrap_header();
@@ -1453,7 +1453,7 @@ mod test {
             let mut encoder = Encoder::new(MailType::Ascii);
             let mut handle = encoder.encode_header_handle();
             assert_ok!(handle.write_str(AsciiStr::from_ascii("Header-One: 12").unwrap()));
-            handle.finish();
+            handle.finish_current();
             mem::drop(handle);
         }
 
@@ -1485,7 +1485,7 @@ mod test {
             {
                 let mut handle = encoder.encode_header_handle();
                 assert_ok!(handle.write_utf8("H: a"));
-                handle.finish();
+                handle.finish_current();
                 assert_ok!(handle.write_utf8("something"));
                 handle.mark_fws_pos();
                 assert_ok!(handle.write_utf8("<else>"));
@@ -1512,7 +1512,7 @@ mod test {
                 assert_ok!(handle.write_utf8("❤"));
                 assert_ok!(handle.write_str_unchecked("remove me\r\n"));
                 assert_ok!(handle.write_utf8("   "));
-                handle.finish()
+                handle.finish_current()
             }
             assert_eq!(encoder.trace, vec![
                 NewSection,
