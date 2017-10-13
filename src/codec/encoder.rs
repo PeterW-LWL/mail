@@ -111,22 +111,22 @@ impl<FN> Debug for EncodableClosure<FN> {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Section<R: BodyBuffer> {
-    Header(String),
-    MIMEBody(R)
+    String(String),
+    BodyPayload(R)
 }
 
 impl<R> Section<R>
     where R: BodyBuffer
 {
     pub fn unwrap_header(self) -> String {
-        if let Section::Header(res) = self {
+        if let Section::String(res) = self {
             res
         } else {
             panic!("expected `Section::Header` got `Section::Body`")
         }
     }
     pub fn unwrap_body(self) -> R {
-        if let Section::MIMEBody(res) = self {
+        if let Section::BodyPayload(res) = self {
             res
         } else {
             panic!("expected `Section::MIMEBody` got `Section::Header`")
@@ -202,14 +202,14 @@ impl<B: BodyBuffer> Encoder<B> {
     /// pushes a `NewSection` Token if the the returned
     /// `EncodeHeaderHandle` refers to a new empty buffer
     pub fn encode_header_handle( &mut self ) -> EncodeHeaderHandle {
-        if let Some(&Section::Header(..)) = self.sections.last() {}
+        if let Some(&Section::String(..)) = self.sections.last() {}
         else {
-            self.sections.push(Section::Header(String::new()));
+            self.sections.push(Section::String(String::new()));
             #[cfg(test)]
             { self.trace.push(TraceToken::NewSection) }
         }
 
-        if let Some(&mut Section::Header(ref mut string)) = self.sections.last_mut() {
+        if let Some(&mut Section::String(ref mut string)) = self.sections.last_mut() {
             #[cfg(not(test))]
             { EncodeHeaderHandle::new(self.mail_type,  string) }
             #[cfg(test)]
@@ -221,14 +221,14 @@ impl<B: BodyBuffer> Encoder<B> {
     }
 
     pub fn add_blank_line(&mut self) {
-        if let Some(&Section::Header(..)) = self.sections.last() {}
+        if let Some(&Section::String(..)) = self.sections.last() {}
             else {
-                self.sections.push(Section::Header(String::new()));
+                self.sections.push(Section::String(String::new()));
                 #[cfg(test)]
                 { self.trace.push(TraceToken::NewSection); }
             }
 
-        if let Some(&mut Section::Header(ref mut string)) = self.sections.last_mut() {
+        if let Some(&mut Section::String(ref mut string)) = self.sections.last_mut() {
             string.push_str("\r\n");
             #[cfg(test)]
             { self.trace.push(TraceToken::BlankLine); }
@@ -242,7 +242,7 @@ impl<B: BodyBuffer> Encoder<B> {
     /// without validating it, the encoder mainly provides
     /// buffers it is not validating them.
     pub fn write_body( &mut self, body: B) {
-        self.sections.push(Section::MIMEBody(body))
+        self.sections.push(Section::BodyPayload(body))
     }
 
     pub fn into_sections(self) -> Vec<Section<B>> {
@@ -254,10 +254,10 @@ impl<B: BodyBuffer> Encoder<B> {
         let mut out = String::new();
         for section in self.sections.into_iter() {
             match section {
-                Section::Header(string) => {
+                Section::String(string) => {
                     out.push_str(&*string)
                 },
-                Section::MIMEBody(body) => {
+                Section::BodyPayload(body) => {
                     body.with_slice(|slice| {
                         let string = String::from_utf8_lossy(slice);
                         out.push_str(&*string);
@@ -1010,8 +1010,8 @@ mod test {
                 .into_sections()
                 .into_iter()
                 .map(|s| match s {
-                    Section::Header(..) => panic!("we only added bodies"),
-                    Section::MIMEBody(body) => body
+                    Section::String(..) => panic!("we only added bodies"),
+                    Section::BodyPayload(body) => body
                 })
                 .collect::<Vec<_>>();
 
