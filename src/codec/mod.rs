@@ -7,16 +7,13 @@ pub mod idna;
 pub mod mime;
 pub mod quoted_string;
 
-#[cfg(test)]
-#[macro_use]
-pub mod test_utils;
 
 mod traits;
 pub use self::traits::*;
 
-mod encoder_impl;
-pub use self::encoder_impl::*;
-
+#[cfg_attr(test, macro_use)]
+mod encoder;
+pub use self::encoder::*;
 
 mod writer_impl;
 pub use self::writer_impl::*;

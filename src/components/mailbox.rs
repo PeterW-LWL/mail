@@ -2,7 +2,7 @@ use ascii::AsciiChar;
 
 use error::*;
 use utils::{HeaderTryFrom, HeaderTryInto};
-use codec::{ MailEncodable, MailEncoder };
+use codec::{EncodableInHeader, EncodeHandle};
 
 use super::Phrase;
 use super::Email;
@@ -72,17 +72,17 @@ impl<P, E> HeaderTryFrom<(P, E)> for Mailbox
 }
 
 
-impl<E> MailEncodable<E> for Mailbox where E: MailEncoder {
+impl EncodableInHeader for  Mailbox {
 
-    fn encode(&self, encoder: &mut E) -> Result<()> {
+    fn encode(&self, handle: &mut EncodeHandle) -> Result<()> {
         if let Some( display_name ) = self.display_name.as_ref() {
-            display_name.encode( encoder )?;
-            encoder.write_fws();
+            display_name.encode( handle )?;
+            handle.write_fws();
         }
         //for now this always uses the "<user@do.main>" form even if no display-name is given
-        encoder.write_char( AsciiChar::LessThan );
-        self.email.encode( encoder )?;
-        encoder.write_char( AsciiChar::GreaterThan );
+        handle.write_char( AsciiChar::LessThan )?;
+        self.email.encode( handle )?;
+        handle.write_char( AsciiChar::GreaterThan )?;
         Ok( () )
     }
 }
@@ -92,43 +92,42 @@ impl<E> MailEncodable<E> for Mailbox where E: MailEncoder {
 mod test {
     use data::FromInput;
     use components::{ Email, Phrase };
-    use codec::test_utils::*;
     use super::*;
 
     ec_test!{ email_only, {
-        Email::from_input( "affen@haus" )
-            .map(Mailbox::from)
+        let email = Email::from_input( "affen@haus" )?;
+        Mailbox::from(email)
     } => ascii => [
-        LinePart( "<" ),
-        OptFWS,
-        LinePart( "affen" ),
-        OptFWS,
-        LinePart( "@" ),
-        OptFWS,
-        LinePart( "haus" ),
-        OptFWS,
-        LinePart( ">" )
+        Text "<",
+        MarkFWS,
+        Text "affen",
+        MarkFWS,
+        Text "@",
+        MarkFWS,
+        Text "haus",
+        MarkFWS,
+        Text ">"
     ]}
 
-    ec_test!{ with_display_text, { Some(
+    ec_test!{ with_display_text, {
         Mailbox {
             display_name: Some( Phrase::from_input( "ay ya" ).unwrap() ),
             email: Email::from_input( "affen@haus" ).unwrap(),
         }
-    ) } => ascii => [
-        LinePart( "ay" ),
-        FWS,
-        LinePart( "ya" ),
-        FWS,
-        LinePart( "<" ),
-        OptFWS,
-        LinePart( "affen" ),
-        OptFWS,
-        LinePart( "@" ),
-        OptFWS,
-        LinePart( "haus" ),
-        OptFWS,
-        LinePart( ">" )
+    } => ascii => [
+        Text "ay",
+        MarkFWS,
+        Text " ya",
+        MarkFWS,
+        Text " <",
+        MarkFWS,
+        Text "affen",
+        MarkFWS,
+        Text "@",
+        MarkFWS,
+        Text "haus",
+        MarkFWS,
+        Text ">"
     ]}
 }
 

@@ -14,6 +14,7 @@ use utils::SendBoxFuture;
 use error::{ Error, Result };
 
 use codec::transfer_encoding::TransferEncodedFileBuffer;
+use codec::BodyBuffer;
 use components::TransferEncoding;
 
 
@@ -276,6 +277,19 @@ impl<'a> Deref for Guard<'a> {
         // the Guard which is also part of this struct and therefore
         // has to life at last as long as the struct
         unsafe { &*self.inner_ref }
+    }
+}
+
+impl BodyBuffer for Resource {
+    fn with_slice<FN, R>(&self, func: FN) -> Result<R>
+        where FN: FnOnce(&[u8]) -> Result<R>
+    {
+        if let Some( guard ) = self.get_if_encoded()?{
+            func(&*guard)
+        } else {
+            bail!("buffer has not been encoded yet");
+        }
+
     }
 }
 

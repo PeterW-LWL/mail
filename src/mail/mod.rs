@@ -1,7 +1,7 @@
 use std::ops::Deref;
 use std::fmt;
 
-use codec::{ MailEncoder, MailEncodable };
+use codec::{EncodableInHeader, Encoder, Encodable, EncodeHandle};
 use ascii::{ AsciiString, AsciiChar };
 use futures::{ Future, Async, Poll };
 
@@ -34,36 +34,34 @@ mod context;
 
 
 
-pub struct Mail<E: MailEncoder> {
+pub struct Mail {
     //NOTE: by using some OwnedOrStaticRef AsciiStr we can probably safe a lot of
     // unnecessary allocations
-    headers: HeaderMap<E>,
-    body: MailPart<E>,
+    headers: HeaderMap,
+    body: MailPart,
 }
 
 
-pub enum MailPart<E: MailEncoder> {
+pub enum MailPart {
     SingleBody {
         body: Resource
     },
     MultipleBodies {
-        bodies: Vec<Mail<E>>,
+        bodies: Vec<Mail>,
         hidden_text: AsciiString
     }
 }
 
 /// a future returning an EncodableMail once all futures contained in the wrapped Mail are resolved
-pub struct MailFuture<'a, T: 'a, E: MailEncoder> {
-    mail: Option<Mail<E>>,
+pub struct MailFuture<'a, T: 'a> {
+    mail: Option<Mail>,
     ctx: &'a T
 }
 
 /// a mail with all contained futures resolved, so that it can be encoded
-pub struct EncodableMail<E: MailEncoder>( Mail<E> );
+pub struct EncodableMail( Mail );
 
-impl<E> Mail<E>
-    where E: MailEncoder
-{
+impl Mail {
 
 
     /// adds a new header,
@@ -79,30 +77,30 @@ impl<E> Mail<E>
     ///
     pub fn set_header<H, C>( &mut self, header: H, comp: C) -> Result<()>
         where H: Header,
-              H::Component: MailEncodable<E>,
+              H::Component: EncodableInHeader,
               C: HeaderTryInto<H::Component>
     {
         let comp = comp.try_into()?;
-        check_header::<H, _>( &comp, self.body.is_multipart() )?;
+        check_header::<H>( &comp, self.body.is_multipart() )?;
         self.headers.insert( header, comp )?;
         Ok( () )
     }
 
-    pub fn set_headers( &mut self, headers: HeaderMap<E> ) -> Result<()> {
+    pub fn set_headers( &mut self, headers: HeaderMap ) -> Result<()> {
         check_multiple_headers( &headers, self.body.is_multipart() )?;
         self.headers.extend( headers )?;
         Ok( () )
     }
 
-    pub fn headers( &self ) -> &HeaderMap<E> {
+    pub fn headers( &self ) -> &HeaderMap {
         &self.headers
     }
 
-    pub fn body( &self ) -> &MailPart<E> {
+    pub fn body( &self ) -> &MailPart {
         &self.body
     }
 
-    pub fn into_future<'a, C: BuilderContext>( self, ctx: &'a C ) -> MailFuture<'a, C, E> {
+    pub fn into_future<'a, C: BuilderContext>( self, ctx: &'a C ) -> MailFuture<'a, C> {
         MailFuture {
             ctx,
             mail: Some( self )
@@ -131,9 +129,7 @@ impl<E> Mail<E>
 
 
 
-impl<E> MailPart<E>
-    where E: MailEncoder
-{
+impl MailPart {
 
     pub fn is_multipart( &self ) -> bool {
         use self::MailPart::*;
@@ -145,11 +141,10 @@ impl<E> MailPart<E>
 }
 
 
-impl<'a, E, T> Future for MailFuture<'a, T, E>
+impl<'a, T> Future for MailFuture<'a, T>
     where T: BuilderContext,
-          E: MailEncoder
 {
-    type Item = EncodableMail<E>;
+    type Item = EncodableMail;
     type Error = Error;
 
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
@@ -184,10 +179,9 @@ impl<'a, E, T> Future for MailFuture<'a, T, E>
     }
 }
 
-impl<E> EncodableMail<E>
-    where E: MailEncoder
-{
-    fn from_loaded_mail(mut mail: Mail<E>) -> Result<Self> {
+impl EncodableMail {
+
+    fn from_loaded_mail(mut mail: Mail) -> Result<Self> {
         Self::insert_generated_headers(&mut mail)?;
         mail.headers.use_contextual_validators()?;
         if !mail.headers.contains(Date) {
@@ -202,7 +196,7 @@ impl<E> EncodableMail<E>
         Ok(EncodableMail(mail))
     }
 
-    fn insert_generated_headers(mail: &mut Mail<E>) -> Result<()> {
+    fn insert_generated_headers(mail: &mut Mail) -> Result<()> {
         if let MailPart::SingleBody { ref body } = mail.body {
             let file_buffer = body.get_if_encoded()?
                 .expect( "encoded mail, should only contain already transferencoded resources" );
@@ -218,37 +212,30 @@ impl<E> EncodableMail<E>
     }
 }
 
-impl<E> Deref for EncodableMail<E>
-    where E: MailEncoder
-{
-    type Target = Mail<E>;
+impl Deref for EncodableMail {
+
+    type Target = Mail;
     fn deref( &self ) -> &Self::Target {
         &self.0
     }
 }
 
-impl<E> Into<Mail<E>> for EncodableMail<E>
-    where E: MailEncoder
-{
-    fn into( self ) -> Mail<E> {
+impl Into<Mail> for EncodableMail {
+    fn into( self ) -> Mail {
         self.0
     }
 }
 
-impl<E> MailEncodable<E> for EncodableMail<E>
-    where E: MailEncoder
-{
+impl Encodable<Resource> for EncodableMail {
 
-    fn encode(&self, encoder: &mut E) -> Result<()> {
+    fn encode(&self, encoder:  &mut Encoder<Resource>) -> Result<()> {
         // does not panic as a EncodableMail only is constructed from
         // a Mail which has all of it's bodies resolved, without failure
         encode::encode_mail( &self, true, encoder )
     }
 }
 
-impl<E> fmt::Debug for EncodableMail<E>
-    where E: MailEncoder
-{
+impl fmt::Debug for EncodableMail {
     fn fmt(&self, fter: &mut fmt::Formatter) -> fmt::Result {
         write!(fter, "EncodableMail {{ .. }}")
     }

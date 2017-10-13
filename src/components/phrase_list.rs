@@ -1,7 +1,7 @@
 use ascii::AsciiChar;
 
 use error::*;
-use codec::{ MailEncoder, MailEncodable };
+use codec::{EncodableInHeader, EncodeHandle};
 use external::vec1::Vec1;
 use utils::{ HeaderTryFrom, HeaderTryInto };
 
@@ -12,17 +12,17 @@ use super::Phrase;
 pub struct PhraseList(pub Vec1<Phrase>);
 
 
-impl<E> MailEncodable<E> for PhraseList where E: MailEncoder {
+impl EncodableInHeader for  PhraseList {
 
-    fn encode(&self, encoder: &mut E) -> Result<()> {
+    fn encode(&self, handle: &mut EncodeHandle) -> Result<()> {
         sep_for!{ word in self.0.iter();
             sep {
-                //Note that we do not want to write FWS, as the following word might contains
-                // a left_padding with a FWS, but a space if fine
-                encoder.write_char( AsciiChar::Comma );
-                encoder.write_char( AsciiChar::Space );
+                //Note that we do not want to write MarkFWS, NowChar, Text " " as the following word might contains
+                // a left_padding with a MarkFWS, NowChar, Text " " but a space if fine
+                handle.write_char( AsciiChar::Comma )?;
+                handle.write_char( AsciiChar::Space )?;
             };
-            word.encode( encoder )?;
+            word.encode( handle )?;
 
         }
 
@@ -94,45 +94,44 @@ impl_header_try_from_array! {
 #[cfg(test)]
 mod test {
     use data::FromInput;
-    use codec::test_utils::*;
     use super::*;
 
     ec_test!{ some_phrases, {
-        Some( PhraseList( vec1![
-            Phrase::from_input( "hy there" ).unwrap(),
-            Phrase::from_input( "magic man" ).unwrap()
-        ]) )
+        PhraseList( vec1![
+            Phrase::from_input( "hy there" )?,
+            Phrase::from_input( "magic man" )?
+        ])
     } => ascii => [
-        LinePart( "hy" ),
-        FWS,
+        Text "hy",
+        MarkFWS,
         //TODO really no FWS by the seperator??
-        // (currently it's this way as word can start with a FWS making it a duble FWS)
-        LinePart( "there, magic" ),
-        FWS,
-        LinePart( "man" )
+        // (currently it's this way as word can start with a FWS making it a double FWS)
+        Text " there, magic",
+        MarkFWS,
+        Text " man"
     ]}
 
     ec_test!{ some_simple_phrases_try_from, {
         PhraseList::try_from(
             "hy there"
-        )
+        )?
     } => ascii => [
-        LinePart( "hy" ),
-        FWS,
-        LinePart( "there" )
+        Text "hy",
+        MarkFWS,
+        Text " there"
     ]}
 
     ec_test!{ some_phrases_try_from, {
         PhraseList::try_from( [
             "hy there",
             "magic man"
-        ] )
+        ] )?
     } => ascii => [
-        LinePart( "hy" ),
-        FWS,
-        LinePart( "there, magic" ),
-        FWS,
-        LinePart( "man" )
+        Text "hy",
+        MarkFWS,
+        Text " there, magic",
+        MarkFWS,
+        Text " man"
     ]}
 }
 

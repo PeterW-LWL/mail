@@ -21,7 +21,7 @@ fn main() {
 }
 
 fn _main() -> Result<()> {
-    let mut encoder = MailEncoderImpl::new( MailType::Ascii );
+    let mut encoder = Encoder::new( MailType::Ascii );
 
     let builder_ctx = SimpleBuilderContext::default();
 
@@ -37,10 +37,7 @@ fn _main() -> Result<()> {
     let encodable_mail = mail.into_future( &builder_ctx ).wait().unwrap();
     encodable_mail.encode( &mut encoder )?;
 
-    let as_buff: Vec<u8> = encoder.into();
-
-    //FIXME newline, between header and body
-    println!( "{}", String::from_utf8_lossy( &*as_buff ) );
+    println!( "{}", encoder.into_string_lossy().unwrap() );
 
     Ok( () )
 

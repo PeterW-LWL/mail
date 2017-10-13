@@ -63,36 +63,6 @@ pub(crate) fn timeout( s: u32, ms: u32 ) -> oneshot::Receiver<()> {
     timeout
 }
 
-
-//modified, origin is:
-// https://github.com/rust-lang/rust/blob/2fbba5bdbadeef403a64e9e1568cdad225cbcec1/src/liballoc/string.rs
-pub(crate) fn insert_bytes(vec: &mut Vec<u8> , idx: usize, bytes: &[u8]) {
-    use std::ptr;
-    let len = vec.len();
-    let amount = bytes.len();
-    vec.reserve(amount);
-
-    unsafe  {
-        ptr::copy( vec.as_ptr().offset( idx as isize ),
-                   vec.as_mut_ptr().offset( (idx + amount) as isize ),
-                   len - idx );
-        ptr::copy( bytes.as_ptr(),
-                   vec.as_mut_ptr().offset( idx as isize ),
-                   amount );
-
-        vec.set_len( len + amount );
-    }
-}
-
-
-pub fn unbox_ref<E: ?Sized>( bxr: &Box<E> ) -> &E {
-    &**bxr
-}
-pub fn unbox_mut<E: ?Sized>( bxm: &mut Box<E> ) -> &mut E {
-    &mut **bxm
-}
-
-
 //TODO replace with std TryFrom once it is stable
 // (either a hard replace, or a soft replace which implements HeaderTryFrom if TryFrom exist)
 pub trait HeaderTryFrom<T>: Sized {

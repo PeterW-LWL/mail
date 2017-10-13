@@ -11,7 +11,7 @@ use grammar::encoded_word::{
 use super::input::Input;
 use super::inner_item::InnerAscii;
 use codec::{
-    MailEncoder,
+    EncodeHandle,
     WriterWrapper, VecWriter,
     base64,
     quoted_printable,
@@ -28,17 +28,17 @@ pub struct EncodedWord {
 
 impl EncodedWord {
 
-    pub fn write_into<E>(
-        encoder: &mut E,
+    pub fn write_into<'a, 'b: 'a>(
+        handle: &'a mut EncodeHandle<'b>,
         word: &str,
         encoding: EncodedWordEncoding,
         _ctx: EncodedWordContext
-    ) where E: MailEncoder {
+    ) {
         //FIXME use the EncodedWordContext
         let mut writer = WriterWrapper::new(
             ascii_str!{ u t f _8 },
             encoding,
-            encoder
+            handle
         );
         encoding.encode(word, &mut writer);
     }

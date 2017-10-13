@@ -8,7 +8,7 @@ use ascii::AsciiStr;
 use error::*;
 use utils::HeaderTryFrom;
 use grammar::{ is_token, MailType};
-use codec::{ MailEncoder, MailEncodable, self };
+use codec::{EncodableInHeader, EncodeHandle, self };
 
 pub use mime::Mime;
 
@@ -98,13 +98,13 @@ impl<'a> HeaderTryFrom<&'a str> for mime::Mime {
 }
 
 
-impl<E> MailEncodable<E> for mime::Mime where E: MailEncoder {
+impl EncodableInHeader for  mime::Mime {
 
-    fn encode(&self, encoder: &mut E) -> Result<()> {
+    fn encode(&self, handle: &mut EncodeHandle) -> Result<()> {
         let res = self.to_string();
-        if !encoder.try_write_utf8(&*res).is_ok() {
+        if !handle.write_utf8(&*res).is_ok() {
             match AsciiStr::from_ascii(&*res) {
-                Ok(asciied) => encoder.write_str( asciied ),
+                Ok(asciied) => handle.write_str( asciied )?,
                 Err(_err) => bail!("mime containining utf8 in ascii only mail")
             }
         }
@@ -131,13 +131,12 @@ impl Error for MimeFromStrError {
 #[cfg(test)]
 mod test {
     use super::*;
-    use codec::test_utils::*;
 
     ec_test!{simple,{
         let mime: Mime = "text/wtf;charset=utf8;random=alot".parse().unwrap();
-        Some( mime )
+        mime
     } => ascii => [
-        LinePart("text/wtf;charset=utf8;random=alot")
+        Text "text/wtf;charset=utf8;random=alot"
     ]}
 
     #[test]

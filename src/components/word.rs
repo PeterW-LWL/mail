@@ -1,7 +1,7 @@
 use error::*;
-use codec::{ 
+use codec::{
     EncodedWordEncoding,
-    MailEncodable, MailEncoder
+    EncodableInHeader, EncodeHandle
 };
 
 use grammar::is_atext;
@@ -50,43 +50,43 @@ impl Word {
 
 
 /// As word has to be differently encoded, depending on the context it
-/// appears in it cannot implement MailEncodable, instead we have
+/// appears in it cannot implement EncodableInHeader, instead we have
 /// a function which can be used by type containing it which (should)
-/// implement MailEncodable
+/// implement EncodableInHeader
 ///
 /// If `ecw_ctx` is `None` the word can not be encoded as a "encoded-word",
 /// if it is `Some(context)` the `context` represents in which context the
 /// word does appear, which changes some properties of the encoded word.
 ///
 /// NOTE: != encoded-word, through it might create an encoded-word
-pub fn do_encode_word<E: MailEncoder>(
-    word: &Word,
-    encoder: &mut E,
+pub fn do_encode_word<'a,'b: 'a>(
+    word: &'a Word,
+    handle: &'a mut EncodeHandle<'b>,
     ecw_ctx: Option<EncodedWordContext>,
 ) -> Result<()> {
 
     if let Some( pad ) = word.left_padding.as_ref() {
-        pad.encode( encoder )?;
+        pad.encode( handle )?;
     }
 
     let input: &str = &*word.input;
 
     let ok = (!input.starts_with("=?")) && word.input.chars()
-        .all( |ch| is_atext( ch, encoder.mail_type() ) );
+        .all( |ch| is_atext( ch, handle.mail_type() ) );
 
     if ok {
-        encoder.write_str_unchecked( input )
+        handle.write_str_unchecked( input )?;
     } else {
         if let Some( ecw_ctx ) = ecw_ctx {
-            EncodedWord::write_into( encoder, input,
+            EncodedWord::write_into( handle, input,
                                      EncodedWordEncoding::QuotedPrintable, ecw_ctx );
         } else {
-            QuotedString::write_into( encoder, input )?;
+            QuotedString::write_into( handle, input )?;
         }
     }
 
     if let Some( pad ) = word.right_padding.as_ref() {
-        pad.encode( encoder )?;
+        pad.encode( handle )?;
     }
     Ok( () )
 }
@@ -94,51 +94,54 @@ pub fn do_encode_word<E: MailEncoder>(
 
 #[cfg(test)]
 mod test {
-    use super::*;
-    use super::super::{ FWS as Fws };
+    use std::mem;
+
     use grammar::MailType;
-    use codec::test_utils::*;
+    use codec::{ Encoder, VecBodyBuf, EncodableClosure};
+    use codec::TraceToken::*;
+    use codec::simplify_trace_tokens;
 
-    #[test]
-    fn encode_pseudo_encoded_words() {
-        let word = Word::from_input( "=?" ).unwrap();
-        let mut encoder = TestMailEncoder::new( MailType::Ascii );
-        do_encode_word( &word, &mut encoder, Some( EncodedWordContext::Text ) ).unwrap();
-        assert_eq!(
-            vec![ LinePart( "=?utf8?Q?=3D=3F?=" ) ],
-            encoder.into_state_seq()
-        )
-    }
+    use super::*;
+    use super::super::FWS;
 
-    #[test]
-    fn encode_word() {
-        let word = Word::from_input( "a↑b" ).unwrap();
-        let mut encoder = TestMailEncoder::new( MailType::Ascii );
-        do_encode_word( &word, &mut encoder, Some( EncodedWordContext::Text ) ).unwrap();
-        assert_eq!(
-            vec![ LinePart( "=?utf8?Q?a=E2=86=91b?=" ) ],
-            encoder.into_state_seq()
-        )
-    }
+    ec_test!{encode_pseudo_encoded_words, {
+        let word = Word::from_input( "=?" )?;
+        EncodableClosure(move |handle: &mut EncodeHandle| {
+            do_encode_word( &word, handle, Some( EncodedWordContext::Text ) )
+        })
+    } => ascii => [
+        Text "=?utf8?Q?=3D=3F?="
+    ]}
+
+    ec_test!{encode_word, {
+        let word = Word::from_input( "a↑b" )?;
+        EncodableClosure(move |handle: &mut EncodeHandle| {
+            do_encode_word( &word, handle, Some( EncodedWordContext::Text ) )
+        })
+    } => ascii => [
+        Text "=?utf8?Q?a=E2=86=91b?="
+    ]}
+
 
     #[test]
     fn encode_fails() {
+        let mut encoder = Encoder::<VecBodyBuf>::new(MailType::Ascii);
+        let mut handle = encoder.encode_handle();
         let word = Word::from_input( "a↑b" ).unwrap();
-        let mut encoder = TestMailEncoder::new( MailType::Ascii );
-        let res = do_encode_word( &word, &mut encoder, None );
-        assert_eq!( false, res.is_ok() );
+        assert_err!(do_encode_word( &word, &mut handle, None ));
+        handle.undo_header();
     }
 
-    #[test]
-    fn quoted_fallback() {
-        let word = Word::from_input( "a\"b" ).unwrap();
-        let mut encoder = TestMailEncoder::new( MailType::Ascii );
-        do_encode_word( &word, &mut encoder, None ).unwrap();
-        assert_eq!(
-            vec![ LinePart(r#""a\"b""#) ],
-            encoder.into_state_seq()
-        )
-    }
+
+    ec_test!{quoted_fallback, {
+        let word = Word::from_input( "a\"b" )?;
+        EncodableClosure(move |handle: &mut EncodeHandle| {
+            do_encode_word( &word, handle, None )
+        })
+    } => ascii => [
+        Text r#""a\"b""#
+    ]}
+
 
     #[test]
     fn encode_word_padding() {
@@ -148,42 +151,47 @@ mod test {
                 input: "abc".into(),
                 right_padding: None,
             }, vec![
-                LinePart( "abc" )
+                Text("abc".into())
             ] ),
             ( Word {
-                left_padding: Some( CFWS::SingleFws( Fws ) ),
+                left_padding: Some( CFWS::SingleFws( FWS) ),
                 input: "abc".into(),
                 right_padding: None,
             }, vec![
-                FWS,
-                LinePart( "abc" )
+                MarkFWS,
+                Text(" abc".into())
             ] ),
             ( Word {
-                left_padding: Some( CFWS::SingleFws( Fws ) ),
+                left_padding: Some( CFWS::SingleFws( FWS ) ),
                 input: "abc".into(),
-                right_padding: Some( CFWS::SingleFws( Fws ) ),
+                right_padding: Some( CFWS::SingleFws( FWS ) ),
             }, vec![
-                FWS,
-                LinePart( "abc" ),
-                FWS
+                MarkFWS,
+                Text(" abc".into()),
+                MarkFWS,
+                Text(" ".into())
             ] ),
             ( Word {
                 left_padding: None,
                 input: "abc".into(),
-                right_padding: Some( CFWS::SingleFws( Fws ) ),
+                right_padding: Some( CFWS::SingleFws( FWS ) ),
             }, vec![
-                LinePart( "abc" ),
-                FWS
+                Text("abc".into()),
+                MarkFWS,
+                Text(" ".into())
             ] )
         ];
 
         for &( ref word, ref expection) in words.iter() {
-            let mut encoder = TestMailEncoder::new( MailType::Ascii );
-            do_encode_word( word, &mut encoder, None ).unwrap();
-            let seq = encoder.into_state_seq();
+            let mut encoder = Encoder::<VecBodyBuf>::new(MailType::Ascii);
+            {
+                let mut handle = encoder.encode_handle();
+                do_encode_word( word, &mut handle, None ).unwrap();
+                mem::forget(handle);
+            }
             assert_eq!(
-                expection,
-                &seq
+                &simplify_trace_tokens(encoder.trace.into_iter().skip(1)),
+                expection
             );
         }
     }

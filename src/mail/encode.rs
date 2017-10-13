@@ -9,19 +9,23 @@ use headers::HeaderName;
 /// on `Mail` to prevent this from happening
 ///
 #[inline(always)]
-pub fn encode_mail<E>( mail: &EncodableMail<E>, top: bool, encoder: &mut E ) -> Result<()>
-    where E: MailEncoder
-{
+pub fn encode_mail(
+    mail: &EncodableMail,
+    top: bool,
+    encoder: &mut Encoder<Resource>
+) -> Result<()> {
     _encode_mail( &mail.0, top, encoder )
 }
 
-fn _encode_mail<E>( mail: &Mail<E>, top: bool, encoder: &mut E ) -> Result<()>
-    where E: MailEncoder
-{
+fn _encode_mail(
+    mail: &Mail,
+    top: bool,
+    encoder: &mut Encoder<Resource>
+) -> Result<()> {
     encode_headers( &mail, top, encoder )?;
 
     //the empty line between the headers and the body
-    encoder.write_new_line();
+    encoder.add_blank_line();
 
     encode_mail_part( &mail, encoder )?;
 
@@ -33,12 +37,15 @@ fn _encode_mail<E>( mail: &Mail<E>, top: bool, encoder: &mut E ) -> Result<()>
 /// if the body is not yet resolved use `Body::poll_body` or `IntoFuture`
 /// on `Mail` to prevent this from happening
 ///
-fn encode_headers<E>(mail: &Mail<E>, top: bool, encoder:  &mut E ) -> Result<()>
-    where E: MailEncoder
-{
+fn encode_headers(
+    mail: &Mail,
+    top: bool,
+    encoder:  &mut Encoder<Resource>
+) -> Result<()> {
+    let mut handle = encoder.encode_handle();
     if top {
-        encoder.write_str( ascii_str!{ M I M E Minus V e r s i o n Colon Space _1 Dot _0 } );
-        encoder.write_new_line();
+        handle.write_str( ascii_str!{ M I M E Minus V e r s i o n Colon Space _1 Dot _0 } )?;
+        handle.finish_header();
     }
 
     for (name, hbody) in mail.headers.iter() {
@@ -51,19 +58,21 @@ fn encode_headers<E>(mail: &Mail<E>, top: bool, encoder:  &mut E ) -> Result<()>
             //TODO warn!
         }
 
-        encode_header( encoder, name, hbody)?;
+        encode_header( &mut handle, name, hbody)?;
     }
     Ok( () )
 }
 
-fn encode_header<E>( encoder: &mut E, name: HeaderName, component: &MailEncodable<E>) -> Result<()>
-    where E: MailEncoder
-{
-    encoder.write_str( name.as_ascii_str() );
-    encoder.write_char( AsciiChar::Colon );
-    encoder.write_fws();
-    component.encode( encoder )?;
-    encoder.write_new_line();
+fn encode_header(
+    handle: &mut EncodeHandle,
+    name: HeaderName,
+    component: &EncodableInHeader
+) -> Result<()> {
+    handle.write_str( name.as_ascii_str() )?;
+    handle.write_char( AsciiChar::Colon )?;
+    handle.write_fws();
+    component.encode( handle )?;
+    handle.finish_header();
     Ok( () )
 }
 
@@ -72,18 +81,12 @@ fn encode_header<E>( encoder: &mut E, name: HeaderName, component: &MailEncodabl
 /// if the body is not yet resolved use `Body::poll_body` or `IntoFuture`
 /// on `Mail` to prevent this from happening
 ///
-fn encode_mail_part<E>(mail: &Mail<E>, encoder:  &mut E ) -> Result<()>
-    where E: MailEncoder
-{
+fn encode_mail_part(mail: &Mail, encoder:  &mut Encoder<Resource> ) -> Result<()> {
     use super::MailPart::*;
     match mail.body {
         SingleBody { ref body } => {
-            if let Some( file_buffer ) = body.get_if_encoded()? {
-                encoder.write_body( &*file_buffer );
-                encoder.write_new_line();
-            } else {
-                bail!( "encoded mail, should only contain already transferencoded resources" )
-            }
+            //Note: Resource is a Arc so sheap to clone
+            encoder.add_body(body.clone());
         },
         MultipleBodies { ref hidden_text, ref bodies } => {
             if hidden_text.len() > 0 {
@@ -91,33 +94,36 @@ fn encode_mail_part<E>(mail: &Mail<E>, encoder:  &mut E ) -> Result<()>
             }
             let boundary: String = {
                 //FIXME there has to be a better way
+                // yes if the boundary is missing just genrate one!
                 if let Some( mime ) = mail.headers.get_single(ContentType) {
                     mime?.get_param(BOUNDARY)
                         .ok_or_else( ||-> Error { "boundary gone missing".into() } )?
                         .to_string()
                 } else {
-                    bail!( "Content-Type header gone missing" );
+                    bail!( "Content-Type header gone missing" )
                 }
             };
 
-            let boundary = boundary.into_ascii_string().chain_err( || "non ascii boundary" )?;
+            let boundary = boundary.into_ascii_string()
+                .chain_err( || "non ascii boundary" )?;
 
             for mail in bodies.iter() {
-                encoder.write_char( AsciiChar::Minus );
-                encoder.write_char( AsciiChar::Minus );
-                encoder.write_str( &*boundary );
-                encoder.write_new_line();
-
+                encoder.write_header_line(|handle| {
+                    handle.write_char( AsciiChar::Minus )?;
+                    handle.write_char( AsciiChar::Minus )?;
+                    handle.write_str( &*boundary )
+                })?;
                 _encode_mail( mail, false, encoder )?;
             }
 
             if bodies.len() > 0 {
-                encoder.write_char( AsciiChar::Minus );
-                encoder.write_char( AsciiChar::Minus );
-                encoder.write_str( &*boundary );
-                encoder.write_char( AsciiChar::Minus );
-                encoder.write_char( AsciiChar::Minus );
-                encoder.write_new_line();
+                encoder.write_header_line(|handle| {
+                    handle.write_char( AsciiChar::Minus )?;
+                    handle.write_char( AsciiChar::Minus )?;
+                    handle.write_str( &*boundary )?;
+                    handle.write_char( AsciiChar::Minus )?;
+                    handle.write_char( AsciiChar::Minus )
+                })?;
             } else {
                 //TODO warn
             }
@@ -125,4 +131,4 @@ fn encode_mail_part<E>(mail: &Mail<E>, encoder:  &mut E ) -> Result<()>
         }
     }
     Ok( () )
-    }
+}

@@ -13,7 +13,6 @@ use headers::{
     ContentId,
     ContentDisposition
 };
-use codec::MailEncoder;
 
 use components::{
     Disposition,
@@ -65,13 +64,11 @@ impl<T, C, CP, D> Compositor<T, C, CP, D>
     }
 
     /// composes a mail based on the given template_id, data and send_context
-    pub fn compose_mail<E>( &self,
+    pub fn compose_mail( &self,
                          send_context: MailSendContext,
                          template_id: T::TemplateId,
                          data: D,
-    ) -> Result<Mail<E>>
-        where E: MailEncoder
-    {
+    ) -> Result<Mail> {
 
         let mut data = data;
         //compose display name => create Address with display name;
@@ -165,14 +162,12 @@ impl<T, C, CP, D> Compositor<T, C, CP, D>
 
     /// uses the results of preprocessing data and templates, as well as a list of
     /// mail headers like `From`,`To`, etc. to create a new mail
-    pub fn build_mail<E>( &self,
+    pub fn build_mail( &self,
                        bodies: Vec<BodyWithEmbeddings>,
                        embeddings: Vec<EmbeddingWithCID>,
                        attachments: Attachments,
-                       core_headers: HeaderMap<E>
-    ) -> Result<Mail<E>>
-        where E: MailEncoder
-    {
+                       core_headers: HeaderMap
+    ) -> Result<Mail> {
         let mail = match attachments.len() {
             0 => Builder::create_alternate_bodies_with_embeddings(
                 bodies, embeddings, Some(core_headers) )?,
@@ -191,44 +186,44 @@ impl<T, C, CP, D> Compositor<T, C, CP, D>
 
 pub trait BuilderExt {
 
-    fn create_alternate_bodies<E, HM>(
+    fn create_alternate_bodies<HM>(
         bodies: Vec<BodyWithEmbeddings>,
         header: HM
-    ) -> Result<Mail<E>>
-        where E: MailEncoder, HM: Into<Option<HeaderMap<E>>>;
+    ) -> Result<Mail>
+        where HM: Into<Option<HeaderMap>>;
 
-    fn create_alternate_bodies_with_embeddings<E, HM>(
+    fn create_alternate_bodies_with_embeddings<HM>(
         bodies: Vec<BodyWithEmbeddings>,
         embeddings: Vec<EmbeddingWithCID>,
         header: HM
-    ) -> Result<Mail<E>>
-        where E: MailEncoder, HM: Into<Option<HeaderMap<E>>>;
+    ) -> Result<Mail>
+        where HM: Into<Option<HeaderMap>>;
 
-    fn create_mail_body<E, HM>(
+    fn create_mail_body<HM>(
         body: BodyWithEmbeddings,
         headers: HM
-    ) -> Result<Mail<E>>
-        where E: MailEncoder, HM: Into<Option<HeaderMap<E>>>;
+    ) -> Result<Mail>
+        where HM: Into<Option<HeaderMap>>;
 
-    fn create_with_attachments<E, HM>(
-        body: Mail<E>,
+    fn create_with_attachments<HM>(
+        body: Mail,
         attachments: Attachments,
         headers: HM
-    ) -> Result<Mail<E>>
-        where E: MailEncoder, HM: Into<Option<HeaderMap<E>>>;
+    ) -> Result<Mail>
+        where HM: Into<Option<HeaderMap>>;
 
-    fn create_body_from_resource<E, HM>(
+    fn create_body_from_resource<HM>(
         resource: Resource,
         headers: HM
-    ) -> Result<Mail<E>>
-        where E: MailEncoder, HM: Into<Option<HeaderMap<E>>>;
+    ) -> Result<Mail>
+        where HM: Into<Option<HeaderMap>>;
 
-    fn create_body_with_embeddings<E, HM>(
-        sub_body: Mail<E>,
+    fn create_body_with_embeddings<HM>(
+        sub_body: Mail,
         embeddings: Vec<EmbeddingWithCID>,
         headers: HM
-    ) -> Result<Mail<E>>
-        where E: MailEncoder, HM: Into<Option<HeaderMap<E>>>;
+    ) -> Result<Mail>
+        where HM: Into<Option<HeaderMap>>;
 
 }
 
@@ -236,11 +231,11 @@ pub trait BuilderExt {
 
 impl BuilderExt for Builder {
 
-    fn create_alternate_bodies<E, HM>(
+    fn create_alternate_bodies<HM>(
         bodies: Vec<BodyWithEmbeddings>,
         headers: HM
-    ) -> Result<Mail<E>>
-        where E: MailEncoder, HM: Into<Option<HeaderMap<E>>>
+    ) -> Result<Mail>
+        where HM: Into<Option<HeaderMap>>
     {
         let mut bodies = bodies;
 
@@ -264,12 +259,12 @@ impl BuilderExt for Builder {
         builder.build()
     }
 
-    fn create_alternate_bodies_with_embeddings<E, HM>(
+    fn create_alternate_bodies_with_embeddings<HM>(
         bodies: Vec<BodyWithEmbeddings>,
         embeddings: Vec<EmbeddingWithCID>,
         headers: HM
-    ) -> Result<Mail<E>>
-        where E: MailEncoder, HM: Into<Option<HeaderMap<E>>>
+    ) -> Result<Mail>
+        where HM: Into<Option<HeaderMap>>
     {
         match embeddings.len() {
             0 => {
@@ -285,11 +280,11 @@ impl BuilderExt for Builder {
         }
     }
 
-    fn create_mail_body<E, HM>(
+    fn create_mail_body<HM>(
         body: BodyWithEmbeddings,
         headers: HM
-    ) -> Result<Mail<E>>
-        where E: MailEncoder, HM: Into<Option<HeaderMap<E>>>
+    ) -> Result<Mail>
+        where HM: Into<Option<HeaderMap>>
     {
         let (resource, embeddings) = body;
         if embeddings.len() > 0 {
@@ -303,11 +298,11 @@ impl BuilderExt for Builder {
         }
     }
 
-    fn create_body_from_resource<E, HM>(
+    fn create_body_from_resource<HM>(
         resource: Resource,
         headers: HM
-    ) -> Result<Mail<E>>
-        where E: MailEncoder, HM: Into<Option<HeaderMap<E>>>
+    ) -> Result<Mail>
+        where HM: Into<Option<HeaderMap>>
     {
         let mut builder = Builder::singlepart( resource );
         if let Some( headers ) = headers.into() {
@@ -316,12 +311,12 @@ impl BuilderExt for Builder {
         builder.build()
     }
 
-    fn create_body_with_embeddings<E, HM>(
-        sub_body: Mail<E>,
+    fn create_body_with_embeddings<HM>(
+        sub_body: Mail,
         embeddings: Vec<EmbeddingWithCID>,
         headers: HM
-    ) -> Result<Mail<E>>
-        where E: MailEncoder, HM: Into<Option<HeaderMap<E>>>
+    ) -> Result<Mail>
+        where HM: Into<Option<HeaderMap>>
     {
 
         if embeddings.len() == 0 {
@@ -350,12 +345,12 @@ impl BuilderExt for Builder {
     }
 
 
-    fn create_with_attachments<E, HM>(
-        body: Mail<E>,
+    fn create_with_attachments<HM>(
+        body: Mail,
         attachments: Attachments,
         headers: HM
-    )  -> Result<Mail<E>>
-        where E: MailEncoder, HM: Into<Option<HeaderMap<E>>>
+    )  -> Result<Mail>
+        where HM: Into<Option<HeaderMap>>
     {
 
         let mut builder = Builder::multipart( gen_multipart_mime( ascii_str!{ m i x e d } )? );
