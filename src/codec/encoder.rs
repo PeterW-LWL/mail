@@ -220,6 +220,34 @@ impl<B: BodyBuffer> Encoder<B> {
         }
     }
 
+    /// calls the provided function with a EncodeHandle cleaning up afterwards
+    ///
+    /// After calling `func` with the EncodeHandle following cleanup is performed:
+    /// - if `func` returned an error `handle.undo_header()` is called, this won't
+    ///   undo anything before a `finish_current()` call but will discard partial
+    ///   writes
+    /// - if there are unfinished parts `handle.undo_header()` is called and
+    ///   an error is returned
+    pub fn with_handle<FN>(&mut self, func: FN) -> Result<()>
+        where FN: FnOnce(&mut EncodeHandle) -> Result<()>
+    {
+        let mut handle  = self.encode_handle();
+        match func(&mut handle) {
+            Ok(()) => {
+                if handle.has_unfinished_parts() {
+                    handle.undo_header();
+                    bail!("with_handle ended with unfinished parts")
+                }
+                Ok(())
+            },
+            Err(e) => {
+                handle.undo_header();
+                Err(e.chain_err(|| "with_handle finished with an error" ))
+            }
+        }
+
+    }
+
     pub fn add_blank_line(&mut self) {
         if let Some(&Section::String(..)) = self.sections.last() {}
             else {
@@ -1533,6 +1561,51 @@ mod test {
                 TruncateToCRLF,
                 End
             ]);
+        }
+
+        #[test]
+        fn with_handle_on_error() {
+            let mut encoder = Encoder::new(MailType::Internationalized);
+            let res = encoder.with_handle(|hdl| {
+                hdl.write_utf8("some partial writes")?;
+                bail!("error ;=)")
+            });
+            assert_err!(res);
+            assert_eq!(encoder.trace, vec![NewSection]);
+            assert_eq!(encoder.sections, vec![Section::String("".into())]);
+        }
+
+        #[test]
+        fn with_handle_partial_writes() {
+            let mut encoder = Encoder::new(MailType::Internationalized);
+            let res = encoder.with_handle(|hdl| {
+                hdl.write_utf8("some partial writes")?;
+                Ok(())
+            });
+            assert_err!(res);
+            assert_eq!(encoder.trace, vec![NewSection]);
+            assert_eq!(encoder.sections, vec![Section::String("".into())]);
+        }
+
+        #[test]
+        fn with_handle_ok() {
+            let mut encoder = Encoder::new(MailType::Internationalized);
+            let res = encoder.with_handle(|hdl| {
+                hdl.write_utf8("X-A: 12")?;
+                hdl.finish_current();
+                Ok(())
+            });
+            assert_ok!(res);
+            assert_eq!(encoder.trace, vec![
+                NewSection,
+                NowUtf8,
+                Text("X-A: 12".into()),
+                CRLF,
+                End
+            ]);
+            assert_eq!(encoder.sections, vec![
+                Section::String("X-A: 12\r\n".into())
+            ])
         }
     }
 
