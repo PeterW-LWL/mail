@@ -45,7 +45,7 @@ fn encode_headers(
     let mut handle = encoder.encode_handle();
     if top {
         handle.write_str( ascii_str!{ M I M E Minus V e r s i o n Colon Space _1 Dot _0 } )?;
-        handle.finish_current();
+        handle.finish_header();
     }
 
     for (name, hbody) in mail.headers.iter() {
@@ -72,7 +72,7 @@ fn encode_header(
     handle.write_char( AsciiChar::Colon )?;
     handle.write_fws();
     component.encode( handle )?;
-    handle.finish_current();
+    handle.finish_header();
     Ok( () )
 }
 
