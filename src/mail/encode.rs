@@ -86,7 +86,7 @@ fn encode_mail_part(mail: &Mail, encoder:  &mut Encoder<Resource> ) -> Result<()
     match mail.body {
         SingleBody { ref body } => {
             //Note: Resource is a Arc so sheap to clone
-            encoder.write_body(body.clone());
+            encoder.add_body(body.clone());
         },
         MultipleBodies { ref hidden_text, ref bodies } => {
             if hidden_text.len() > 0 {

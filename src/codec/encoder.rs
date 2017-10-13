@@ -241,7 +241,7 @@ impl<B: BodyBuffer> Encoder<B> {
     /// adds adds a body payload buffer to the encoder
     /// without validating it, the encoder mainly provides
     /// buffers it is not validating them.
-    pub fn write_body( &mut self, body: B) {
+    pub fn add_body(&mut self, body: B) {
         self.sections.push(Section::BodyPayload(body))
     }
 
@@ -1002,9 +1002,9 @@ mod test {
         fn writing_bodies() {
             let mut encoder = Encoder::new(MailType::Ascii);
             let body1 = VecBody::new(0);
-            encoder.write_body(body1.clone());
+            encoder.add_body(body1.clone());
             let body2 = VecBody::new(5);
-            encoder.write_body(body2.clone());
+            encoder.add_body(body2.clone());
 
             let res = encoder
                 .into_sections()
@@ -1415,7 +1415,7 @@ mod test {
                 handle.finish();
             }
             let body = VecBody::new(3);
-            encoder.write_body(body.clone());
+            encoder.add_body(body.clone());
             {
                 let mut handle = encoder.encode_header_handle();
                 assert_ok!(handle.write_utf8("❤"));
