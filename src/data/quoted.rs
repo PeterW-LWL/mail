@@ -22,10 +22,10 @@ impl QuotedString {
         let quoted = QuotedString::quote( input )?;
         match *quoted {
             Ascii( ref inner ) => {
-                handle.write_str( &*inner );
+                handle.write_str( &*inner )?;
             },
             Utf8( ref inner ) => {
-                handle.write_utf8( &*inner )?
+                handle.write_utf8( &*inner )?;
             }
         }
         Ok( () )

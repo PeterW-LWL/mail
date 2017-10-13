@@ -44,7 +44,7 @@ fn encode_headers(
 ) -> Result<()> {
     let mut handle = encoder.encode_header_handle();
     if top {
-        handle.write_str( ascii_str!{ M I M E Minus V e r s i o n Colon Space _1 Dot _0 } );
+        handle.write_str( ascii_str!{ M I M E Minus V e r s i o n Colon Space _1 Dot _0 } )?;
         handle.finish();
     }
 

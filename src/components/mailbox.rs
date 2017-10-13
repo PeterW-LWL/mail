@@ -80,9 +80,9 @@ impl EncodableInHeader for  Mailbox {
             handle.write_fws();
         }
         //for now this always uses the "<user@do.main>" form even if no display-name is given
-        handle.write_char( AsciiChar::LessThan );
+        handle.write_char( AsciiChar::LessThan )?;
         self.email.encode( handle )?;
-        handle.write_char( AsciiChar::GreaterThan );
+        handle.write_char( AsciiChar::GreaterThan )?;
         Ok( () )
     }
 }
@@ -98,19 +98,14 @@ mod test {
         let email = Email::from_input( "affen@haus" )?;
         Mailbox::from(email)
     } => ascii => [
-        NowChar,
         Text "<",
         MarkFWS,
-        NowStr,
         Text "affen",
         MarkFWS,
-        NowChar,
         Text "@",
         MarkFWS,
-        NowStr,
         Text "haus",
         MarkFWS,
-        NowChar,
         Text ">"
     ]}
 
@@ -120,25 +115,18 @@ mod test {
             email: Email::from_input( "affen@haus" ).unwrap(),
         }
     } => ascii => [
-        NowStr,
         Text "ay",
-        MarkFWS, NowChar, Text " ",
-        NowStr,
-        Text "ya",
-        MarkFWS, NowChar, Text " ",
-        NowChar,
-        Text "<",
         MarkFWS,
-        NowStr,
+        Text " ya",
+        MarkFWS,
+        Text " <",
+        MarkFWS,
         Text "affen",
         MarkFWS,
-        NowChar,
         Text "@",
         MarkFWS,
-        NowStr,
         Text "haus",
         MarkFWS,
-        NowChar,
         Text ">"
     ]}
 }

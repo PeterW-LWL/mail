@@ -80,7 +80,7 @@ impl EncodableInHeader for  Unstructured {
                             continue;
                         } else if had_fws {
                             //OPTIMIZE: from_unchecked as char is always a char in this context
-                            handle.write_char( AsciiChar::from( char ).unwrap() );
+                            handle.write_char( AsciiChar::from( char ).unwrap() )?;
                         } else {
                             //FIXME allow writing fws based on '\t'
                             handle.write_fws();
@@ -120,85 +120,68 @@ mod test {
     ec_test! { simple_encoding, {
         Unstructured::from_input( "this simple case" )?
     } => ascii => [
-        NowStr,
         Text "this",
-        MarkFWS, NowChar, Text " ",
-        NowStr,
-        Text "simple",
-        MarkFWS, NowChar, Text " ",
-        NowStr,
-        Text "case"
+        MarkFWS,
+        Text " simple",
+        MarkFWS,
+        Text " case"
     ]}
 
     ec_test!{ simple_utf8,  {
          Unstructured::from_input( "thüs sümple case" )?
     } => utf8 => [
-        NowUtf8,
         Text "thüs",
-        MarkFWS, NowChar, Text " ",
-        NowUtf8,
-        Text "sümple",
-        MarkFWS, NowChar, Text " ",
-        NowUtf8,
-        Text "case"
+        MarkFWS,
+        Text " sümple",
+        MarkFWS,
+        Text " case"
     ]}
 
     ec_test!{ encoded_words,  {
          Unstructured::from_input( "↑ ↓ ←→ bA" )?
     } => ascii => [
-        NowStr,
         Text "=?utf8?Q?=E2=86=91?=",
-        MarkFWS, NowChar, Text " ",
-        NowStr,
-        Text "=?utf8?Q?=E2=86=93?=",
-        MarkFWS, NowChar, Text " ",
-        NowStr,
-        Text "=?utf8?Q?=E2=86=90=E2=86=92?=",
-        MarkFWS, NowChar, Text " ",
-        NowStr,
-        Text "bA"
+        MarkFWS,
+        Text " =?utf8?Q?=E2=86=93?=",
+        MarkFWS,
+        Text " =?utf8?Q?=E2=86=90=E2=86=92?=",
+        MarkFWS,
+        Text " bA"
     ]}
 
     ec_test!{ eats_cr_lf, {
         Unstructured::from_input( "a \rb\n c\r\n " )?
     } => ascii => [
-        NowStr,
         Text "a",
-        MarkFWS, NowChar, Text " ",
-        NowStr,
-        Text "b",
-        MarkFWS, NowChar, Text " ",
-        NowStr,
-        Text "c",
-        MarkFWS, NowChar, Text " "
+        MarkFWS,
+        Text " b",
+        MarkFWS,
+        Text " c",
+        MarkFWS,
+        Text " "
     ]}
 
     ec_test!{ at_last_one_fws, {
         Unstructured::from_input( "a\rb\nc\r\n" )?
     } => ascii => [
-        NowStr,
         Text "a",
-        MarkFWS, NowChar, Text " ",
-        NowStr,
-        Text "b",
-        MarkFWS, NowChar, Text " ",
-        NowStr,
-        Text "c",
-        MarkFWS, NowChar, Text " "
+        MarkFWS,
+        Text " b",
+        MarkFWS,
+        Text " c",
+        MarkFWS,
+        Text " "
     ]}
 
     ec_test!{ kinda_keeps_wsp, {
         Unstructured::from_input("\t\ta  b \t")?
     } => ascii => [
-        MarkFWS, NowChar, Text " ",
-        NowStr,
-        Text "\ta",
-        MarkFWS, NowChar, Text " ",
-        NowStr,
-        Text " b",
-        MarkFWS, NowChar, Text " ",
-        NowStr,
-        Text "\t"
+        MarkFWS,
+        Text " \ta",
+        MarkFWS,
+        Text "  b",
+        MarkFWS,
+        Text " \t"
     ]}
 
 

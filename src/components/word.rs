@@ -99,6 +99,7 @@ mod test {
     use grammar::MailType;
     use codec::{ Encoder, VecBodyBuf, EncodableClosure};
     use codec::Token::*;
+    use codec::simplify_trace_tokens;
 
     use super::*;
     use super::super::FWS;
@@ -109,7 +110,6 @@ mod test {
             do_encode_word( &word, handle, Some( EncodedWordContext::Text ) )
         })
     } => ascii => [
-        NowStr,
         Text "=?utf8?Q?=3D=3F?="
     ]}
 
@@ -119,7 +119,6 @@ mod test {
             do_encode_word( &word, handle, Some( EncodedWordContext::Text ) )
         })
     } => ascii => [
-        NowStr,
         Text "=?utf8?Q?a=E2=86=91b?="
     ]}
 
@@ -140,7 +139,6 @@ mod test {
             do_encode_word( &word, handle, None )
         })
     } => ascii => [
-        NowStr,
         Text r#""a\"b""#
     ]}
 
@@ -153,7 +151,6 @@ mod test {
                 input: "abc".into(),
                 right_padding: None,
             }, vec![
-                NowStr,
                 Text("abc".into())
             ] ),
             ( Word {
@@ -161,28 +158,27 @@ mod test {
                 input: "abc".into(),
                 right_padding: None,
             }, vec![
-                MarkFWS, NowChar, Text(" ".into()),
-                NowStr,
-                Text("abc".into())
+                MarkFWS,
+                Text(" abc".into())
             ] ),
             ( Word {
                 left_padding: Some( CFWS::SingleFws( FWS ) ),
                 input: "abc".into(),
                 right_padding: Some( CFWS::SingleFws( FWS ) ),
             }, vec![
-                MarkFWS, NowChar, Text(" ".into()),
-                NowStr,
-                Text("abc".into()),
-                MarkFWS, NowChar, Text(" ".into())
+                MarkFWS,
+                Text(" abc".into()),
+                MarkFWS,
+                Text(" ".into())
             ] ),
             ( Word {
                 left_padding: None,
                 input: "abc".into(),
                 right_padding: Some( CFWS::SingleFws( FWS ) ),
             }, vec![
-                NowStr,
                 Text("abc".into()),
-                MarkFWS, NowChar, Text(" ".into())
+                MarkFWS,
+                Text(" ".into())
             ] )
         ];
 
@@ -194,8 +190,8 @@ mod test {
                 mem::forget(handle);
             }
             assert_eq!(
-                &encoder.trace[1..],
-                &expection[..]
+                &simplify_trace_tokens(encoder.trace.into_iter().skip(1)),
+                expection
             );
         }
     }

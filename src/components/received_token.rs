@@ -24,9 +24,9 @@ impl EncodableInHeader for  ReceivedToken {
             Address( ref addr ) => {
                 // we do not need to use <..> , but I think it's better and it is definitely
                 // not wrong
-                handle.write_char( AsciiChar::LessThan );
+                handle.write_char( AsciiChar::LessThan )?;
                 addr.encode( handle )?;
-                handle.write_char( AsciiChar::GreaterThan );
+                handle.write_char( AsciiChar::GreaterThan )?;
             },
             Domain( ref domain ) => {
                 domain.encode( handle )?;
@@ -47,7 +47,6 @@ mod test {
         Domain::from_input( "random.mailnot" )?
     } => ascii => [
         MarkFWS,
-        NowStr,
         Text "random.mailnot",
         MarkFWS
     ]}
@@ -56,19 +55,14 @@ mod test {
         let email = Email::from_input( "modnar@random.mailnot")?;
         ReceivedToken::Address( email )
     } => ascii => [
-        NowChar,
         Text "<",
         MarkFWS,
-        NowStr,
         Text "modnar",
         MarkFWS,
-        NowChar,
         Text "@",
         MarkFWS,
-        NowStr,
         Text "random.mailnot",
         MarkFWS,
-        NowChar,
         Text ">"
     ]}
 
@@ -76,7 +70,6 @@ mod test {
         let word = Word::from_input( "simple" )?;
         ReceivedToken::Word( word )
     } => ascii => [
-        NowStr,
         Text "simple"
     ]}
 
@@ -84,7 +77,6 @@ mod test {
         let word = Word::from_input( "sim ple" )?;
         ReceivedToken::Word( word )
     } => ascii => [
-        NowStr,
         Text r#""sim ple""#
     ]}
 

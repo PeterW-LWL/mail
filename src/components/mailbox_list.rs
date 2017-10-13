@@ -230,7 +230,7 @@ fn encode_list<'a, I>( list_iter: I, handle: &mut EncodeHeaderHandle ) -> Result
 {
     sep_for!{ mailbox in list_iter;
         sep {
-            handle.write_char( AsciiChar::Comma );
+            handle.write_char( AsciiChar::Comma )?;
             handle.write_fws();
         };
         mailbox.encode( handle )?;
@@ -262,12 +262,11 @@ mod test {
             },
         ] )
     } => ascii => [
-        NowStr,
         Text "hy",
-        MarkFWS, NowChar, Text " ",
-        Text "ho",
-        MarkFWS, NowChar, Text " ",
-        Text "<",
+        MarkFWS,
+        Text " ho",
+        MarkFWS,
+        Text " <",
         MarkFWS,
         Text "ran",
         MarkFWS,
@@ -290,40 +289,28 @@ mod test {
             }
         ] )
     } => ascii => [
-        NowStr,
         Text "hy",
-        MarkFWS, NowChar, Text " ",
-        NowStr,
-        Text "ho",
-        MarkFWS, NowChar, Text " ",
-        NowChar,
-        Text "<",
         MarkFWS,
-        NowStr,
+        Text " ho",
+        MarkFWS,
+        Text " <",
+        MarkFWS,
         Text "nar",
         MarkFWS,
-        NowChar,
         Text "@",
         MarkFWS,
-        NowStr,
         Text "mod",
         MarkFWS,
-        NowStr,
         Text ">,",
-        MarkFWS, NowChar, Text " ",
-        NowChar,
-        Text "<",
         MarkFWS,
-        NowStr,
+        Text " <",
+        MarkFWS,
         Text "ran",
         MarkFWS,
-        NowChar,
         Text "@",
         MarkFWS,
-        NowStr,
         Text "dom",
         MarkFWS,
-        NowChar,
         Text ">"
     ]}
 }

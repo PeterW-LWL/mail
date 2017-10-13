@@ -60,7 +60,7 @@ impl EncodableInHeader for  Email {
 
     fn encode(&self, handle: &mut EncodeHeaderHandle) -> Result<()> {
         self.local_part.encode( handle )?;
-        handle.write_char( AsciiChar::At );
+        handle.write_char( AsciiChar::At )?;
         self.domain.encode( handle )?;
         Ok( () )
     }
@@ -93,7 +93,7 @@ impl EncodableInHeader  for LocalPart {
         // if mail_type == Ascii quote_if_needed already made sure this
         // is ascii (or returned an error if not)
         // it also made sure it is valid as it is either `dot-atom-text` or `quoted-string`
-        handle.write_str_unchecked(&*res);
+        handle.write_str_unchecked(&*res)?;
         handle.mark_fws_pos();
         Ok( () )
     }
@@ -204,7 +204,6 @@ mod test {
         LocalPart::from_input(  "hans" )?
     } => ascii => [
         MarkFWS,
-        NowStr,
         Text "hans",
         MarkFWS
     ]}
@@ -214,7 +213,6 @@ mod test {
         LocalPart::from_input(  "ha ns" )?
     } => ascii => [
         MarkFWS,
-        NowStr,
         Text "\"ha ns\"",
         MarkFWS
     ]}
@@ -224,7 +222,6 @@ mod test {
         LocalPart::from_input( "Jörn" )?
     } => utf8 => [
         MarkFWS,
-        NowStr,
         Text "Jörn",
         MarkFWS
     ]}
@@ -242,7 +239,6 @@ mod test {
         Domain::from_input( "bad.at.domain" )?
     } => ascii => [
         MarkFWS,
-        NowStr,
         Text "bad.at.domain",
         MarkFWS
     ]}
@@ -251,7 +247,6 @@ mod test {
         Domain::from_input( "dömain" )?
     } => utf8 => [
         MarkFWS,
-        NowUtf8,
         Text "dömain",
         MarkFWS
     ]}
@@ -261,7 +256,6 @@ mod test {
         Domain::from_input( "dat.ü.dü" )?
     } => ascii => [
         MarkFWS,
-        NowStr,
         Text "dat.xn--tda.xn--d-eha",
         MarkFWS
     ]}
@@ -271,13 +265,10 @@ mod test {
         Email::from_input( "simple@and.ascii" )?
     } => ascii => [
         MarkFWS,
-        NowStr,
         Text "simple",
         MarkFWS,
-        NowChar,
         Text "@",
         MarkFWS,
-        NowStr,
         Text "and.ascii",
         MarkFWS
     ]}

@@ -19,8 +19,8 @@ impl EncodableInHeader for  PhraseList {
             sep {
                 //Note that we do not want to write MarkFWS, NowChar, Text " " as the following word might contains
                 // a left_padding with a MarkFWS, NowChar, Text " " but a space if fine
-                handle.write_char( AsciiChar::Comma );
-                handle.write_char( AsciiChar::Space );
+                handle.write_char( AsciiChar::Comma )?;
+                handle.write_char( AsciiChar::Space )?;
             };
             word.encode( handle )?;
 
@@ -102,16 +102,13 @@ mod test {
             Phrase::from_input( "magic man" )?
         ])
     } => ascii => [
-        NowStr,
         Text "hy",
-        MarkFWS, NowChar, Text " ",
+        MarkFWS,
         //TODO really no FWS by the seperator??
         // (currently it's this way as word can start with a FWS making it a double FWS)
-        NowStr,
-        Text "there, magic",
-        MarkFWS, NowChar, Text " ",
-        NowStr,
-        Text "man"
+        Text " there, magic",
+        MarkFWS,
+        Text " man"
     ]}
 
     ec_test!{ some_simple_phrases_try_from, {
@@ -119,11 +116,9 @@ mod test {
             "hy there"
         )?
     } => ascii => [
-        NowStr,
         Text "hy",
-        MarkFWS, NowChar, Text " ",
-        NowStr,
-        Text "there"
+        MarkFWS,
+        Text " there"
     ]}
 
     ec_test!{ some_phrases_try_from, {
@@ -132,14 +127,11 @@ mod test {
             "magic man"
         ] )?
     } => ascii => [
-        NowStr,
         Text "hy",
-        MarkFWS, NowChar, Text " ",
-        NowStr,
-        Text "there, magic",
-        MarkFWS, NowChar, Text " ",
-        NowStr,
-        Text "man"
+        MarkFWS,
+        Text " there, magic",
+        MarkFWS,
+        Text " man"
     ]}
 }
 

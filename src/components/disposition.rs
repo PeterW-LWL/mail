@@ -107,10 +107,10 @@ impl EncodableInHeader for Disposition {
         use self::DispositionKind::*;
         match self.kind {
             Inline => {
-                handle.write_str( ascii_str!{ i n l i n e } );
+                handle.write_str( ascii_str!{ i n l i n e } )?;
             },
             Attachment => {
-                handle.write_str( ascii_str!{ a t t a c h m e n t } );
+                handle.write_str( ascii_str!{ a t t a c h m e n t } )?;
             }
         }
         self.file_meta.encode( handle )?;
@@ -131,14 +131,12 @@ mod test {
     ec_test!{ no_params_inline, {
         Disposition::inline()
     } => ascii => [
-        NowStr,
         Text "inline"
     ]}
 
     ec_test!{ no_params_attachment, {
         Disposition::attachment()
     } => ascii => [
-        NowStr,
         Text "attachment"
     ]}
 
@@ -148,7 +146,6 @@ mod test {
             ..Default::default()
         })
     } => ascii => [
-        NowStr,
         Text "attachment;filename=\"this is nice\""
     ]}
 
@@ -161,7 +158,6 @@ mod test {
             size: Some( 4096 )
         })
     } => ascii => [
-        NowStr,
         Text concat!( "attachment",
             ";filename=random.png",
             ";creation-date=\"Tue,  6 Aug 2013 04:11:01 +0000\"",

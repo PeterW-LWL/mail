@@ -42,12 +42,12 @@ impl EncodableInHeader for  MessageID {
 
     fn encode(&self, handle: &mut EncodeHeaderHandle) -> Result<()> {
         handle.mark_fws_pos();
-        handle.write_char( AsciiChar::LessThan );
+        handle.write_char( AsciiChar::LessThan )?;
         match self.message_id {
             SimpleItem::Ascii( ref ascii ) => handle.write_str( ascii )?,
             SimpleItem::Utf8( ref utf8 ) => handle.write_utf8( utf8 )?
         }
-        handle.write_char( AsciiChar::GreaterThan );
+        handle.write_char( AsciiChar::GreaterThan )?;
         handle.mark_fws_pos();
         Ok( () )
     }
@@ -81,16 +81,11 @@ mod test {
         MessageID::from_input( "affen@haus" )?
     } => ascii => [
         MarkFWS,
-        NowChar,
-        Text "<",
-        NowStr,
         // there are two "context" one which allows FWS inside (defined = email)
         // and one which doesn't for simplicity we use the later every where
         // especially because message ids without a `@domain.part` are quite
         // common
-        Text "affen@haus",
-        NowChar,
-        Text ">",
+        Text "<affen@haus>",
         MarkFWS
     ]}
 
@@ -98,12 +93,7 @@ mod test {
         MessageID::from_input( "↓@↑.utf8")?
     } => utf8 => [
         MarkFWS,
-        NowChar,
-        Text "<",
-        NowUtf8,
         Text "<↓@↑.utf8>",
-        NowChar,
-        Text ">",
         MarkFWS
     ]}
 
@@ -125,20 +115,10 @@ mod test {
         ])
     } => ascii => [
         MarkFWS,
-        NowChar,
-        Text "<",
-        NowStr,
-        Text "affen@haus",
-        NowChar,
-        Text ">",
+        Text "<affen@haus>",
         MarkFWS,
         MarkFWS,
-        NowChar,
-        Text "<",
-        NowStr,
-        Text "obst@salat",
-        NowChar,
-        Text ">",
+        Text "<obst@salat>",
         MarkFWS,
     ]}
 }

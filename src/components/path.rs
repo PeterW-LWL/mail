@@ -27,11 +27,11 @@ impl EncodableInHeader for  Path {
 
     fn encode(&self, handle: &mut EncodeHeaderHandle) -> Result<()> {
         handle.mark_fws_pos();
-        handle.write_char( AsciiChar::LessThan );
+        handle.write_char( AsciiChar::LessThan )?;
         if let Some( mail ) = self.0.as_ref() {
             mail.encode( handle )?;
         }
-        handle.write_char( AsciiChar::GreaterThan );
+        handle.write_char( AsciiChar::GreaterThan )?;
         handle.mark_fws_pos();
         Ok( () )
     }
@@ -47,10 +47,7 @@ mod test {
         Path( None )
     } => ascii => [
         MarkFWS,
-        NowChar,
-        Text "<",
-        NowChar,
-        Text ">",
+        Text "<>",
         MarkFWS
     ]}
 
@@ -58,19 +55,14 @@ mod test {
         Path( Some( Email::from_input( "abc@de.fg" )? ) )
     } => ascii => [
         MarkFWS,
-        NowChar,
         Text "<",
         MarkFWS,
-        NowStr,
         Text "abc",
         MarkFWS,
-        NowChar,
         Text "@",
         MarkFWS,
-        NowStr,
         Text "de.fg",
         MarkFWS,
-        NowChar,
         Text ">",
         MarkFWS
     ]}

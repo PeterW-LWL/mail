@@ -1,7 +1,6 @@
 use std::any::{Any, TypeId};
 use std::fmt::{self, Debug};
 use std::result::{ Result as StdResult };
-use std::borrow::Cow;
 
 use ascii::{AsciiStr, AsciiChar};
 
@@ -260,7 +259,7 @@ impl<B: BodyBuffer> Encoder<B> {
                 },
                 Section::MIMEBody(body) => {
                     body.with_slice(|slice| {
-                        let mut string = String::from_utf8_lossy(slice);
+                        let string = String::from_utf8_lossy(slice);
                         out.push_str(&*string);
                         if !string.ends_with("\r\n") {
                             out.push_str("\r\n");

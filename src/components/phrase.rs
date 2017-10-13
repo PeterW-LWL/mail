@@ -71,25 +71,20 @@ mod test {
     ec_test!{ simple, {
         Phrase::from_input("simple think")?
     } => ascii => [
-        NowStr,
         Text "simple",
-        MarkFWS, NowChar, Text " ",
-        NowStr,
-        Text "think"
+        MarkFWS,
+        Text " think"
     ]}
 
     ec_test!{ with_encoding, {
         Phrase::from_input(" hm nääds encoding")?
     } => ascii => [
-        MarkFWS, NowChar, Text " ",
-        NowStr,
-        Text "hm",
-        MarkFWS, NowChar, Text " ",
-        NowStr,
-        Text "=?utf8?Q?n=C3=A4=C3=A4ds?=",
-        MarkFWS, NowChar, Text " ",
-        NowStr,
-        Text "encoding"
+        MarkFWS,
+        Text " hm",
+        MarkFWS,
+        Text " =?utf8?Q?n=C3=A4=C3=A4ds?=",
+        MarkFWS,
+        Text " encoding"
     ]}
 }
 

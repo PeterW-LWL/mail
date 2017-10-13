@@ -36,7 +36,7 @@ impl TransferEncoding {
 impl EncodableInHeader for  TransferEncoding {
 
     fn encode(&self, handle: &mut EncodeHeaderHandle) -> Result<()> {
-        handle.write_str( self.name() );
+        handle.write_str( self.name() )?;
         Ok( () )
     }
 }
@@ -72,35 +72,30 @@ mod test {
     ec_test! {_7bit, {
         TransferEncoding::_7Bit
     } => ascii => [
-        NowStr,
         Text "7bit"
     ]}
 
     ec_test! {_8bit, {
         TransferEncoding::_8Bit
     } => ascii => [
-        NowStr,
         Text "8bit"
     ]}
 
     ec_test!{binary, {
         TransferEncoding::Binary
     } => ascii => [
-        NowStr,
         Text "binary"
     ]}
 
     ec_test!{base64, {
         TransferEncoding::Base64
     } => ascii => [
-        NowStr,
         Text "base64"
     ]}
 
     ec_test!{quoted_printable, {
         TransferEncoding::QuotedPrintable
     } => ascii => [
-        NowStr,
         Text "quoted-printable"
     ]}
 }

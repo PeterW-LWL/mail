@@ -136,7 +136,6 @@ mod test {
         let mime: Mime = "text/wtf;charset=utf8;random=alot".parse().unwrap();
         mime
     } => ascii => [
-        NowStr,
         Text "text/wtf;charset=utf8;random=alot"
     ]}
 

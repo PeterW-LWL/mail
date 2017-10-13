@@ -53,7 +53,6 @@ mod test {
             CFWS::SingleFws( FWS )
         } => utf8 => [
             MarkFWS,
-            NowChar,
             Text " "
         ]
     }
