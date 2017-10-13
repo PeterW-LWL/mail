@@ -716,6 +716,49 @@ pub trait Encodable<B: BodyBuffer> {
 }
 
 #[cfg(test)]
+pub fn simplify_trace_tokens<I: IntoIterator<Item=Token>>(inp: I) -> Vec<Token> {
+    use std::mem;
+    use self::Token::*;
+    let iter = inp.into_iter()
+        .filter(|t| {
+            match *t {
+                NowChar |
+                NowStr |
+                NowAText |
+                NowUtf8 |
+                NowUnchecked => false,
+                _ => true
+            }
+        });
+    let (min, _max) = iter.size_hint();
+    let mut out =
+        if min > 0 { Vec::with_capacity(min) }
+        else { Vec::new() };
+    let mut textbf = String::new();
+    let mut had_text = false;
+    for token in iter {
+        match token {
+            Text(str) => {
+                had_text = true;
+                textbf.push_str(&*str)
+            },
+            e => {
+                if had_text {
+                    let text = mem::replace(&mut textbf, String::new());
+                    out.push(Text(text));
+                    had_text = false;
+                }
+                out.push(e);
+            }
+        }
+    }
+    if had_text {
+        out.push(Text(textbf))
+    }
+    out
+}
+
+#[cfg(test)]
 #[macro_export]
 macro_rules! ec_test {
     ( $name:ident, $inp:block => $mt:tt => [ $($tokens:tt)* ] ) => (
@@ -764,7 +807,8 @@ macro_rules! ec_test {
             let mut expected: Vec<Token> = Vec::new();
             ec_test!{ __PRIV_TO_TOKEN_LIST expected $($tokens)* }
             //skip over the NewSection part
-            assert_eq!(&encoder.trace[1..], &expected[..])
+            let got = $crate::codec::simplify_trace_tokens(encoder.trace.into_iter().skip(1));
+            assert_eq!(got, expected)
         }
     );
 
@@ -825,6 +869,92 @@ mod test {
         {
             func(self.data.as_slice())
         }
+    }
+
+    mod test_test_utilities {
+        use codec::Token::*;
+        use super::super::simplify_trace_tokens;
+
+        #[test]
+        fn does_simplify_tokens_strip_nows() {
+            let inp = vec![
+                NowChar,
+                Text("h".into()),
+                CRLF,
+                NowStr,
+                Text("y yo".into()),
+                CRLF,
+                NowUtf8,
+                Text(", what's".into()),
+                CRLF,
+                NowUnchecked,
+                Text("up!".into()),
+                CRLF,
+                NowAText,
+                Text("abc".into())
+            ];
+            let out = simplify_trace_tokens(inp);
+            assert_eq!(out, vec![
+                Text("h".into()),
+                CRLF,
+                Text("y yo".into()),
+                CRLF,
+                Text(", what's".into()),
+                CRLF,
+                Text("up!".into()),
+                CRLF,
+                Text("abc".into())
+            ])
+
+        }
+
+        #[test]
+        fn simplify_does_collapse_text() {
+            let inp = vec![
+                NowChar,
+                Text("h".into()),
+                NowStr,
+                Text("y yo".into()),
+                NowUtf8,
+                Text(", what's".into()),
+                NowUnchecked,
+                Text(" up! ".into()),
+                NowAText,
+                Text("abc".into())
+            ];
+            let out = simplify_trace_tokens(inp);
+            assert_eq!(out, vec![
+                Text("hy yo, what's up! abc".into())
+            ]);
+        }
+
+        #[test]
+        fn simplify_works_with_empty_text() {
+            let inp = vec![
+                NowStr,
+                Text("".into()),
+                CRLF,
+            ];
+            assert_eq!(simplify_trace_tokens(inp), vec![
+                Text("".into()),
+                CRLF
+            ])
+        }
+
+        #[test]
+        fn simplify_works_with_trailing_empty_text() {
+            let inp = vec![
+                Text("a".into()),
+                CRLF,
+                Text("".into()),
+            ];
+            assert_eq!(simplify_trace_tokens(inp), vec![
+                Text("a".into()),
+                CRLF,
+                Text("".into())
+            ])
+        }
+
     }
 
     mod EncodableInHeader {
@@ -1413,7 +1543,6 @@ mod test {
                 x.write_utf8("hy")
             })
         } => Utf8 => [
-            NowUtf8,
             Text "hy"
         ]
     }
@@ -1428,7 +1557,6 @@ mod test {
                 x.write_utf8("hy")
             })
         } => Utf8 => [
-            NowUtf8,
             Text "hy"
         ]
     }
