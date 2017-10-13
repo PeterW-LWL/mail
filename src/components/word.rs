@@ -98,7 +98,7 @@ mod test {
 
     use grammar::MailType;
     use codec::{ Encoder, VecBodyBuf, EncodableClosure};
-    use codec::Token::*;
+    use codec::TraceToken::*;
     use codec::simplify_trace_tokens;
 
     use super::*;

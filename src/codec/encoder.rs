@@ -144,7 +144,7 @@ pub struct Encoder<R: BodyBuffer> {
     mail_type: MailType,
     sections: Vec<Section<R>>,
     #[cfg(test)]
-    pub trace: Vec<Token>
+    pub trace: Vec<TraceToken>
 }
 
 
@@ -158,7 +158,7 @@ pub struct Encoder<R: BodyBuffer> {
 /// `[NowUtf8, Text("hy")]`
 #[cfg(test)]
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
-pub enum Token {
+pub enum TraceToken {
     MarkFWS,
     CRLF,
     TruncateToCRLF,
@@ -206,7 +206,7 @@ impl<B: BodyBuffer> Encoder<B> {
         else {
             self.sections.push(Section::Header(String::new()));
             #[cfg(test)]
-            { self.trace.push(Token::NewSection) }
+            { self.trace.push(TraceToken::NewSection) }
         }
 
         if let Some(&mut Section::Header(ref mut string)) = self.sections.last_mut() {
@@ -225,13 +225,13 @@ impl<B: BodyBuffer> Encoder<B> {
             else {
                 self.sections.push(Section::Header(String::new()));
                 #[cfg(test)]
-                { self.trace.push(Token::NewSection); }
+                { self.trace.push(TraceToken::NewSection); }
             }
 
         if let Some(&mut Section::Header(ref mut string)) = self.sections.last_mut() {
             string.push_str("\r\n");
             #[cfg(test)]
-            { self.trace.push(Token::BlankLine); }
+            { self.trace.push(TraceToken::BlankLine); }
         } else {
             //REFACTOR(NLL): with NLL we can combine both if-else blocks not needing unreachable! anymore
             unreachable!("we already made sure the last is Section::Header")
@@ -293,7 +293,7 @@ impl<B: BodyBuffer> Encoder<B> {
 pub struct EncodeHeaderHandle<'a> {
     buffer: &'a mut String,
     #[cfg(test)]
-    trace: &'a mut Vec<Token>,
+    trace: &'a mut Vec<TraceToken>,
     mail_type: MailType,
     line_start_idx: usize,
     last_fws_idx: usize,
@@ -348,7 +348,7 @@ impl<'a> EncodeHeaderHandle<'a> {
     fn new(
         mail_type: MailType,
         buffer: &'a mut String,
-        trace: &'a mut Vec<Token>
+        trace: &'a mut Vec<TraceToken>
     ) -> Self {
         let start_idx = buffer.len();
         let trace_start_idx = trace.len();
@@ -405,7 +405,7 @@ impl<'a> EncodeHeaderHandle<'a> {
     /// does push a `MarkFWS` Token
     pub fn mark_fws_pos(&mut self) {
         #[cfg(test)]
-        { self.trace.push(Token::MarkFWS) }
+        { self.trace.push(TraceToken::MarkFWS) }
         self.content_before_fws |= self.content_since_fws;
         self.content_since_fws = false;
         self.last_fws_idx = self.buffer.len()
@@ -422,7 +422,7 @@ impl<'a> EncodeHeaderHandle<'a> {
     /// does push `NowChar` and then can push `Text`,`CRLF`
     pub fn write_char(&mut self, ch: AsciiChar) -> Result<()>  {
         #[cfg(test)]
-        { self.trace.push(Token::NowChar) }
+        { self.trace.push(TraceToken::NowChar) }
         self.internal_write_char(ch.as_char())
     }
 
@@ -443,7 +443,7 @@ impl<'a> EncodeHeaderHandle<'a> {
     ///
     pub fn write_str(&mut self, s: &AsciiStr)  -> Result<()>  {
         #[cfg(test)]
-        { self.trace.push(Token::NowStr) }
+        { self.trace.push(TraceToken::NowStr) }
         self.internal_write_str(s.as_str())
     }
 
@@ -465,7 +465,7 @@ impl<'a> EncodeHeaderHandle<'a> {
     pub fn write_utf8(&mut self, s: &str) -> Result<()> {
         if self.mail_type().is_internationalized() {
             #[cfg(test)]
-            { self.trace.push(Token::NowUtf8) }
+            { self.trace.push(TraceToken::NowUtf8) }
             self.internal_write_str(s)
         } else {
             bail!( "can not write utf8 into Ascii mail" )
@@ -499,7 +499,7 @@ impl<'a> EncodeHeaderHandle<'a> {
     pub fn try_write_atext(&mut self, s: &str) -> Result<()> {
         if s.chars().all( |ch| is_atext( ch, self.mail_type() ) ) {
             #[cfg(test)]
-            { self.trace.push(Token::NowAText) }
+            { self.trace.push(TraceToken::NowAText) }
             // the ascii or not aspect is already coverted by `is_atext`
             self.internal_write_str(s)
         } else {
@@ -514,7 +514,7 @@ impl<'a> EncodeHeaderHandle<'a> {
     /// an Ascii Mail, which is incorrect but has to be safe wrt. rust's safety.
     pub fn write_str_unchecked( &mut self, s: &str) -> Result<()> {
         #[cfg(test)]
-        { self.trace.push(Token::NowUnchecked) }
+        { self.trace.push(TraceToken::NowUnchecked) }
         self.internal_write_str(s)
     }
 
@@ -536,7 +536,7 @@ impl<'a> EncodeHeaderHandle<'a> {
     pub fn finish(&mut self) {
         self.start_new_line();
         #[cfg(test)]
-        { self.trace.push(Token::End) }
+        { self.trace.push(TraceToken::End) }
         self.reinit();
     }
 
@@ -601,13 +601,13 @@ impl<'a> EncodeHeaderHandle<'a> {
     fn start_new_line(&mut self) {
         if self.line_has_content() {
             #[cfg(test)]
-            { self.trace.push(Token::CRLF) }
+            { self.trace.push(TraceToken::CRLF) }
 
             self.buffer.push('\r');
             self.buffer.push('\n');
         } else {
             #[cfg(test)]
-            { self.trace.push(Token::TruncateToCRLF) }
+            { self.trace.push(TraceToken::TruncateToCRLF) }
             // e.g. if we "broke" the line on a tailing space => "\r\n  "
             // this would not be valid so we cut awy the trailing white space
             // be if we have "ab  " we do not want to cut away the trailing
@@ -670,7 +670,7 @@ impl<'a> EncodeHeaderHandle<'a> {
         {
             //REFACTOR(NLL): just use a `if let`-`else` with NLL's
             let need_new =
-                if let Some(&mut Token::Text(ref mut string)) = self.trace.last_mut() {
+                if let Some(&mut TraceToken::Text(ref mut string)) = self.trace.last_mut() {
                     string.push(ch);
                     false
                 } else {
@@ -679,7 +679,7 @@ impl<'a> EncodeHeaderHandle<'a> {
             if need_new {
                 let mut string = String::new();
                 string.push(ch);
-                self.trace.push(Token::Text(string))
+                self.trace.push(TraceToken::Text(string))
             }
 
         }
@@ -715,9 +715,9 @@ pub trait Encodable<B: BodyBuffer> {
 }
 
 #[cfg(test)]
-pub fn simplify_trace_tokens<I: IntoIterator<Item=Token>>(inp: I) -> Vec<Token> {
+pub fn simplify_trace_tokens<I: IntoIterator<Item=TraceToken>>(inp: I) -> Vec<TraceToken> {
     use std::mem;
-    use self::Token::*;
+    use self::TraceToken::*;
     let iter = inp.into_iter()
         .filter(|t| {
             match *t {
@@ -763,10 +763,11 @@ macro_rules! ec_test {
     ( $name:ident, $inp:block => $mt:tt => [ $($tokens:tt)* ] ) => (
         #[test]
         fn $name() {
+            #![allow(unused_mut)]
             use $crate::codec::{
                 EncodableInHeader,
                 EncodeHeaderHandle,
-                Token, Encoder,
+                Encoder,
                 VecBodyBuf
             };
             use std::mem;
@@ -803,7 +804,7 @@ macro_rules! ec_test {
                 // test just parts of headers
                 mem::forget(handle);
             }
-            let mut expected: Vec<Token> = Vec::new();
+            let mut expected: Vec<$crate::codec::TraceToken> = Vec::new();
             ec_test!{ __PRIV_TO_TOKEN_LIST expected $($tokens)* }
             //skip over the NewSection part
             let got = $crate::codec::simplify_trace_tokens(encoder.trace.into_iter().skip(1));
@@ -812,10 +813,10 @@ macro_rules! ec_test {
     );
 
     (__PRIV_TO_TOKEN_LIST $col:ident Text $e:expr) => (
-        $col.push($crate::codec::Token::Text({$e}.into()));
+        $col.push($crate::codec::TraceToken::Text({$e}.into()));
     );
     (__PRIV_TO_TOKEN_LIST $col:ident $token:ident) => (
-        $col.push($crate::codec::Token::$token);
+        $col.push($crate::codec::TraceToken::$token);
     );
     (__PRIV_TO_TOKEN_LIST $col:ident Text $e:expr, $($other:tt)*) => ({
         ec_test!{ __PRIV_TO_TOKEN_LIST $col Text $e }
@@ -840,7 +841,7 @@ mod test {
     use error::*;
     use grammar::MailType;
 
-    use super::Token::*;
+    use super::TraceToken::*;
     use super::{
         BodyBuffer,
         Section,
@@ -871,7 +872,7 @@ mod test {
     }
 
     mod test_test_utilities {
-        use codec::Token::*;
+        use codec::TraceToken::*;
         use super::super::simplify_trace_tokens;
 
         #[test]
@@ -960,7 +961,7 @@ mod test {
         #![allow(non_snake_case)]
         use super::super::*;
         use super::VecBody;
-        use self::Token::*;
+        use self::TraceToken::*;
 
         #[test]
         fn is_implemented_for_closures() {

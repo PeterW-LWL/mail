@@ -95,7 +95,7 @@ impl EncodableInHeader for DispositionParameters {
                 "size", size.to_string(), &mut out, mt)?;
         }
         //TODO this function will be removed so do it differently
-        handle.write_str_unchecked(&*out);
+        handle.write_str_unchecked(&*out)?;
         Ok( () )
     }
 }
