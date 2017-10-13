@@ -5,7 +5,7 @@ use ascii::AsciiChar;
 use error::*;
 use grammar::is_vchar;
 use grammar::encoded_word::EncodedWordContext;
-use codec::{EncodeHeaderHandle, EncodableInHeader,EncodedWordEncoding};
+use codec::{EncodeHandle, EncodableInHeader, EncodedWordEncoding};
 use data::{ FromInput, EncodedWord };
 
 use super::utils::text_partition::{partition, Partition};
@@ -40,7 +40,7 @@ impl FromInput for Unstructured {
 
 impl EncodableInHeader for  Unstructured {
 
-    fn encode(&self, handle: &mut EncodeHeaderHandle) -> Result<()> {
+    fn encode(&self, handle: &mut EncodeHandle) -> Result<()> {
         let text: &str = &*self.text;
         if text.len() == 0 {
             return Ok( () )

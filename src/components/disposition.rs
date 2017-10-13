@@ -1,7 +1,7 @@
 use std::ascii::AsciiExt;
 
 use error::*;
-use codec::{EncodableInHeader, EncodeHeaderHandle};
+use codec::{EncodableInHeader, EncodeHandle};
 use utils::{ FileMeta, HeaderTryFrom };
 use components::mime::create_encoded_mime_parameter;
 
@@ -71,7 +71,7 @@ impl<'a> HeaderTryFrom<&'a str> for Disposition {
 //  this are: ContentType and ContentDisposition for now
 impl EncodableInHeader for DispositionParameters {
 
-    fn encode(&self, handle: &mut EncodeHeaderHandle) -> Result<()> {
+    fn encode(&self, handle: &mut EncodeHandle) -> Result<()> {
         let mt = handle.mail_type();
         let mut out = String::new();
         if let Some(filename) = self.file_name.as_ref() {
@@ -103,7 +103,7 @@ impl EncodableInHeader for DispositionParameters {
 
 impl EncodableInHeader for Disposition {
 
-    fn encode(&self, handle: &mut EncodeHeaderHandle) -> Result<()> {
+    fn encode(&self, handle: &mut EncodeHandle) -> Result<()> {
         use self::DispositionKind::*;
         match self.kind {
             Inline => {

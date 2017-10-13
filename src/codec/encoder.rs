@@ -15,13 +15,13 @@ const LINE_LEN_SOFT_LIMIT: usize = 78;
 const LINE_LEN_HARD_LIMIT: usize = 998;
 
 // can not be moved to `super::traits` as it depends on the
-// EncodeHeaderHandle defined here
+// EncodeHandle defined here
 /// Trait Implemented by "components" used in header field bodies
 ///
 /// This trait can be turned into a trait object allowing runtime
 /// genericallity over the "components" if needed.
 pub trait EncodableInHeader: Any+Debug {
-    fn encode(&self, encoder:  &mut EncodeHeaderHandle) -> Result<()>;
+    fn encode(&self, encoder:  &mut EncodeHandle) -> Result<()>;
 
     #[doc(hidden)]
     fn type_id( &self ) -> TypeId {
@@ -94,9 +94,9 @@ impl EncodableInHeaderBoxExt for Box<EncodableInHeader+Send> {
 /// `impl<FN> EncodableInHeader for FN where FN: ...`
 pub struct EncodableClosure<F>(pub F);
 impl<FN: 'static> EncodableInHeader for EncodableClosure<FN>
-    where FN: for<'a,'b: 'a> Fn(&'a mut EncodeHeaderHandle<'b>) -> Result<()>
+    where FN: for<'a,'b: 'a> Fn(&'a mut EncodeHandle<'b>) -> Result<()>
 {
-    fn encode(&self, encoder:  &mut EncodeHeaderHandle) -> Result<()> {
+    fn encode(&self, encoder:  &mut EncodeHandle) -> Result<()> {
         (self.0)(encoder)
     }
 }
@@ -195,13 +195,13 @@ impl<B: BodyBuffer> Encoder<B> {
         self.mail_type
     }
 
-    /// returns a new EncodeHeaderHandle which contains
+    /// returns a new EncodeHandle which contains
     /// a mutable reference to the current string buffer
     ///
     /// # Trace (test build only)
     /// pushes a `NewSection` Token if the the returned
-    /// `EncodeHeaderHandle` refers to a new empty buffer
-    pub fn encode_handle(&mut self ) -> EncodeHeaderHandle {
+    /// `EncodeHandle` refers to a new empty buffer
+    pub fn encode_handle(&mut self ) -> EncodeHandle {
         if let Some(&Section::String(..)) = self.sections.last() {}
         else {
             self.sections.push(Section::String(String::new()));
@@ -211,9 +211,9 @@ impl<B: BodyBuffer> Encoder<B> {
 
         if let Some(&mut Section::String(ref mut string)) = self.sections.last_mut() {
             #[cfg(not(test))]
-            { EncodeHeaderHandle::new(self.mail_type,  string) }
+            { EncodeHandle::new(self.mail_type, string) }
             #[cfg(test)]
-            { EncodeHeaderHandle::new(self.mail_type,  string, &mut self.trace) }
+            { EncodeHandle::new(self.mail_type, string, &mut self.trace) }
         } else {
             //REFACTOR(NLL): with NLL we can combine both if-else blocks not needing unreachable! anymore
             unreachable!("we already made sure the last is Section::Header")
@@ -282,7 +282,7 @@ impl<B: BodyBuffer> Encoder<B> {
 /// It's basically a string buffer which know how to brake
 /// lines at the right place.
 ///
-/// Note any act of writing a header through `EncodeHeaderHandle`
+/// Note any act of writing a header through `EncodeHandle`
 /// has to be concluded by either calling `finish_current` or `undo_header`.
 /// If not this handle will panic in _test_ builds when being dropped
 /// (and the thread is not already panicing) as writes through the handle are directly
@@ -291,7 +291,7 @@ impl<B: BodyBuffer> Encoder<B> {
 /// needed `forget`-ing it won't leak any memory)
 ///
 ///
-pub struct EncodeHeaderHandle<'a> {
+pub struct EncodeHandle<'a> {
     buffer: &'a mut String,
     #[cfg(test)]
     trace: &'a mut Vec<TraceToken>,
@@ -313,7 +313,7 @@ pub struct EncodeHeaderHandle<'a> {
 }
 
 #[cfg(test)]
-impl<'a> Drop for EncodeHeaderHandle<'a> {
+impl<'a> Drop for EncodeHandle<'a> {
 
     fn drop(&mut self) {
         use std::thread;
@@ -325,7 +325,7 @@ impl<'a> Drop for EncodeHeaderHandle<'a> {
     }
 }
 
-impl<'a> EncodeHeaderHandle<'a> {
+impl<'a> EncodeHandle<'a> {
 
     #[cfg(not(test))]
     fn new(
@@ -333,7 +333,7 @@ impl<'a> EncodeHeaderHandle<'a> {
         buffer: &'a mut String,
     ) -> Self {
         let start_idx = buffer.len();
-        EncodeHeaderHandle {
+        EncodeHandle {
             buffer,
             mail_type,
             line_start_idx: start_idx,
@@ -353,7 +353,7 @@ impl<'a> EncodeHeaderHandle<'a> {
     ) -> Self {
         let start_idx = buffer.len();
         let trace_start_idx = trace.len();
-        EncodeHeaderHandle {
+        EncodeHandle {
             buffer,
             trace,
             mail_type,
@@ -767,7 +767,7 @@ macro_rules! ec_test {
             #![allow(unused_mut)]
             use $crate::codec::{
                 EncodableInHeader,
-                EncodeHeaderHandle,
+                EncodeHandle,
                 Encoder,
                 VecBodyBuf
             };
@@ -793,7 +793,7 @@ macro_rules! ec_test {
             let mut encoder = Encoder::<VecBodyBuf>::new(mail_type);
             {
                 //REFACTOR(catch): use catch block once stable
-                let doit = |ec: &mut EncodeHeaderHandle| -> Result<()> {
+                let doit = |ec: &mut EncodeHandle| -> Result<()> {
                     let input = $inp;
                     let to_encode: &EncodableInHeader = &input;
                     to_encode.encode(ec)?;
@@ -967,7 +967,7 @@ mod test {
         #[test]
         fn is_implemented_for_closures() {
             let text = "hy ho";
-            let closure = EncodableClosure(move |handle: &mut EncodeHeaderHandle| {
+            let closure = EncodableClosure(move |handle: &mut EncodeHandle| {
                 handle.write_utf8(text)
             });
 
@@ -1024,7 +1024,7 @@ mod test {
     }
 
 
-    mod EncodeHeaderHandle {
+    mod EncodeHandle {
         #![allow(non_snake_case)]
         use std::mem;
 
@@ -1539,8 +1539,8 @@ mod test {
     ec_test! {
         does_ec_test_work,
         {
-            use super::EncodeHeaderHandle;
-            EncodableClosure(|x: &mut EncodeHeaderHandle| {
+            use super::EncodeHandle;
+            EncodableClosure(|x: &mut EncodeHandle| {
                 x.write_utf8("hy")
             })
         } => Utf8 => [
@@ -1551,10 +1551,10 @@ mod test {
     ec_test! {
         does_ec_test_allow_early_return,
         {
-            use super::EncodeHeaderHandle;
+            use super::EncodeHandle;
             // this is just a type system test, if it compiles it can bail
             if false { bail!("if false..."); }
-            EncodableClosure(|x: &mut EncodeHeaderHandle| {
+            EncodableClosure(|x: &mut EncodeHandle| {
                 x.write_utf8("hy")
             })
         } => Utf8 => [
@@ -1569,7 +1569,7 @@ mod test {
         struct TestType(&'static str);
 
         impl EncodableInHeader for TestType {
-            fn encode( &self, encoder:  &mut EncodeHeaderHandle ) -> Result<()> {
+            fn encode(&self, encoder:  &mut EncodeHandle) -> Result<()> {
                 encoder.write_utf8(self.0)
             }
         }
@@ -1578,7 +1578,7 @@ mod test {
         struct AnotherType(&'static str);
 
         impl EncodableInHeader for AnotherType {
-            fn encode( &self, encoder:  &mut EncodeHeaderHandle ) -> Result<()> {
+            fn encode(&self, encoder:  &mut EncodeHandle) -> Result<()> {
                 encoder.write_utf8(self.0)
             }
         }

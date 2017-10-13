@@ -1,7 +1,7 @@
 use ascii::AsciiChar;
 
 use error::*;
-use codec::{EncodableInHeader, EncodeHeaderHandle};
+use codec::{EncodableInHeader, EncodeHandle};
 use super::word::{ Word, do_encode_word };
 use super::{ Email, Domain };
 
@@ -15,7 +15,7 @@ pub enum ReceivedToken {
 
 impl EncodableInHeader for  ReceivedToken {
 
-    fn encode(&self, handle: &mut EncodeHeaderHandle) -> Result<()> {
+    fn encode(&self, handle: &mut EncodeHandle) -> Result<()> {
         use self::ReceivedToken::*;
         match *self {
             Word( ref word ) => {

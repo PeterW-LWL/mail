@@ -1,7 +1,7 @@
 use ascii::{ AsciiChar };
 
 use error::*;
-use codec::{ self, EncodeHeaderHandle, EncodableInHeader };
+use codec::{self, EncodeHandle, EncodableInHeader };
 use codec::idna;
 
 use grammar::{
@@ -58,7 +58,7 @@ impl FromInput for Email {
 
 impl EncodableInHeader for  Email {
 
-    fn encode(&self, handle: &mut EncodeHeaderHandle) -> Result<()> {
+    fn encode(&self, handle: &mut EncodeHandle) -> Result<()> {
         self.local_part.encode( handle )?;
         handle.write_char( AsciiChar::At )?;
         self.domain.encode( handle )?;
@@ -77,7 +77,7 @@ impl FromInput for LocalPart {
 
 impl EncodableInHeader  for LocalPart {
 
-    fn encode(&self, handle: &mut EncodeHeaderHandle) -> Result<()> {
+    fn encode(&self, handle: &mut EncodeHandle) -> Result<()> {
         let input: &str = &*self.0;
         let mail_type = handle.mail_type();
 
@@ -162,7 +162,7 @@ impl Domain {
 
 impl EncodableInHeader for  Domain {
 
-    fn encode(&self, handle: &mut EncodeHeaderHandle) -> Result<()> {
+    fn encode(&self, handle: &mut EncodeHandle) -> Result<()> {
         handle.mark_fws_pos();
         match self.0 {
             SimpleItem::Ascii( ref ascii ) => {

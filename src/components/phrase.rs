@@ -1,6 +1,6 @@
 use error::*;
 use external::vec1::Vec1;
-use codec::{EncodableInHeader, EncodeHeaderHandle};
+use codec::{EncodableInHeader, EncodeHandle};
 use grammar::encoded_word::EncodedWordContext;
 
 use data::{ FromInput, Input };
@@ -53,7 +53,7 @@ impl EncodableInHeader for  Phrase {
 
     //FEATURE_TODO(warn_on_bad_phrase): warn if the phrase contains chars it should not
     //  but can contain due to encoding, e.g. ascii CTL's
-    fn encode(&self, heandle: &mut EncodeHeaderHandle) -> Result<()> {
+    fn encode(&self, heandle: &mut EncodeHandle) -> Result<()> {
         for word in self.0.iter() {
             do_encode_word( &*word, heandle, Some( EncodedWordContext::Phrase ) )?;
         }

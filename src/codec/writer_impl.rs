@@ -3,7 +3,7 @@ use ascii::{ AsciiString, AsciiChar, AsciiStr };
 use external::vec1::Vec1;
 use grammar::encoded_word::{ MAX_ECW_LEN, ECW_SEP_OVERHEAD };
 use super::{ EncodedWordEncoding as Encoding };
-use super::encoder::EncodeHeaderHandle;
+use super::encoder::EncodeHandle;
 use super::traits::EncodedWordWriter;
 
 pub struct VecWriter<'a> {
@@ -55,13 +55,13 @@ impl<'a> EncodedWordWriter for VecWriter<'a> {
 pub struct WriterWrapper<'a, 'b: 'a>{
     charset: &'a AsciiStr,
     encoding: Encoding,
-    encoder_handle: &'a mut EncodeHeaderHandle<'b>
+    encoder_handle: &'a mut EncodeHandle<'b>
 }
 
 impl<'a, 'b: 'a> WriterWrapper<'a, 'b> {
-    pub fn new( charset: &'a AsciiStr,
-                encoding: Encoding,
-                encoder: &'a mut EncodeHeaderHandle<'b> ) -> Self
+    pub fn new(charset: &'a AsciiStr,
+               encoding: Encoding,
+               encoder: &'a mut EncodeHandle<'b> ) -> Self
     {
         WriterWrapper { charset, encoding, encoder_handle: encoder }
     }

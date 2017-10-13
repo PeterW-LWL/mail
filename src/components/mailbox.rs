@@ -2,7 +2,7 @@ use ascii::AsciiChar;
 
 use error::*;
 use utils::{HeaderTryFrom, HeaderTryInto};
-use codec::{EncodableInHeader, EncodeHeaderHandle};
+use codec::{EncodableInHeader, EncodeHandle};
 
 use super::Phrase;
 use super::Email;
@@ -74,7 +74,7 @@ impl<P, E> HeaderTryFrom<(P, E)> for Mailbox
 
 impl EncodableInHeader for  Mailbox {
 
-    fn encode(&self, handle: &mut EncodeHeaderHandle) -> Result<()> {
+    fn encode(&self, handle: &mut EncodeHandle) -> Result<()> {
         if let Some( display_name ) = self.display_name.as_ref() {
             display_name.encode( handle )?;
             handle.write_fws();

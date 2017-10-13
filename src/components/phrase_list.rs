@@ -1,7 +1,7 @@
 use ascii::AsciiChar;
 
 use error::*;
-use codec::{EncodableInHeader, EncodeHeaderHandle};
+use codec::{EncodableInHeader, EncodeHandle};
 use external::vec1::Vec1;
 use utils::{ HeaderTryFrom, HeaderTryInto };
 
@@ -14,7 +14,7 @@ pub struct PhraseList(pub Vec1<Phrase>);
 
 impl EncodableInHeader for  PhraseList {
 
-    fn encode(&self, handle: &mut EncodeHeaderHandle) -> Result<()> {
+    fn encode(&self, handle: &mut EncodeHandle) -> Result<()> {
         sep_for!{ word in self.0.iter();
             sep {
                 //Note that we do not want to write MarkFWS, NowChar, Text " " as the following word might contains

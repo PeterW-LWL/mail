@@ -53,7 +53,7 @@ pub mod mail_builder_prelude {
     pub type Encoder = ::codec::Encoder<::mail::Resource>;
     pub use error::*;
     pub use grammar::MailType;
-    pub use codec::{EncodableInHeader, Encodable, EncodeHeaderHandle};
+    pub use codec::{EncodableInHeader, Encodable, EncodeHandle};
     pub use data::FromInput;
     pub use headers::*;
     pub use components::*;
@@ -81,7 +81,7 @@ pub mod composition_prelude {
     };
     pub use codec::{
         EncodableInHeader,
-        EncodeHeaderHandle,
+        EncodeHandle,
         Encodable
     };
     pub use composition::{

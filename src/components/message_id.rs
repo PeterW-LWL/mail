@@ -5,7 +5,7 @@ use nom::IResult;
 
 use error::*;
 use external::vec1::Vec1;
-use codec::{EncodableInHeader, EncodeHeaderHandle};
+use codec::{EncodableInHeader, EncodeHandle};
 
 use data::{ FromInput, Input, SimpleItem };
 
@@ -40,7 +40,7 @@ impl FromInput for MessageID {
 
 impl EncodableInHeader for  MessageID {
 
-    fn encode(&self, handle: &mut EncodeHeaderHandle) -> Result<()> {
+    fn encode(&self, handle: &mut EncodeHandle) -> Result<()> {
         handle.mark_fws_pos();
         handle.write_char( AsciiChar::LessThan )?;
         match self.message_id {
@@ -60,7 +60,7 @@ deref0!{ +mut MessageIDList => Vec1<MessageID> }
 
 impl EncodableInHeader for  MessageIDList {
 
-    fn encode(&self, handle: &mut EncodeHeaderHandle) -> Result<()> {
+    fn encode(&self, handle: &mut EncodeHandle) -> Result<()> {
         for msg_id in self.iter() {
             msg_id.encode( handle )?;
         }

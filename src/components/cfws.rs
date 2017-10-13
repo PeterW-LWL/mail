@@ -1,5 +1,5 @@
 use error::*;
-use codec::{EncodableInHeader, EncodeHeaderHandle};
+use codec::{EncodableInHeader, EncodeHandle};
 
 //FEATURE_TODO(fws_controll): allow controlling the amount of WS and if a CRLF should be used in FWS
 //  this is also usefull for parsing and keeping information about FWS structure
@@ -34,7 +34,7 @@ pub enum CFWS {
 
 
 impl EncodableInHeader for CFWS {
-    fn encode(&self, handle: &mut EncodeHeaderHandle) -> Result<()> {
+    fn encode(&self, handle: &mut EncodeHandle) -> Result<()> {
         match *self {
             CFWS::SingleFws(ref _fws ) => {
                 handle.write_fws();

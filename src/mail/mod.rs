@@ -1,7 +1,7 @@
 use std::ops::Deref;
 use std::fmt;
 
-use codec::{EncodableInHeader, Encoder, Encodable, EncodeHeaderHandle};
+use codec::{EncodableInHeader, Encoder, Encodable, EncodeHandle};
 use ascii::{ AsciiString, AsciiChar };
 use futures::{ Future, Async, Poll };
 

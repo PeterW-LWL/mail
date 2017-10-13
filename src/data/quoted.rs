@@ -5,7 +5,7 @@ use ascii::AsciiString;
 use error::*;
 use grammar::MailType;
 use grammar::is_quoted_string;
-use codec::{ EncodeHeaderHandle, self};
+use codec::{EncodeHandle, self};
 
 use super::simple_item::SimpleItem;
 use super::inner_item::{ InnerAscii, InnerUtf8 };
@@ -16,7 +16,7 @@ pub struct QuotedString( SimpleItem );
 
 impl QuotedString {
 
-    pub fn write_into( handle: &mut EncodeHeaderHandle, input: &str ) -> Result<()> {
+    pub fn write_into(handle: &mut EncodeHandle, input: &str ) -> Result<()> {
         //OPTIMIZE: do not unnecessarily allocate strings, but directly write to Encoder
         use self::SimpleItem::*;
         let quoted = QuotedString::quote( input )?;

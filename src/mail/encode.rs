@@ -64,7 +64,7 @@ fn encode_headers(
 }
 
 fn encode_header(
-    handle: &mut EncodeHeaderHandle,
+    handle: &mut EncodeHandle,
     name: HeaderName,
     component: &EncodableInHeader
 ) -> Result<()> {

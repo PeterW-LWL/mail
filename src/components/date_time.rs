@@ -1,13 +1,13 @@
 use ascii::AsciiStr;
 
 use error::*;
-use codec::{EncodableInHeader, EncodeHeaderHandle};
+use codec::{EncodableInHeader, EncodeHandle};
 
 pub use utils::DateTime;
 
 impl EncodableInHeader for DateTime {
 
-    fn encode(&self, handle: &mut EncodeHeaderHandle) -> Result<()> {
+    fn encode(&self, handle: &mut EncodeHandle) -> Result<()> {
         let as_str = self.to_rfc2822();
         let ascii = unsafe { AsciiStr::from_ascii_unchecked( &*as_str ) };
         handle.write_str( ascii )?;

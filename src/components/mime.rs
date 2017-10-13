@@ -8,7 +8,7 @@ use ascii::AsciiStr;
 use error::*;
 use utils::HeaderTryFrom;
 use grammar::{ is_token, MailType};
-use codec::{ EncodableInHeader, EncodeHeaderHandle, self };
+use codec::{EncodableInHeader, EncodeHandle, self };
 
 pub use mime::Mime;
 
@@ -100,7 +100,7 @@ impl<'a> HeaderTryFrom<&'a str> for mime::Mime {
 
 impl EncodableInHeader for  mime::Mime {
 
-    fn encode(&self, handle: &mut EncodeHeaderHandle) -> Result<()> {
+    fn encode(&self, handle: &mut EncodeHandle) -> Result<()> {
         let res = self.to_string();
         if !handle.write_utf8(&*res).is_ok() {
             match AsciiStr::from_ascii(&*res) {

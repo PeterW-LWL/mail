@@ -3,7 +3,7 @@ use std::ops::Deref;
 use ascii::{ AsciiString, AsciiStr };
 
 use error::*;
-use codec::{EncodableInHeader, EncodeHeaderHandle};
+use codec::{EncodableInHeader, EncodeHandle};
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum TransferEncoding {
@@ -35,7 +35,7 @@ impl TransferEncoding {
 
 impl EncodableInHeader for  TransferEncoding {
 
-    fn encode(&self, handle: &mut EncodeHeaderHandle) -> Result<()> {
+    fn encode(&self, handle: &mut EncodeHandle) -> Result<()> {
         handle.write_str( self.name() )?;
         Ok( () )
     }

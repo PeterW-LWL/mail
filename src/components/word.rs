@@ -1,7 +1,7 @@
 use error::*;
-use codec::{ 
+use codec::{
     EncodedWordEncoding,
-    EncodableInHeader, EncodeHeaderHandle
+    EncodableInHeader, EncodeHandle
 };
 
 use grammar::is_atext;
@@ -61,7 +61,7 @@ impl Word {
 /// NOTE: != encoded-word, through it might create an encoded-word
 pub fn do_encode_word<'a,'b: 'a>(
     word: &'a Word,
-    handle: &'a mut EncodeHeaderHandle<'b>,
+    handle: &'a mut EncodeHandle<'b>,
     ecw_ctx: Option<EncodedWordContext>,
 ) -> Result<()> {
 
@@ -106,7 +106,7 @@ mod test {
 
     ec_test!{encode_pseudo_encoded_words, {
         let word = Word::from_input( "=?" )?;
-        EncodableClosure(move |handle: &mut EncodeHeaderHandle| {
+        EncodableClosure(move |handle: &mut EncodeHandle| {
             do_encode_word( &word, handle, Some( EncodedWordContext::Text ) )
         })
     } => ascii => [
@@ -115,7 +115,7 @@ mod test {
 
     ec_test!{encode_word, {
         let word = Word::from_input( "a↑b" )?;
-        EncodableClosure(move |handle: &mut EncodeHeaderHandle| {
+        EncodableClosure(move |handle: &mut EncodeHandle| {
             do_encode_word( &word, handle, Some( EncodedWordContext::Text ) )
         })
     } => ascii => [
@@ -135,7 +135,7 @@ mod test {
 
     ec_test!{quoted_fallback, {
         let word = Word::from_input( "a\"b" )?;
-        EncodableClosure(move |handle: &mut EncodeHeaderHandle| {
+        EncodableClosure(move |handle: &mut EncodeHandle| {
             do_encode_word( &word, handle, None )
         })
     } => ascii => [

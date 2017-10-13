@@ -2,7 +2,7 @@
 
 use error::*;
 use ascii::AsciiChar;
-use codec::{EncodableInHeader, EncodeHeaderHandle};
+use codec::{EncodableInHeader, EncodeHandle};
 
 use external::vec1::Vec1;
 use utils::{ HeaderTryFrom, HeaderTryInto};
@@ -23,7 +23,7 @@ impl MailboxList {
 
 impl EncodableInHeader for  OptMailboxList {
 
-    fn encode(&self, handle: &mut EncodeHeaderHandle) -> Result<()> {
+    fn encode(&self, handle: &mut EncodeHandle) -> Result<()> {
        encode_list( self.0.iter(), handle )
     }
 }
@@ -220,12 +220,12 @@ impl<T> HeaderTryFrom<Vec<T>> for OptMailboxList
 
 impl EncodableInHeader for  MailboxList {
 
-    fn encode(&self, handle: &mut EncodeHeaderHandle) -> Result<()> {
+    fn encode(&self, handle: &mut EncodeHandle) -> Result<()> {
         encode_list( self.0.iter(), handle )
     }
 }
 
-fn encode_list<'a, I>( list_iter: I, handle: &mut EncodeHeaderHandle ) -> Result<()>
+fn encode_list<'a, I>(list_iter: I, handle: &mut EncodeHandle) -> Result<()>
     where I: Iterator<Item=&'a Mailbox>
 {
     sep_for!{ mailbox in list_iter;

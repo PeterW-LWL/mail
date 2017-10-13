@@ -11,7 +11,7 @@ use grammar::encoded_word::{
 use super::input::Input;
 use super::inner_item::InnerAscii;
 use codec::{
-    EncodeHeaderHandle,
+    EncodeHandle,
     WriterWrapper, VecWriter,
     base64,
     quoted_printable,
@@ -29,7 +29,7 @@ pub struct EncodedWord {
 impl EncodedWord {
 
     pub fn write_into<'a, 'b: 'a>(
-        handle: &'a mut EncodeHeaderHandle<'b>,
+        handle: &'a mut EncodeHandle<'b>,
         word: &str,
         encoding: EncodedWordEncoding,
         _ctx: EncodedWordContext

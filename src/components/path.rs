@@ -2,7 +2,7 @@ use ascii::AsciiChar;
 
 use error::*;
 use utils::{HeaderTryFrom, HeaderTryInto};
-use codec::{EncodableInHeader, EncodeHeaderHandle};
+use codec::{EncodableInHeader, EncodeHandle};
 use super::Email;
 
 
@@ -25,7 +25,7 @@ impl<T> HeaderTryFrom<T> for Path
 
 impl EncodableInHeader for  Path {
 
-    fn encode(&self, handle: &mut EncodeHeaderHandle) -> Result<()> {
+    fn encode(&self, handle: &mut EncodeHandle) -> Result<()> {
         handle.mark_fws_pos();
         handle.write_char( AsciiChar::LessThan )?;
         if let Some( mail ) = self.0.as_ref() {
