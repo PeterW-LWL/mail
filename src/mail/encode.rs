@@ -108,25 +108,21 @@ fn encode_mail_part(mail: &Mail, encoder:  &mut Encoder<Resource> ) -> Result<()
                 .chain_err( || "non ascii boundary" )?;
 
             for mail in bodies.iter() {
-                encoder.with_handle(|handle| {
+                encoder.write_header_line(|handle| {
                     handle.write_char( AsciiChar::Minus )?;
                     handle.write_char( AsciiChar::Minus )?;
-                    handle.write_str( &*boundary )?;
-                    handle.finish_current();
-                    Ok(())
+                    handle.write_str( &*boundary )
                 })?;
                 _encode_mail( mail, false, encoder )?;
             }
 
             if bodies.len() > 0 {
-                encoder.with_handle(|handle| {
+                encoder.write_header_line(|handle| {
                     handle.write_char( AsciiChar::Minus )?;
                     handle.write_char( AsciiChar::Minus )?;
                     handle.write_str( &*boundary )?;
                     handle.write_char( AsciiChar::Minus )?;
-                    handle.write_char( AsciiChar::Minus )?;
-                    handle.finish_current();
-                    Ok(())
+                    handle.write_char( AsciiChar::Minus )
                 })?;
             } else {
                 //TODO warn
