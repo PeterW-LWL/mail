@@ -556,12 +556,15 @@ impl<'a> EncodeHandle<'a> {
     /// are not allowed.
     ///
     /// # Trace (test build only)
-    /// can push 0-1 of `[CRLF, TruncateToCRLF]`
-    /// then does push `End`
+    /// - can push 0-1 of `[CRLF, TruncateToCRLF]`
+    /// - then does push `End`
+    /// - calling `funish_current()` multiple times in a row
+    ///   will not generate multiple `End` tokens, just one
     pub fn finish_current(&mut self) {
         self.start_new_line();
         #[cfg(test)]
-        { self.trace.push(TraceToken::End) }
+        { if let Some(&TraceToken::End) = self.trace.last() {}
+            else { self.trace.push(TraceToken::End) } }
         self.reinit();
     }
 
@@ -632,7 +635,11 @@ impl<'a> EncodeHandle<'a> {
             self.buffer.push('\n');
         } else {
             #[cfg(test)]
-            { self.trace.push(TraceToken::TruncateToCRLF) }
+            {
+                if self.buffer.len() > self.line_start_idx {
+                    self.trace.push(TraceToken::TruncateToCRLF);
+                }
+            }
             // e.g. if we "broke" the line on a tailing space => "\r\n  "
             // this would not be valid so we cut awy the trailing white space
             // be if we have "ab  " we do not want to cut away the trailing
@@ -1605,8 +1612,6 @@ mod test {
                 Text("X-A: 12".into()),
                 CRLF,
                 End,
-                TruncateToCRLF,
-                End
             ]);
             assert_eq!(encoder.sections, vec![
                 Section::String("X-A: 12\r\n".into())
