@@ -284,11 +284,12 @@ impl<B: BodyBuffer> Encoder<B> {
 ///
 /// Note any act of writing a header through `EncodeHeaderHandle`
 /// has to be concluded by either calling `finish_current` or `undo_header`.
-/// If not this handle will panic when being dropped (and the thread
-/// is not already panicing) as writes through the handle are directly
+/// If not this handle will panic in _test_ builds when being dropped
+/// (and the thread is not already panicing) as writes through the handle are directly
 /// writes to the underlying buffer which now contains malformed/incomplete
-/// data. (Note that this Handle does not own any Drop types so if realy
+/// data. (Note that this Handle does not own any Drop types so if
 /// needed `forget`-ing it won't leak any memory)
+///
 ///
 pub struct EncodeHeaderHandle<'a> {
     buffer: &'a mut String,
@@ -311,7 +312,7 @@ pub struct EncodeHeaderHandle<'a> {
     trace_start_idx: usize
 }
 
-
+#[cfg(test)]
 impl<'a> Drop for EncodeHeaderHandle<'a> {
 
     fn drop(&mut self) {
