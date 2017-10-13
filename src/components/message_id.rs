@@ -100,7 +100,7 @@ mod test {
     #[test]
     fn utf8_fails() {
         let mut encoder = Encoder::<VecBodyBuf>::new(MailType::Ascii);
-        let mut handle = encoder.encode_header_handle();
+        let mut handle = encoder.encode_handle();
         let mid = MessageID::from_input( "abc@øpunny.code" ).unwrap();
         assert_err!(mid.encode( &mut handle ));
         handle.undo_header();

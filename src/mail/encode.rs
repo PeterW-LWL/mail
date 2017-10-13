@@ -42,7 +42,7 @@ fn encode_headers(
     top: bool,
     encoder:  &mut Encoder<Resource>
 ) -> Result<()> {
-    let mut handle = encoder.encode_header_handle();
+    let mut handle = encoder.encode_handle();
     if top {
         handle.write_str( ascii_str!{ M I M E Minus V e r s i o n Colon Space _1 Dot _0 } )?;
         handle.finish_current();
@@ -109,7 +109,7 @@ fn encode_mail_part(mail: &Mail, encoder:  &mut Encoder<Resource> ) -> Result<()
 
             for mail in bodies.iter() {
                 {
-                    let mut handle = encoder.encode_header_handle();
+                    let mut handle = encoder.encode_handle();
                     handle.write_char( AsciiChar::Minus )?;
                     handle.write_char( AsciiChar::Minus )?;
                     handle.write_str( &*boundary )?;
@@ -119,7 +119,7 @@ fn encode_mail_part(mail: &Mail, encoder:  &mut Encoder<Resource> ) -> Result<()
             }
 
             if bodies.len() > 0 {
-                let mut handle = encoder.encode_header_handle();
+                let mut handle = encoder.encode_handle();
                 handle.write_char( AsciiChar::Minus )?;
                 handle.write_char( AsciiChar::Minus )?;
                 handle.write_str( &*boundary )?;

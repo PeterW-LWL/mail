@@ -84,7 +84,7 @@ mod test {
     #[test]
     fn no_encoded_word() {
         let mut encoder = Encoder::<VecBodyBuf>::new( MailType::Ascii );
-        let mut handle = encoder.encode_header_handle();
+        let mut handle = encoder.encode_handle();
         let input = ReceivedToken::Word( Word::from_input( "↓right" ).unwrap() );
         assert_err!(input.encode( &mut handle ));
         handle.undo_header();

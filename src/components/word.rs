@@ -126,7 +126,7 @@ mod test {
     #[test]
     fn encode_fails() {
         let mut encoder = Encoder::<VecBodyBuf>::new(MailType::Ascii);
-        let mut handle = encoder.encode_header_handle();
+        let mut handle = encoder.encode_handle();
         let word = Word::from_input( "a↑b" ).unwrap();
         assert_err!(do_encode_word( &word, &mut handle, None ));
         handle.undo_header();
@@ -185,7 +185,7 @@ mod test {
         for &( ref word, ref expection) in words.iter() {
             let mut encoder = Encoder::<VecBodyBuf>::new(MailType::Ascii);
             {
-                let mut handle = encoder.encode_header_handle();
+                let mut handle = encoder.encode_handle();
                 do_encode_word( word, &mut handle, None ).unwrap();
                 mem::forget(handle);
             }

@@ -189,7 +189,7 @@ mod test {
     fn wsp_only_phrase_fails() {
         let mut encoder = Encoder::<VecBodyBuf>::new(MailType::Ascii);
         {
-            let mut handle = encoder.encode_header_handle();
+            let mut handle = encoder.encode_handle();
             let input = Unstructured::from_input( " \t " ).unwrap();
             assert_err!(input.encode( &mut handle ));
             handle.undo_header();

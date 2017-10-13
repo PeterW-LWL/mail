@@ -229,7 +229,7 @@ mod test {
     #[test]
     fn local_part_utf8_on_ascii() {
         let mut encoder = Encoder::<VecBodyBuf>::new( MailType::Ascii );
-        let mut handle = encoder.encode_header_handle();
+        let mut handle = encoder.encode_handle();
         let local = LocalPart::from_input( "Jörn" ).unwrap();
         assert_err!(local.encode( &mut handle ));
         handle.undo_header();
