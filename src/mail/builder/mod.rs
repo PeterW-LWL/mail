@@ -247,7 +247,88 @@ impl MultipartBuilder {
     }
 }
 
-//TODO test
-// - can not misset Content-Type
-// - can not set Content-Transfer-Encoding (done through ressource)
-// - above tests but wrt. set_headers/headers
+
+
+#[cfg(test)]
+mod test {
+    //TODO test
+    // - can not misset Content-Type
+    // - can not set Content-Transfer-Encoding (done through ressource)
+    // - above tests but wrt. set_headers/headers
+
+    mod check_header {
+        use components::TransferEncoding;
+        use headers::{
+            ContentType,
+            ContentTransferEncoding,
+        };
+        use super::super::*;
+
+        fn ct(s: &str) -> Result<<ContentType as Header>::Component> {
+            <&str as HeaderTryInto<_>>::try_into(s)
+        }
+        #[test]
+        fn setting_non_multipart_headers_is_forbidden() {
+            let comp = assert_ok!(ct("text/plain"));
+            assert_err!(check_header::<ContentType>(&comp, false));
+            let comp = assert_ok!(ct("multipart/plain"));
+            assert_err!(check_header::<ContentType>(&comp, false));
+        }
+
+        #[test]
+        fn setting_multi_on_multi_is_ok() {
+            let comp = assert_ok!(ct("multipart/plain"));
+            assert_ok!(check_header::<ContentType>(&comp, true));
+        }
+
+        #[test]
+        fn setting_single_on_multi_is_err() {
+            let comp = assert_ok!(ct("text/plain"));
+            assert_err!(check_header::<ContentType>(&comp, true));
+        }
+
+        #[test]
+        fn content_transfer_encoding_is_never_ok() {
+            let comp = TransferEncoding::Base64;
+            assert_err!(check_header::<ContentTransferEncoding>(&comp, true));
+            assert_err!(check_header::<ContentTransferEncoding>(&comp, false));
+        }
+    }
+
+    mod check_multiple_headers {
+        use components::TransferEncoding;
+        use headers::{
+            ContentType,
+            ContentTransferEncoding,
+        };
+        use super::super::*;
+
+        #[test]
+        fn setting_non_multipart_headers_is_forbidden() {
+            let headers = headers!{ ContentType: "text/plain" }.unwrap();
+            assert_err!(check_multiple_headers(&headers, false));
+            let headers = headers!{ ContentType: "multipart/plain" }.unwrap();
+            assert_err!(check_multiple_headers(&headers, false));
+
+        }
+
+        #[test]
+        fn setting_multi_on_multi_is_ok() {
+            let headers = headers!{ ContentType: "multipart/plain" }.unwrap();
+            assert_ok!(check_multiple_headers(&headers, true));
+        }
+
+        #[test]
+        fn setting_single_on_multi_is_err() {
+            let headers = headers!{ ContentType: "text/plain" }.unwrap();
+            assert_err!(check_multiple_headers(&headers, true));
+        }
+
+        #[test]
+        fn content_transfer_encoding_is_never_ok() {
+            let headers = headers!{ ContentTransferEncoding: TransferEncoding::Base64 }.unwrap();
+            assert_err!(check_multiple_headers(&headers, true));
+            assert_err!(check_multiple_headers(&headers, false));
+        }
+    }
+}
