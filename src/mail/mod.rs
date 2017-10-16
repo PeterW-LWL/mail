@@ -296,6 +296,9 @@ mod test {
     mod Mail {
         #![allow(non_snake_case)]
         use super::super::*;
+        use headers::{
+            Subject, Comments
+        };
         use futures::future;
         use std::str;
 
@@ -380,13 +383,51 @@ mod test {
 
             assert_err!(
                 mail.set_header(ContentTransferEncoding, ::components::TransferEncoding::Base64));
-            //assert_err!(mail.set_header(ContentType, "text/plain"));
+            //Note: a more fine grained test is done in ::mail::builder::test
+            assert_err!(mail.set_header(ContentType, "text/plain"));
             assert_err!(mail.set_header(ContentType, "multipart/plain"));
         }
 
         #[test]
-        fn set_headers_checks_the_headers() {
+        fn set_header_set_a_header() {
+            let mut mail = Mail {
+                headers: HeaderMap::new(),
+                body: MailPart::SingleBody {
+                    body: Resource::from_text("r0".into()),
+                }
+            };
+            assert_ok!(mail.set_header(Subject, "hy"));
+            assert!(mail.headers().contains(Subject));
+        }
 
+        #[test]
+        fn set_headers_checks_the_headers() {
+            let mut mail = Mail {
+                headers: HeaderMap::new(),
+                body: MailPart::SingleBody {
+                    body: Resource::from_text("r0".into()),
+                }
+            };
+            assert_err!(mail.set_headers(headers! {
+                ContentType: "test/html;charset=utf8"
+            }.unwrap()));
+        }
+
+        #[test]
+        fn set_headers_sets_all_headers() {
+            let mut mail = Mail {
+                headers: HeaderMap::new(),
+                body: MailPart::SingleBody {
+                    body: Resource::from_text("r0".into()),
+                }
+            };
+            assert_ok!(mail.set_headers(headers! {
+                Subject: "yes",
+                Comments: "so much"
+            }.unwrap()));
+
+            assert!(mail.headers().contains(Subject));
+            assert!(mail.headers().contains(Comments));
         }
 
     }

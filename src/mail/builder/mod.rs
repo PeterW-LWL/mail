@@ -97,7 +97,6 @@ impl BuilderShared {
 }
 
 pub fn check_multiple_headers( headers: &HeaderMap , is_multipart: bool) -> Result<()> {
-    //TODO call check_header
     if let Some( .. ) = headers.get_single(ContentTransferEncoding) {
         bail!( concat!(
             "setting content transfer encoding through a header is not supported,",
@@ -105,8 +104,16 @@ pub fn check_multiple_headers( headers: &HeaderMap , is_multipart: bool) -> Resu
         ) );
     }
     if let Some( mime ) = headers.get_single(ContentType) {
-        if is_multipart != is_multipart_mime( mime? ) {
-            return Err( ErrorKind::ContentTypeAndBodyIncompatible.into() )
+        if is_multipart {
+            if !is_multipart_mime( mime? ) {
+                return Err( ErrorKind::ContentTypeAndBodyIncompatible.into() )
+            }
+        } else {
+            bail!( concat!(
+                    "setting content type through a header for a single part body",
+                    "is not supported use RessourceSpec::use_mime if you want to",
+                    "override the content type"
+                ) );
         }
     }
     Ok( () )
@@ -121,11 +128,20 @@ pub fn check_header<H>(
 {
     match H::name().as_str() {
         "Content-Type" => {
-            let mime: &Mime = uneraser_ref(hbody)
-                .ok_or_else( || "custom Content-Type headers are not supported" )?;
-            if is_multipart != is_multipart_mime( mime ) {
-                return Err( ErrorKind::ContentTypeAndBodyIncompatible.into() )
+            if is_multipart {
+                let mime: &Mime = uneraser_ref(hbody)
+                    .ok_or_else( || "custom Content-Type headers are not supported" )?;
+                if !is_multipart_mime( mime ) {
+                    return Err( ErrorKind::ContentTypeAndBodyIncompatible.into() )
+                }
+            } else {
+                bail!( concat!(
+                    "setting content type through a header for a single part body",
+                    "is not supported use RessourceSpec::use_mime if you want to",
+                    "override the content type"
+                ) );
             }
+
         },
         "Content-Transfer-Encoding" => {
             bail!( concat!(
