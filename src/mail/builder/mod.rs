@@ -97,6 +97,7 @@ impl BuilderShared {
 }
 
 pub fn check_multiple_headers( headers: &HeaderMap , is_multipart: bool) -> Result<()> {
+    //TODO call check_header
     if let Some( .. ) = headers.get_single(ContentTransferEncoding) {
         bail!( concat!(
             "setting content transfer encoding through a header is not supported,",

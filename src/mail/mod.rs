@@ -273,3 +273,147 @@ impl fmt::Debug for EncodableMail {
         write!(fter, "EncodableMail {{ .. }}")
     }
 }
+
+
+#[cfg(test)]
+mod test {
+
+    mod MailFuture {
+        #![allow(non_snake_case)]
+        use super::super::*;
+
+        #[test]
+        fn short_circuits_on_resource_failure() {
+
+        }
+
+        #[test]
+        fn makes_sure_all_resources_are_ready() {
+
+        }
+    }
+
+    mod Mail {
+        #![allow(non_snake_case)]
+        use super::super::*;
+        use futures::future;
+        use std::str;
+
+        fn load_blocking<C>(r: &mut Resource, ctx: &C)
+            where C: BuilderContext
+        {
+            let fut = future::poll_fn(|| r.poll_encoding_completion(ctx));
+            fut.wait().unwrap();
+        }
+
+        #[test]
+        fn walk_mail_bodies_does_not_skip() {
+            let mut mail = Mail {
+                headers: HeaderMap::new(),
+                body: MailPart::MultipleBodies {
+                    bodies: vec! [
+                        Mail {
+                            headers: HeaderMap::new(),
+                            body: MailPart::MultipleBodies {
+                                bodies: vec! [
+                                    Mail {
+                                        headers: HeaderMap::new(),
+                                        body: MailPart::SingleBody {
+                                            body: Resource::from_text("r1".into())
+                                        }
+                                    },
+                                    Mail {
+                                        headers: HeaderMap::new(),
+                                        body: MailPart::SingleBody {
+                                            body: Resource::from_text("r2".into())
+                                        }
+                                    }
+                                ],
+                                hidden_text: Default::default()
+                            }
+                        },
+                        Mail {
+                            headers: HeaderMap::new(),
+                            body: MailPart::SingleBody {
+                                body: Resource::from_text("r3".into())
+                            }
+                        }
+
+                    ],
+                    hidden_text: Default::default()
+                }
+            };
+
+            let ctx = ::default_impl::SimpleBuilderContext::new();
+            let mut body_count = 0;
+            mail.walk_mail_bodies_mut(&mut |body: &mut Resource| {
+                body_count += 1;
+                load_blocking(body, &ctx);
+                let encoded = assert_ok!(body.get_if_encoded());
+                let encoded = encoded.expect("it should be loaded");
+                let slice = str::from_utf8(&encoded[..]).unwrap();
+                assert!([ "r1", "r2", "r3"].contains(&slice));
+                Ok(())
+            }).unwrap();
+        }
+
+        #[test]
+        fn walk_mail_bodies_handles_errors() {
+            let mut mail = Mail {
+                headers: HeaderMap::new(),
+                body: MailPart::SingleBody {
+                    body: Resource::from_text("r0".into()),
+                }
+            };
+            assert_ok!(mail.walk_mail_bodies_mut(&mut |_| { Ok(()) }));
+            assert_err!(mail.walk_mail_bodies_mut(&mut |_| { bail!("bad") }));
+        }
+
+        #[test]
+        fn set_header_checks_the_header() {
+            let mut mail = Mail {
+                headers: HeaderMap::new(),
+                body: MailPart::SingleBody {
+                    body: Resource::from_text("r0".into()),
+                }
+            };
+
+            assert_err!(
+                mail.set_header(ContentTransferEncoding, ::components::TransferEncoding::Base64));
+            //assert_err!(mail.set_header(ContentType, "text/plain"));
+            assert_err!(mail.set_header(ContentType, "multipart/plain"));
+        }
+
+        #[test]
+        fn set_headers_checks_the_headers() {
+
+        }
+
+    }
+
+    mod EncodableMail {
+        #![allow(non_snake_case)]
+        use super::super::*;
+
+        #[test]
+        fn sets_generated_headers_for_outer_mail() {
+            //including data
+        }
+
+        #[test]
+        fn sets_generated_headers_for_sub_mails() {
+
+        }
+
+        #[test]
+        fn runs_contextual_validators() {
+
+        }
+
+        #[test]
+        fn checks_there_is_from() {
+
+        }
+    }
+
+}
