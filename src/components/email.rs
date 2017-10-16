@@ -169,9 +169,10 @@ impl EncodableInHeader for  Domain {
                 handle.write_str( ascii )?;
             },
             SimpleItem::Utf8( ref utf8 ) => {
-                if !handle.write_utf8( utf8 ).is_ok() {
-                    handle.write_str( &*idna::puny_code_domain( utf8 )? )?;
-                }
+                handle.write_if_utf8(utf8)
+                    .handle_condition_failure(|handle| {
+                        handle.write_str( &*idna::puny_code_domain( utf8 )? )
+                    })?;
             }
         }
         handle.mark_fws_pos();

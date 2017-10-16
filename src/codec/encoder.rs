@@ -4,7 +4,7 @@ use std::result::{ Result as StdResult };
 
 use ascii::{AsciiStr, AsciiChar};
 
-use error::Result;
+use error::{Result, Error};
 use grammar::{is_atext, MailType};
 
 use super::traits::BodyBuffer;
@@ -349,12 +349,12 @@ impl<'a> Drop for EncodeHandle<'a> {
     }
 }
 
-impl<'a> EncodeHandle<'a> {
+impl<'inner> EncodeHandle<'inner> {
 
     #[cfg(not(test))]
     fn new(
         mail_type: MailType,
-        buffer: &'a mut String,
+        buffer: &'inner mut String,
     ) -> Self {
         let start_idx = buffer.len();
         EncodeHandle {
@@ -372,8 +372,8 @@ impl<'a> EncodeHandle<'a> {
     #[cfg(test)]
     fn new(
         mail_type: MailType,
-        buffer: &'a mut String,
-        trace: &'a mut Vec<TraceToken>
+        buffer: &'inner mut String,
+        trace: &'inner mut Vec<TraceToken>
     ) -> Self {
         let start_idx = buffer.len();
         let trace_start_idx = trace.len();
@@ -475,25 +475,38 @@ impl<'a> EncodeHandle<'a> {
 
     /// writes a utf8 str into a buffer for an internationalized mail
     ///
-    /// # Error
-    /// - fails if the underlying MailType is not Internationalized
-    /// - fails if the hard line length limit is reached
-    /// - buffer would contain a orphan '\r' or '\n' after the write
+    /// # Error (ConditionalWriteResult)
+    /// - fails with `ConditionFailure` if the underlying MailType
+    ///    is not Internationalized
+    /// - fails with `GeneralFailure` if the hard line length limit is reached
+    /// - or if the buffer would contain a orphan '\r' or '\n' after the write
     ///
     /// Note that in case of an error part of the content might already
     /// have been written to the buffer, therefore it is recommended
     /// to call `undo_header` after an error (especially if the
-    /// handle is doped after this!)
+    /// handle is droped after this!)
     ///
     /// # Trace (test build only)
     /// does push `NowUtf8` and then can push `Text`,`CRLF`
+    pub fn write_if_utf8<'short>(&'short mut self, s: &str)
+        -> ConditionalWriteResult<'short, 'inner>
+    {
+        if self.mail_type().is_internationalized() {
+            #[cfg(test)]
+            { self.trace.push(TraceToken::NowUtf8) }
+            self.internal_write_str(s).into()
+        } else {
+            ConditionalWriteResult::ConditionFailure(self)
+        }
+    }
+
     pub fn write_utf8(&mut self, s: &str) -> Result<()> {
         if self.mail_type().is_internationalized() {
             #[cfg(test)]
             { self.trace.push(TraceToken::NowUtf8) }
-            self.internal_write_str(s)
+            self.internal_write_str(s).into()
         } else {
-            bail!( "can not write utf8 into Ascii mail" )
+            bail!("writing utf8 into non internationalized headers")
         }
     }
 
@@ -505,13 +518,16 @@ impl<'a> EncodeHandle<'a> {
     /// type is Ascii and which might be non-us-ascii if the mail type
     /// is Inernationalized.
     ///
-    /// # Error
-    /// - if the text is not valid atext
-    /// - if the MailType is not Inernationalized but it is only atext if it is
-    ///   internationalized
-    /// - if the hard line length limit is reached and the line can't be broken
-    ///   with soft line breaks
-    /// - buffer would contain a orphan '\r' or '\n' after the write
+    /// # Error (ConditionalWriteResult)
+    /// - fails with `ConditionFailure` if the text is not valid atext,
+    ///   this indicirectly also includes the utf8/Internationalization check
+    ///   as the `atext` grammar differs between normal and internationalized
+    ///   mail.
+    /// - fails with `GeneralGailure` if the hard line length limit is reached and
+    ///   the line can't be broken with soft line breaks
+    /// - or if buffer would contain a orphan '\r' or '\n' after the write
+    ///   (excluding a tailing `'\r'` as it is still valid if followed by an
+    ///    `'\n'`)
     ///
     /// Note that in case of an error part of the content might already
     /// have been written to the buffer, therefore it is recommended
@@ -521,14 +537,16 @@ impl<'a> EncodeHandle<'a> {
     /// # Trace (test build only)
     /// does push `NowAText` and then can push `Text`
     ///
-    pub fn try_write_atext(&mut self, s: &str) -> Result<()> {
+    pub fn write_if_atext<'short>(&'short mut self, s: &str)
+        -> ConditionalWriteResult<'short, 'inner>
+    {
         if s.chars().all( |ch| is_atext( ch, self.mail_type() ) ) {
             #[cfg(test)]
             { self.trace.push(TraceToken::NowAText) }
-            // the ascii or not aspect is already coverted by `is_atext`
-            self.internal_write_str(s)
+            // the ascii or not aspect is already converted by `is_atext`
+            self.internal_write_str(s).into()
         } else {
-            bail!( "can not write atext, input is not valid atext" );
+            ConditionalWriteResult::ConditionFailure(self)
         }
 
     }
@@ -725,6 +743,41 @@ impl<'a> EncodeHandle<'a> {
         Ok(())
     }
 }
+
+pub enum ConditionalWriteResult<'a, 'b: 'a> {
+    Ok,
+    ConditionFailure(&'a mut EncodeHandle<'b>),
+    GeneralFailure(Error)
+}
+
+impl<'a, 'b: 'a> From<Result<()>> for ConditionalWriteResult<'a, 'b> {
+    fn from(v: Result<()>) -> Self {
+        match v {
+            Ok(()) => ConditionalWriteResult::Ok,
+            Err(e) => ConditionalWriteResult::GeneralFailure(e)
+        }
+    }
+}
+
+impl<'a, 'b: 'a> ConditionalWriteResult<'a, 'b> {
+
+    #[inline]
+    pub fn handle_condition_failure<FN>(self, func: FN) -> Result<()>
+        where FN: FnOnce(&mut EncodeHandle) -> Result<()>
+    {
+        use self::ConditionalWriteResult as CWR;
+
+        match self {
+            CWR::Ok => Ok(()),
+            CWR::ConditionFailure(handle) => {
+                func(handle)
+            },
+            CWR::GeneralFailure(err) => Err(err)
+        }
+    }
+}
+
+
 
 /// A BodyBuf implementation based on a Vec<u8>
 ///
@@ -1377,9 +1430,14 @@ mod test {
             let mut encoder = Encoder::new(MailType::Ascii);
             {
                 let mut handle = encoder.encode_handle();
-                assert_ok!(handle.try_write_atext("hoho"));
-                assert_err!(handle.try_write_atext("a(b"));
-                assert_ok!(handle.try_write_atext(""));
+                assert_ok!(handle.write_if_atext("hoho")
+                    .handle_condition_failure(|_|panic!("no condition failur expected")));
+                let mut had_cond_failure = false;
+                assert_ok!(handle.write_if_atext("a(b")
+                    .handle_condition_failure(|_| {had_cond_failure=true; Ok(())}));
+                assert!(had_cond_failure);
+                assert_ok!(handle.write_if_atext("")
+                    .handle_condition_failure(|_|panic!("no condition failur expected")));
                 handle.finish_header();
             }
             assert_eq!(encoder.sections.len(), 1);
@@ -1392,9 +1450,14 @@ mod test {
             let mut encoder = Encoder::new(MailType::Internationalized);
             {
                 let mut handle = encoder.encode_handle();
-                assert_ok!(handle.try_write_atext("hoho"));
-                assert_err!(handle.try_write_atext("a(b"));
-                assert_ok!(handle.try_write_atext("❤"));
+                assert_ok!(handle.write_if_atext("hoho")
+                    .handle_condition_failure(|_|panic!("no condition failur expected")));
+                let mut had_cond_failure = false;
+                assert_ok!(handle.write_if_atext("a(b")
+                    .handle_condition_failure(|_| {had_cond_failure=true; Ok(())}));
+                assert!(had_cond_failure);
+                assert_ok!(handle.write_if_atext("❤")
+                    .handle_condition_failure(|_|panic!("no condition failur expected")));
                 handle.finish_header();
             }
             assert_eq!(encoder.sections.len(), 1);
@@ -1407,9 +1470,14 @@ mod test {
             let mut encoder = Encoder::new(MailType::Internationalized);
             {
                 let mut handle = encoder.encode_handle();
-                assert_ok!(handle.try_write_atext("hoho"));
-                assert_err!(handle.try_write_atext("a(b"));
-                assert_ok!(handle.try_write_atext("❤"));
+                assert_ok!(handle.write_if_atext("hoho")
+                    .handle_condition_failure(|_|panic!("no condition failur expected")));
+                let mut had_cond_failure = false;
+                assert_ok!(handle.write_if_atext("a(b")
+                    .handle_condition_failure(|_| {had_cond_failure=true; Ok(())}));
+                assert!(had_cond_failure);
+                assert_ok!(handle.write_if_atext("❤")
+                    .handle_condition_failure(|_|panic!("no condition failur expected")));
                 handle.finish_header();
                 handle.finish_header();
                 handle.finish_header();
@@ -1425,9 +1493,8 @@ mod test {
             let mut encoder = Encoder::new(MailType::Internationalized);
             {
                 let mut handle = encoder.encode_handle();
-                assert_ok!(handle.try_write_atext("hoho"));
-                assert_err!(handle.try_write_atext("a(b"));
-                assert_ok!(handle.try_write_atext("❤"));
+                assert_ok!(handle.write_if_atext("hoho")
+                    .handle_condition_failure(|_|panic!("no condition failur expected")));
                 handle.undo_header();
                 handle.finish_header();
                 handle.undo_header();
@@ -1539,8 +1606,11 @@ mod test {
                 let mut handle = encoder.encode_handle();
                 assert_ok!(handle.write_str(AsciiStr::from_ascii("Header").unwrap()));
                 assert_ok!(handle.write_char(AsciiChar::Colon));
-                assert_err!(handle.try_write_atext("a(b)c"));
-                assert_ok!(handle.try_write_atext("abc"));
+                let mut had_cond_failure = false;
+                assert_ok!(handle.write_if_atext("a(b)c")
+                    .handle_condition_failure(|_|{had_cond_failure=true; Ok(())}));
+                assert_ok!(handle.write_if_atext("abc")
+                    .handle_condition_failure(|_|panic!("unexpected cond failure")));
                 assert_ok!(handle.write_utf8("❤"));
                 assert_ok!(handle.write_str_unchecked("remove me\r\n"));
                 assert_ok!(handle.write_utf8("   "));

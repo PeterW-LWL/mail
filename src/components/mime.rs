@@ -102,13 +102,13 @@ impl EncodableInHeader for  mime::Mime {
 
     fn encode(&self, handle: &mut EncodeHandle) -> Result<()> {
         let res = self.to_string();
-        if !handle.write_utf8(&*res).is_ok() {
-            match AsciiStr::from_ascii(&*res) {
-                Ok(asciied) => handle.write_str( asciied )?,
-                Err(_err) => bail!("mime containining utf8 in ascii only mail")
-            }
-        }
-        Ok( () )
+        handle.write_if_utf8(&*res)
+            .handle_condition_failure(|handle| {
+                match AsciiStr::from_ascii(&*res) {
+                    Ok(asciied) => handle.write_str( asciied ),
+                    Err(_err) => bail!("mime containing utf8 in non Internationalized mail")
+                }
+            })
     }
 }
 
