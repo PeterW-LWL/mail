@@ -1,4 +1,12 @@
 
+/// it's easy to overlook the `!` in `assert!(!this_is.really_eycatching())`
+#[cfg(test)]
+#[macro_export]
+macro_rules! assert_not {
+    //direct forward + `!`
+    ($($t:tt)*) => (assert!(! $($t)*));
+}
+
 #[cfg(test)]
 #[macro_export]
 macro_rules! assert_ok {

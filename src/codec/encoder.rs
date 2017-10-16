@@ -1529,7 +1529,21 @@ mod test {
             assert_eq!(last, String::from("H: yay\r\n"));
         }
 
-
+        #[test]
+        fn has_unfinished_parts() {
+            let mut encoder = Encoder::new(MailType::Internationalized);
+            {
+                let mut handle = encoder.encode_handle();
+                assert_ok!(handle.write_utf8("Abc:"));
+                assert!(handle.has_unfinished_parts());
+                handle.undo_header();
+                assert_not!(handle.has_unfinished_parts());
+                assert_ok!(handle.write_utf8("Abc: c"));
+                assert!(handle.has_unfinished_parts());
+                handle.finish_header();
+                assert_not!(handle.has_unfinished_parts());
+            }
+        }
 
         #[test]
         fn drop_without_write_is_ok() {
