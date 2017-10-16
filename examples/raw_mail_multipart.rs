@@ -2,7 +2,7 @@ extern crate mail_codec;
 extern crate futures;
 extern crate mime;
 
-use futures::{ future, Future };
+use futures::Future;
 
 use mail_codec::mail_builder_prelude::*;
 use mail_codec::resource_prelude::*;
@@ -10,10 +10,7 @@ use mail_codec::resource_prelude::*;
 use mail_codec::default_impl::SimpleBuilderContext;
 
 fn get_some_resource() -> Resource {
-    let data: Vec<u8> = "abcd↓efg".as_bytes().to_vec();
-    Resource::from_future(
-        Box::new(future::ok( FileBuffer::new( mime::TEXT_PLAIN, data ) ))
-    )
+    Resource::from_text("abcd↓efg".into())
 }
 
 fn main() {
@@ -28,6 +25,7 @@ fn _main() -> Result<()> {
     let mail = Builder::multipart(
             MultipartMime::new( "multipart/related; boundary=\"=_abc\"".parse().unwrap() )? )
         .header( Subject, "that ↓ will be encoded " )?
+        .header( From, [ "tim@tom.nixdomain" ])?
         .body( Builder::singlepart( get_some_resource() ).build()? )?
         .body( Builder::singlepart( get_some_resource() ).build()? )?
         .build()?;

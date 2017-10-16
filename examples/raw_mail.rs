@@ -3,7 +3,7 @@ extern crate mail_codec;
 extern crate futures;
 extern crate mime;
 
-use futures::{ future, Future };
+use futures::Future;
 
 use mail_codec::mail_builder_prelude::*;
 use mail_codec::resource_prelude::*;
@@ -13,10 +13,7 @@ use mail_codec::default_impl::SimpleBuilderContext;
 
 
 fn get_some_resource() -> Resource {
-    let data: Vec<u8> = "abcd↓efg".as_bytes().to_vec();
-    Resource::from_future(
-        Box::new( future::ok( FileBuffer::new( mime::TEXT_PLAIN, data ) ) )
-    )
+    Resource::from_text("abcd↓efg".into())
 }
 
 fn main() {
@@ -36,6 +33,7 @@ fn _main() -> Result<()> {
             ("random dude", "this@is.es"),
             ("another person", "abc@def.geh"),
         ],
+        Sender: ("random dude", "this@is.es"),
         To: (
             "target@here.it.goes",
             ("some", "thing@nice"),
