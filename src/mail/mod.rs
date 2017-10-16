@@ -52,7 +52,26 @@ pub enum MailPart {
     }
 }
 
-/// a future returning an EncodableMail once all futures contained in the wrapped Mail are resolved
+/// a future resolving to an encodeable mail
+///
+/// The future resolves like this:
+/// 1. it makes sure all contained futures are resolved, i.e. all
+///    `Resources` are loaded and transfer encoded if needed
+/// 2. it inserts auto-generated headers, i.e. `Content-Type`,
+///    `Content-Transfer-Encoding` are generated and `Date`, too if
+///    it is needed.
+/// 3. contextual validators are used (including a check if there is
+///    a `From` header)
+/// 4. as the mail is now ready to be encoded it resolves to an
+///    `EncodableMail`
+///
+/// # Error (while resolving the future)
+///
+/// - if one of the contained futures fails, e.g. if a resource can not
+///   be loaded or encoded
+/// - if a contextual validator fails, e.g. `From` header is missing or
+///   there is a multi mailbox `From` header but no `Sender` header
+///
 pub struct MailFuture<'a, T: 'a> {
     mail: Option<Mail>,
     ctx: &'a T
@@ -100,7 +119,9 @@ impl Mail {
         &self.body
     }
 
-    pub fn into_future<'a, C: BuilderContext>( self, ctx: &'a C ) -> MailFuture<'a, C> {
+    /// Turns the mail into a future with resolves to an `EncodeableMail`
+    ///
+    pub fn into_encodeable_mail<'a, C: BuilderContext>(self, ctx: &'a C ) -> MailFuture<'a, C> {
         MailFuture {
             ctx,
             mail: Some( self )
@@ -184,9 +205,8 @@ impl EncodableMail {
     fn from_loaded_mail(mut mail: Mail) -> Result<Self> {
         Self::insert_generated_headers(&mut mail)?;
         mail.headers.use_contextual_validators()?;
-        if !mail.headers.contains(Date) {
-            bail!("a mail must have a Date header field");
-        }
+        //Date is generated if needed
+        debug_assert!(mail.headers.contains(Date));
         if !mail.headers.contains(From) {
             bail!("a mail must have a From header field");
         }

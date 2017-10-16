@@ -50,7 +50,7 @@ fn _main() -> Result<()> {
     )?;
 
     let mut encoder = Encoder::new( MailType::Ascii );
-    let encodable_mail = mail.into_future( &context ).wait().unwrap();
+    let encodable_mail = mail.into_encodeable_mail( &context ).wait().unwrap();
     encodable_mail.encode( &mut encoder )?;
 
 

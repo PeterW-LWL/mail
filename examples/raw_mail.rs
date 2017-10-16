@@ -52,7 +52,7 @@ fn _main() -> Result<()> {
         .headers( headers )?
         .build()?;
 
-    let encodable_mail = mail.into_future( &builder_ctx ).wait().unwrap();
+    let encodable_mail = mail.into_encodeable_mail( &builder_ctx ).wait().unwrap();
     encodable_mail.encode( &mut encoder )?;
 
     println!( "{}", encoder.into_string_lossy().unwrap() );
