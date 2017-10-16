@@ -55,7 +55,7 @@ fn encode_headers(
                 || name_as_str.starts_with("X-") );
 
         if ignored_header {
-            //TODO warn!
+            warn!("non `Content-` header in MIME body: {:?}: {:?}", name, hbody);
         }
 
         encode_header( &mut handle, name, hbody)?;
@@ -90,7 +90,7 @@ fn encode_mail_part(mail: &Mail, encoder:  &mut Encoder<Resource> ) -> Result<()
         },
         MultipleBodies { ref hidden_text, ref bodies } => {
             if hidden_text.len() > 0 {
-                //TODO warn that encoding hidden text is not implemented for now
+                warn!("hidden_text fields in multipart bodies are currently not encoded")
             }
             let boundary: String = {
                 //FIXME there has to be a better way
@@ -125,7 +125,7 @@ fn encode_mail_part(mail: &Mail, encoder:  &mut Encoder<Resource> ) -> Result<()
                     handle.write_char( AsciiChar::Minus )
                 })?;
             } else {
-                //TODO warn
+                warn!("multipart body with 0 sub bodies")
             }
 
         }

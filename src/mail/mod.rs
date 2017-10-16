@@ -216,7 +216,7 @@ impl EncodableMail {
             bail!("mail must have a `From` header");
         }
         if !mail.headers.contains(MessageId) {
-            //warn "mail should have a MessageId
+            warn!("mail without MessageId")
         }
 
         Ok(EncodableMail(mail))

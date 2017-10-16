@@ -1,4 +1,6 @@
 #![recursion_limit="128"]
+#[macro_use]
+extern crate log;
 extern crate ascii;
 extern crate mime;
 extern crate owning_ref;
