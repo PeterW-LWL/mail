@@ -278,21 +278,6 @@ impl fmt::Debug for EncodableMail {
 #[cfg(test)]
 mod test {
 
-    mod MailFuture {
-        #![allow(non_snake_case)]
-        use super::super::*;
-
-        #[test]
-        fn short_circuits_on_resource_failure() {
-
-        }
-
-        #[test]
-        fn makes_sure_all_resources_are_ready() {
-
-        }
-    }
-
     mod Mail {
         #![allow(non_snake_case)]
         use super::super::*;
@@ -435,24 +420,149 @@ mod test {
     mod EncodableMail {
         #![allow(non_snake_case)]
         use super::super::*;
+        use chrono::{Utc, TimeZone};
+        use components::{
+            TransferEncoding,
+            DateTime
+        };
+        use headers::{
+            From, ContentType, ContentTransferEncoding,
+            Date, Subject
+        };
 
         #[test]
         fn sets_generated_headers_for_outer_mail() {
-            //including data
+            let mut resource = Resource::from_text("r9".into());
+            resource.set_preferred_encoding(TransferEncoding::Base64);
+            let mail = Mail {
+                headers: headers!{
+                    From: ["random@this.is.no.mail"],
+                    Subject: "hoho"
+                }.unwrap(),
+                body: MailPart::SingleBody { body: resource }
+            };
+
+            let ctx = ::default_impl::SimpleBuilderContext::new();
+            let enc_mail = assert_ok!(mail.into_encodeable_mail(&ctx).wait());
+
+            let headers: &HeaderMap = enc_mail.headers();
+            assert!(headers.contains(From));
+            assert!(headers.contains(Subject));
+            assert!(headers.contains(Date));
+            assert!(headers.contains(ContentType));
+            assert!(headers.contains(ContentTransferEncoding));
+
+            let res = headers.get_single(ContentType)
+                .unwrap()
+                .unwrap();
+
+            assert_eq!(res, &"text/plain;charset=utf8");
+
+            let res = headers.get_single(ContentTransferEncoding)
+                .unwrap()
+                .unwrap();
+
+            assert_eq!(res, &TransferEncoding::Base64);
         }
 
         #[test]
         fn sets_generated_headers_for_sub_mails() {
+            let mut resource = Resource::from_text("r9".into());
+            resource.set_preferred_encoding(TransferEncoding::Base64);
+            let mail = Mail {
+                headers: headers!{
+                    From: ["random@this.is.no.mail"],
+                    Subject: "hoho"
+                }.unwrap(),
+                body: MailPart::MultipleBodies {
+                    bodies: vec![
+                        Mail {
+                            headers: HeaderMap::new(),
+                            body: MailPart::SingleBody { body: resource }
+                        }
+                    ],
+                    hidden_text: Default::default()
+                }
+            };
 
+            let ctx = ::default_impl::SimpleBuilderContext::new();
+            let mail = mail.into_encodeable_mail(&ctx).wait().unwrap();
+
+            assert!(mail.headers().contains(From));
+            assert!(mail.headers().contains(Subject));
+            assert!(mail.headers().contains(Date));
+            //the Builder would have set it but as we didn't use it (intentionally) it's not set
+            //assert!(headers.contains(ContentType));
+
+            if let MailPart::MultipleBodies { ref bodies, ..} = mail.body {
+                let headers = bodies[0].headers();
+                assert_not!(headers.contains(Date));
+
+                let res = headers.get_single(ContentType)
+                    .unwrap()
+                    .unwrap();
+
+                assert_eq!(res, &"text/plain;charset=utf8");
+
+                let res = headers.get_single(ContentTransferEncoding)
+                    .unwrap()
+                    .unwrap();
+
+                assert_eq!(res, &TransferEncoding::Base64);
+
+            } else {
+                unreachable!()
+            }
         }
 
         #[test]
         fn runs_contextual_validators() {
+            let mail = Mail {
+                headers: headers!{
+                    From: ["random@this.is.no.mail", "u.p.s@s.p.u"],
+                    Subject: "hoho"
+                }.unwrap(),
+                body: MailPart::SingleBody { body: Resource::from_text("r9".into()) }
+            };
 
+            let ctx = ::default_impl::SimpleBuilderContext::new();
+            assert_err!(mail.into_encodeable_mail(&ctx).wait());
         }
 
         #[test]
         fn checks_there_is_from() {
+            let mail = Mail {
+                headers: headers!{
+                    Subject: "hoho"
+                }.unwrap(),
+                body: MailPart::SingleBody { body: Resource::from_text("r9".into()) }
+            };
+
+            let ctx = ::default_impl::SimpleBuilderContext::new();
+            assert_err!(mail.into_encodeable_mail(&ctx).wait());
+        }
+
+        #[test]
+        fn does_not_override_date_if_set() {
+            let provided_date = Utc.ymd(1992, 5, 25).and_hms(23, 41, 12);
+            let mail = Mail {
+                headers: headers!{
+                    From: ["random@this.is.no.mail"],
+                    Subject: "hoho",
+                    Date: DateTime::new(provided_date.clone())
+                }.unwrap(),
+                body: MailPart::SingleBody { body: Resource::from_text("r9".into()) }
+            };
+
+            let ctx = ::default_impl::SimpleBuilderContext::new();
+            let enc_mail = assert_ok!(mail.into_encodeable_mail(&ctx).wait());
+            let used_date = enc_mail.headers()
+                .get_single(Date)
+                .unwrap()
+                .unwrap();
+
+            assert_eq!(**used_date, provided_date);
+
 
         }
     }
