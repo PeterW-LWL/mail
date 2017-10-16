@@ -16,6 +16,7 @@ use error::{ Error, Result };
 use codec::transfer_encoding::TransferEncodedFileBuffer;
 use codec::BodyBuffer;
 use components::TransferEncoding;
+use std::marker::PhantomData;
 
 
 use mime::TEXT_PLAIN;
@@ -56,10 +57,17 @@ enum ResourceInner {
 }
 
 pub struct Guard<'lock> {
-    //NOTE: this is NOT dead_code, just unused through it still _drops_
+    //NOTE: this is NOT dead_code (field never used),
+    // just unused through it still _drops_ and has a _side effect_
+    // on drop (which is what rustc's lint does not "know")
     #[allow(dead_code)]
     guard: RwLockReadGuard<'lock, ResourceInner>,
-    inner_ref: *const TransferEncodedFileBuffer
+    inner_ref: *const TransferEncodedFileBuffer,
+    // given that we neither own a value we point to (DropCheck) nor
+    // have a unused type parameter nor lifetime this is probably not
+    // needed, still it's better to be safe and have this zero-runtime-overhead
+    // marker
+    _marker: PhantomData<&'lock TransferEncodedFileBuffer>
 }
 
 
@@ -138,6 +146,7 @@ impl Resource {
         Ok( ptr.map( |ptr |Guard {
             guard: inner,
             inner_ref: ptr,
+            _marker: PhantomData
         } ) )
     }
 
