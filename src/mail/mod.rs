@@ -203,33 +203,46 @@ impl<'a, T> Future for MailFuture<'a, T>
 impl EncodableMail {
 
     fn from_loaded_mail(mut mail: Mail) -> Result<Self> {
-        Self::insert_generated_headers(&mut mail)?;
+        insert_generated_headers(&mut mail)?;
+        // also insert `Date` if needed, but only on the outer most header map
+        if !mail.headers.contains(Date) {
+            mail.headers.insert(Date, DateTime::now())?;
+        }
+
         mail.headers.use_contextual_validators()?;
-        //Date is generated if needed
-        debug_assert!(mail.headers.contains(Date));
+
+        // also check `From` only on the outer most header map
         if !mail.headers.contains(From) {
-            bail!("a mail must have a From header field");
+            bail!("mail must have a `From` header");
         }
         if !mail.headers.contains(MessageId) {
-            //TODO warn
+            //warn "mail should have a MessageId
         }
+
         Ok(EncodableMail(mail))
     }
+}
 
-    fn insert_generated_headers(mail: &mut Mail) -> Result<()> {
-        if let MailPart::SingleBody { ref body } = mail.body {
+/// inserts ContentType and ContentTransferEncoding into
+/// the headers of any contained `MailPart::SingleBody`,
+/// based on the `Resource` representing the body
+fn insert_generated_headers(mail: &mut Mail) -> Result<()> {
+    match mail.body {
+        MailPart::SingleBody { ref body } => {
             let file_buffer = body.get_if_encoded()?
-                .expect( "encoded mail, should only contain already transferencoded resources" );
+                .expect("encoded mail, should only contain already transferencoded resources");
 
             mail.headers.insert(ContentType, file_buffer.content_type().clone())?;
             mail.headers.insert(ContentTransferEncoding, file_buffer.transfer_encoding().clone())?;
         }
-
-        if !mail.headers.contains(Date) {
-            mail.headers.insert(Date, DateTime::now())?;
+        MailPart::MultipleBodies { ref mut bodies, .. } => {
+            for sub_mail in bodies {
+                insert_generated_headers(sub_mail)?;
+            }
         }
-        Ok(())
+
     }
+    Ok(())
 }
 
 impl Deref for EncodableMail {
