@@ -29,11 +29,9 @@ macro_rules! def_headers {
                     unsafe { $crate::headers::HeaderName::from_ascii_unchecked( as_str ) }
                 }
 
-                fn get_contextual_validator()
-                    -> Option<fn(&$crate::headers::HeaderMap) -> $crate::error::Result<()>>
-                {
-                    def_headers!{ _PRIV_mk_validator $validator }
-                }
+                const CONTEXTUAL_VALIDATOR:
+                    Option<fn(&$crate::headers::HeaderMap) -> $crate::error::Result<()>> =
+                        def_headers!{ _PRIV_mk_validator $validator };
             }
         )+
 

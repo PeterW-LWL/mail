@@ -62,7 +62,7 @@ impl HeaderMeta {
     pub fn from_header_type<H: Header>() -> Self {
         HeaderMeta {
             max_count_eq_1: H::MAX_COUNT_EQ_1,
-            contextual_validator: H::get_contextual_validator()
+            contextual_validator: H::CONTEXTUAL_VALIDATOR.clone()
         }
     }
 
@@ -693,17 +693,16 @@ mod test {
         fn name() -> HeaderName {
             HeaderName::new(ascii_str!(X Minus C o m m e n t )).unwrap()
         }
+        const CONTEXTUAL_VALIDATOR: Option<fn(&HeaderMap)-> Result<()>> =
+            Some(__validator);
+    }
 
-        fn get_contextual_validator() -> Option<fn(&HeaderMap) -> Result<()>> {
-            //some stupid but simple validator
-            fn validator(map: &HeaderMap) -> Result<()> {
-                if map.get_untyped(Comments::name()).is_some() {
-                    bail!("can't have X-Comment and Comments in same mail")
-                }
-                Ok(())
-            }
-            Some(validator)
+    //some stupid but simple validator
+    fn __validator(map: &HeaderMap) -> Result<()> {
+        if map.get_untyped(Comments::name()).is_some() {
+            bail!("can't have X-Comment and Comments in same mail")
         }
+        Ok(())
     }
 
     #[test]

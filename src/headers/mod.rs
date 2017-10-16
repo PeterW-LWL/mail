@@ -28,7 +28,7 @@ pub trait Header {
     //NOTE: this is a circular dependency between Header/HeaderMap
     // but putting up e.g. a GeneraicHeaderMap trait/interface is
     // not worth the work at all
-    /// Returns a function which is meant to be called with a reference
+    /// A function which is meant to be called with a reference
     /// to the final header map before encoding the headers. It is
     /// meant to be used do some of the contextual validations,
     /// like e.g. a `From` header might return a function which
@@ -41,9 +41,7 @@ pub trait Header {
     /// there and the component is of the expected type
     /// and it is invalid in the context
     /// an error should be returned.
-    fn get_contextual_validator() -> Option<fn(&HeaderMap) -> Result<()>> {
-        None
-    }
+    const CONTEXTUAL_VALIDATOR: Option<fn(&HeaderMap)-> Result<()>>;
 }
 
 /// all headers defined with `def_headers!` where
