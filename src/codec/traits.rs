@@ -51,6 +51,13 @@ pub trait EncodedWordWriter {
 /// Trait Repesenting the buffer of a mime body payload
 ///
 /// (e.g. a transfer encoded image or text)
+///
+/// Note that the `BodyBuffer` trait is mainly used to break a
+/// cyclic dependency between `codec` and `mail::resource`.
+/// So while all code in lower layers is generic over _one_
+/// kind of BodyBuffer for all Buffers the higher layers
+/// in `mail` and `mail_composition` are fixed on `Resource`.
+///
 pub trait BodyBuffer {
 
     /// Called to access the bytes in the buffer.
