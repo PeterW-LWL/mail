@@ -1,6 +1,8 @@
 use std::ops::Deref;
 use std::fmt;
 
+use mime::{Mime, BOUNDARY};
+
 use codec::{EncodableInHeader, Encoder, Encodable};
 use soft_ascii_string::SoftAsciiString;
 use futures::{ Future, Async, Poll };
@@ -19,12 +21,14 @@ use self::builder::{
     check_header,
     check_multiple_headers,
 };
+use self::mime::write_random_boundary_to;
 
 pub use self::builder::{
     Builder, MultipartBuilder, SinglepartBuilder
 };
 pub use self::context::*;
 pub use self::resource::*;
+
 
 pub mod mime;
 mod resource;
@@ -55,11 +59,13 @@ pub enum MailPart {
 /// a future resolving to an encodeable mail
 ///
 /// The future resolves like this:
+///
 /// 1. it makes sure all contained futures are resolved, i.e. all
 ///    `Resources` are loaded and transfer encoded if needed
 /// 2. it inserts auto-generated headers, i.e. `Content-Type`,
 ///    `Content-Transfer-Encoding` are generated and `Date`, too if
 ///    it is needed.
+///     1. If needed it generates a boundary for the `Content-Type`
 /// 3. contextual validators are used (including a check if there is
 ///    a `From` header)
 /// 4. as the mail is now ready to be encoded it resolves to an
@@ -229,19 +235,59 @@ impl EncodableMail {
 fn insert_generated_headers(mail: &mut Mail) -> Result<()> {
     match mail.body {
         MailPart::SingleBody { ref body } => {
-            let file_buffer = body.get_if_encoded()?
-                .expect("encoded mail, should only contain already transferencoded resources");
-
-            mail.headers.insert(ContentType, file_buffer.content_type().clone())?;
-            mail.headers.insert(ContentTransferEncoding, file_buffer.transfer_encoding().clone())?;
+           auto_gen_headers(&mut mail.headers, body)?;
         }
         MailPart::MultipleBodies { ref mut bodies, .. } => {
+            auto_gen_multipart(&mut mail.headers)?;
             for sub_mail in bodies {
                 insert_generated_headers(sub_mail)?;
             }
         }
 
     }
+    Ok(())
+}
+
+fn auto_gen_multipart(headers: &mut HeaderMap) -> Result<()> {
+    // ask following: <has content type header?><is correct type?><needs new mime?>
+    let current: Option<Result<Option<Mime>>> = headers.get_single(ContentType)
+        .map(|res| {
+            let content_type = res?;
+            if content_type.get_param(BOUNDARY).is_none() {
+                debug_assert_eq!(content_type.type_(), "multipart");
+                let mut boundary = String::new();
+                write_random_boundary_to(&mut boundary);
+                let mime_string = format!("{};boundary={}", content_type, boundary);
+                let new_content_type: Mime = mime_string.parse()
+                    .chain_err( || "[BUG] mime invalidated by adding boundary" )?;
+                Ok(Some(new_content_type))
+            } else {
+                Ok(None)
+            }
+        });
+    if let Some(res) = current {
+        let maybe_new_content_type = res?;
+        if let Some(content_type) = maybe_new_content_type {
+            //FIXME uhm, get_single_mut?, entry?
+            let had_content_type = headers.remove_by_name(ContentType);
+            debug_assert!(had_content_type);
+            headers.insert(ContentType, content_type)?;
+        }
+    } else {
+        bail!("[BUG] multipart does not have content type header, should be enforce by builder")
+    }
+
+    // we do not care at this point that it's missing
+    // checks for quantities are doe after auto generation
+    Ok(())
+}
+
+fn auto_gen_headers(headers: &mut HeaderMap, body: &Resource) -> Result<()> {
+    let file_buffer = body.get_if_encoded()?
+        .expect("encoded mail, should only contain already transferencoded resources");
+
+    headers.insert(ContentType, file_buffer.content_type().clone())?;
+    headers.insert(ContentTransferEncoding, file_buffer.transfer_encoding().clone())?;
     Ok(())
 }
 
@@ -472,7 +518,8 @@ mod test {
             let mail = Mail {
                 headers: headers!{
                     From: ["random@this.is.no.mail"],
-                    Subject: "hoho"
+                    Subject: "hoho",
+                    ContentType: "multipart/mixed"
                 }.unwrap(),
                 body: MailPart::MultipleBodies {
                     bodies: vec![
@@ -564,6 +611,40 @@ mod test {
             assert_eq!(**used_date, provided_date);
 
 
+        }
+
+        #[test]
+        fn generates_boundary_if_needed() {
+            let mail = Mail {
+                headers: headers!{
+                    From: ["random@this.is.no.mail"],
+                    ContentType: "multipart/mixed"
+                }.unwrap(),
+                body: MailPart::MultipleBodies {
+                    bodies: vec![
+                        Mail {
+                            headers: headers!{
+                                From: ["random@this.is.no.mail"]
+                            }.unwrap(),
+                            body: MailPart::SingleBody {
+                                body: Resource::from_text("r9".into())
+                            }
+                        }
+                    ],
+                    hidden_text: Default::default()
+                }
+            };
+
+            let ctx = ::default_impl::SimpleBuilderContext::new();
+            let enc_mail = assert_ok!(mail.into_encodeable_mail(&ctx).wait());
+
+
+            let headers = enc_mail.headers();
+            let ct = headers.get_single(ContentType)
+                .expect("there has to be a ContentType header");
+            let ct = assert_ok!(ct);
+            let pm = format!("no boundary on: {}", ct);
+            assert!(ct.get_param(::mime::BOUNDARY).is_some(), pm);
         }
     }
 

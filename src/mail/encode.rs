@@ -116,7 +116,7 @@ fn encode_mail_part(mail: &Mail, encoder:  &mut Encoder<Resource> ) -> Result<()
                 if let Some( mime ) = mail.headers.get_single(ContentType) {
 
                     mime?.get_param(BOUNDARY)
-                        .ok_or_else( ||-> Error { "boundary gone missing".into() } )?
+                        .ok_or_else( ||-> Error { "[BUG] boundary gone missing".into() } )?
                         .to_string()
                 } else {
                     bail!( "Content-Type header gone missing" )
