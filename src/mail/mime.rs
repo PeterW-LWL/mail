@@ -2,7 +2,7 @@ use std::ops::Deref;
 
 use rand;
 use rand::Rng;
-use mime::{ Mime, BOUNDARY };
+use mime::Mime;
 
 use error::*;
 use utils::{ is_multipart_mime, HeaderTryInto };
@@ -84,7 +84,6 @@ impl MultipartMime {
 
     pub fn new( mime: Mime ) -> Result<Self> {
         if is_multipart_mime( &mime ) {
-            check_boundary( &mime )?;
             Ok( MultipartMime( mime ) )
         }  else {
             Err( ErrorKind::NotMultipartMime( mime ).into() )
@@ -113,11 +112,6 @@ impl Deref for MultipartMime {
     }
 }
 
-fn check_boundary( mime: &Mime ) -> Result<()> {
-    mime.get_param( BOUNDARY )
-        .map( |_|() )
-        .ok_or_else( || ErrorKind::MultipartBoundaryMissing.into() )
-}
 
 
 #[cfg(test)]

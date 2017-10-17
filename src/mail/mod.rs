@@ -1,6 +1,5 @@
 use std::ops::Deref;
 use std::fmt;
-use std::str::FromStr;
 
 use mime::{Mime, BOUNDARY};
 
@@ -269,8 +268,9 @@ fn auto_gen_multipart(headers: &mut HeaderMap) -> Result<()> {
         let maybe_new_content_type = res?;
         if let Some(content_type) = maybe_new_content_type {
             //FIXME uhm, get_single_mut?, entry?
-            headers.remove_by_name(ContentType);
-            headers.insert(ContentType, content_type);
+            let had_content_type = headers.remove_by_name(ContentType);
+            debug_assert!(had_content_type);
+            headers.insert(ContentType, content_type)?;
         }
     }
     // we do not care at this point that it's missing
