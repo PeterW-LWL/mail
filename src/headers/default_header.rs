@@ -16,6 +16,51 @@ pub use soft_ascii_string::{ SoftAsciiStr as _SoftAsciiStr };
 /// some circumstances (e.g. if you have multiple differing definitions of the
 /// same header with different spelling (at last one failed the test) like e.g.
 /// when you override default implementations of fields).
+///
+/// The macros expects following items:
+///
+/// 1. `test_name`, which is the name the auto-generated test will have
+/// 2. `scope`, the scope all components are used with, this helps with some
+///    name collisions. Use `self` to use the current scope.
+/// 3. a list of header definitions consisting of:
+///
+///    1. `1` or `+`, stating wether the header can appear at most one time (1) or more times (+)
+///       (not that only `Date`+`From` are required headers, no other can be made into such)
+///    2. `<typename>` the name the type of the header will have, i.e. the name of a zero-sized
+///       struct which will be generated
+///    3. `unchecked` a hint to make people read the documentation and not forget the the
+///       folowing data is `unchecked` / only vaidated in the auto-generated test
+///    4. `"<header_name>"` the header name in a syntax using `'-'` to serperate words,
+///       also each word has to start with a capital letter and be followed by lowercase
+///       letters additionaly to being a valid header field name. E.g. "Message-Id" is
+///       ok, but "Message-ID" is not. (Note that header field name are on itself ignore
+///       case, but by enforcing a specific case in the encoder equality checks can be
+///       done on byte level, which is especially usefull for e.g. placing them as keys
+///       into a HashMap or for performance reasons.
+///    5. `<component>` the name of the type to use ing `scope` a the component type of
+///       the header. E.g. `Unstructured` for an unstructured header field (which still
+///       support Utf8 through encoded words)
+///    6. `None`/`<ident>`, None or the name of a validator function (if there is one).
+///       This function is called before encoding with the header map as argument, and
+///       can cause a error. Use this to enfore contextual limitations like having a
+///       `From` with multiple mailboxes makes `Sender` an required field.
+///
+/// # Example
+///
+/// ```norun
+/// def_headers! {
+///     // the name of the auto-generated test
+///     test_name: validate_header_names,
+///     // the scope from which all components should be imported
+///     // E.g. `DateTime` refers to `components::DateTime`.
+///     scope: components,
+///     // definitions of the headers
+///     1 Date,     unchecked { "Date"          },  DateTime,       None,
+///     1 From,     unchecked { "From"          },  MailboxList,    validator_from,
+///     1 Subject,  unchecked { "Subject"       },  Unstructured,   None,
+///     + Comments, unchecked { "Comments"      },  Unstructured,   None,
+/// }
+/// ```
 #[macro_export]
 macro_rules! def_headers {
     (
