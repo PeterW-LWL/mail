@@ -1,7 +1,7 @@
 use std::ops::Deref;
 use std::ascii::AsciiExt;
 
-use soft_ascii_string::SoftAsciiString;
+use soft_ascii_string::{ SoftAsciiStr, SoftAsciiString};
 
 use super::input::Input;
 use super::inner_item::{ InnerAscii, InnerUtf8 };
@@ -99,12 +99,8 @@ impl From<Input> for SimpleItem {
             },
             Input( InnerUtf8::Shared( shared ) ) => {
                 if shared.is_ascii() {
-                    SimpleItem::Ascii(InnerAscii::Owned(
-                        SoftAsciiString::from_string_unchecked(&*shared)
-                    ))
-                    //FIXME return shared here
-                    //let a_shared = shared.map(|s| SoftAsciiStr::from_str_unchecked(s));
-                    //SimpleItem::Ascii(InnerAscii::Shared(a_shared))
+                    let a_shared = shared.map(|s| SoftAsciiStr::from_str_unchecked(s));
+                    SimpleItem::Ascii(InnerAscii::Shared(a_shared))
                 } else {
                     SimpleItem::Utf8(InnerUtf8::Shared(shared))
                 }
