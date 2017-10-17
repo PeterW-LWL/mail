@@ -38,7 +38,7 @@ impl Input {
         }
     }
 
-    pub unsafe fn into_ascii_item_unchecked( self ) -> InnerAscii {
+    pub fn into_ascii_item_unchecked( self ) -> InnerAscii {
         match self {
             Input( InnerUtf8::Owned( string ) ) =>
                 InnerAscii::Owned( SoftAsciiString::from_string_unchecked( string ) ),

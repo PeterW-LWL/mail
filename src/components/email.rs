@@ -107,8 +107,7 @@ impl FromInput for Domain {
         let item =
             match Domain::check_domain( &*input )? {
                 MailType::Ascii | MailType::Mime8BitEnabled => {
-                    let asciied = unsafe { input.into_ascii_item_unchecked() };
-                    SimpleItem::Ascii( asciied )
+                    SimpleItem::Ascii( input.into_ascii_item_unchecked() )
                 },
                 MailType::Internationalized => {
                     SimpleItem::from_utf8_input( input )

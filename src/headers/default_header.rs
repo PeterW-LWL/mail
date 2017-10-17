@@ -1,22 +1,27 @@
 pub use soft_ascii_string::{ SoftAsciiStr as _SoftAsciiStr };
-//    def_headers! {
-//        test_name: validate_header_names,
-//        + ContentType, unsafe { "Content-Type" }, components::ContentType
-//        + ContentId, unsafe { "Content-ID" }, components::ContentID
-//        + Magic, unsafe { "X-Magic" }, x_cmds::Magic
-//    }
+
+
 /// Defines a new header types with given type name, filed name and component
-/// Note that the unsafe AsciiStr::from_ascii_unchecked is used with the given
-/// header field names.
+/// Note that the name is not checked/validated, it has to be ascii, a valid
+/// header field name AND has to comply with the naming schema (each word
+/// seperated by `'-'` starts with a capital letter and no cappital letter
+/// follow, e.g. "Message-Id" is ok but "Message-ID" isn't).
 ///
-/// Nevertheless a test is created with the given test name which
-/// tests if all field names are valide.
+/// This macro will create a test which will check if the used field names
+/// are actually valid and appears only once (_per def_header macro call_)
+/// so as long as test's are run any invalid name will be found.
+///
+/// Note that even if a invalid name was used and test where ignored/not run
+/// this will _not_ cause an rust safety issue, but can still cause bugs under
+/// some circumstances (e.g. if you have multiple differing definitions of the
+/// same header with different spelling (at last one failed the test) like e.g.
+/// when you override default implementations of fields).
 #[macro_export]
 macro_rules! def_headers {
     (
         test_name: $tn:ident,
         scope: $scope:ident,
-        $($multi:tt $name:ident, unsafe { $hname:tt }, $component:ident, $validator:ident),+
+        $($multi:tt $name:ident, unchecked { $hname:tt }, $component:ident, $validator:ident),+
     ) => (
         $(
             pub struct $name;
@@ -27,7 +32,7 @@ macro_rules! def_headers {
 
                 fn name() -> $crate::headers::HeaderName {
                     let as_str: &'static str = $hname;
-                    unsafe { $crate::headers::HeaderName::from_ascii_unchecked( as_str ) }
+                    $crate::headers::HeaderName::from_ascii_unchecked( as_str )
                 }
 
                 const CONTEXTUAL_VALIDATOR:
@@ -104,35 +109,35 @@ def_headers! {
     test_name: validate_header_names,
     scope: components,
     //RFC 5322:
-    1 Date,                    unsafe { "Date"          },  DateTime,       None,
-    1 From,                    unsafe { "From"          },  MailboxList,    validator_from,
-    1 Sender,                  unsafe { "Sender"        },  Mailbox,        None,
-    1 ReplyTo,                 unsafe { "Reply-To"      },  MailboxList,    None,
-    1 To,                      unsafe { "To"            },  MailboxList,    None,
-    1 Cc,                      unsafe { "Cc"            },  MailboxList,    None,
-    1 Bcc,                     unsafe { "Bcc"           },  MailboxList,    None,
-    1 MessageId,               unsafe { "Message-Id"    },  MessageID,      None,
-    1 InReplyTo,               unsafe { "In-Reply-To"   },  MessageIDList,  None,
-    1 References,              unsafe { "References"    },  MessageIDList,  None,
-    1 Subject,                 unsafe { "Subject"       },  Unstructured,   None,
-    + Comments,                unsafe { "Comments"      },  Unstructured,   None,
-    + Keywords,                unsafe { "Keywords"      },  PhraseList,     None,
-    + ResentDate,              unsafe { "Resent-Date"   },  DateTime,       validator_resent_any,
-    + ResentFrom,              unsafe { "Resent-From"   },  MailboxList,    validator_resent_any,
-    + ResentSender,            unsafe { "Resent-Sender" },  Mailbox,        validator_resent_any,
-    + ResentTo,                unsafe { "Resent-To"     },  MailboxList,    validator_resent_any,
-    + ResentCc,                unsafe { "Resent-Cc"     },  MailboxList,    validator_resent_any,
-    + ResentBcc,               unsafe { "Resent-Bcc"    },  OptMailboxList, validator_resent_any,
-    + ResentMsgId,             unsafe { "Resent-Msg-Id" },  MessageID,      validator_resent_any,
-    + ReturnPath,              unsafe { "Return-Path"   },  Path,           None,
-    + Received,                unsafe { "Received"      },  ReceivedToken,  None,
+    1 Date,                    unchecked { "Date"          },  DateTime,       None,
+    1 From,                    unchecked { "From"          },  MailboxList,    validator_from,
+    1 Sender,                  unchecked { "Sender"        },  Mailbox,        None,
+    1 ReplyTo,                 unchecked { "Reply-To"      },  MailboxList,    None,
+    1 To,                      unchecked { "To"            },  MailboxList,    None,
+    1 Cc,                      unchecked { "Cc"            },  MailboxList,    None,
+    1 Bcc,                     unchecked { "Bcc"           },  MailboxList,    None,
+    1 MessageId,               unchecked { "Message-Id"    },  MessageID,      None,
+    1 InReplyTo,               unchecked { "In-Reply-To"   },  MessageIDList,  None,
+    1 References,              unchecked { "References"    },  MessageIDList,  None,
+    1 Subject,                 unchecked { "Subject"       },  Unstructured,   None,
+    + Comments,                unchecked { "Comments"      },  Unstructured,   None,
+    + Keywords,                unchecked { "Keywords"      },  PhraseList,     None,
+    + ResentDate,              unchecked { "Resent-Date"   },  DateTime,       validator_resent_any,
+    + ResentFrom,              unchecked { "Resent-From"   },  MailboxList,    validator_resent_any,
+    + ResentSender,            unchecked { "Resent-Sender" },  Mailbox,        validator_resent_any,
+    + ResentTo,                unchecked { "Resent-To"     },  MailboxList,    validator_resent_any,
+    + ResentCc,                unchecked { "Resent-Cc"     },  MailboxList,    validator_resent_any,
+    + ResentBcc,               unchecked { "Resent-Bcc"    },  OptMailboxList, validator_resent_any,
+    + ResentMsgId,             unchecked { "Resent-Msg-Id" },  MessageID,      validator_resent_any,
+    + ReturnPath,              unchecked { "Return-Path"   },  Path,           None,
+    + Received,                unchecked { "Received"      },  ReceivedToken,  None,
     //RFC 2045:
-    1 ContentType,             unsafe { "Content-Type"              }, Mime,             None,
-    1 ContentId,               unsafe { "Content-Id"                }, ContentID,        None,
-    1 ContentTransferEncoding, unsafe { "Content-Transfer-Encoding" }, TransferEncoding, None,
-    1 ContentDescription,      unsafe { "Content-Description"       }, Unstructured,     None,
+    1 ContentType,             unchecked { "Content-Type"              }, Mime,             None,
+    1 ContentId,               unchecked { "Content-Id"                }, ContentID,        None,
+    1 ContentTransferEncoding, unchecked { "Content-Transfer-Encoding" }, TransferEncoding, None,
+    1 ContentDescription,      unchecked { "Content-Description"       }, Unstructured,     None,
     //RFC 2183:
-    1 ContentDisposition,      unsafe { "Content-Disposition"       }, Disposition, None
+    1 ContentDisposition,      unchecked { "Content-Disposition"       }, Disposition, None
 }
 
 mod validators {

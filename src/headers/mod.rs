@@ -93,8 +93,7 @@ impl HeaderName {
         Ok( HeaderName { name } )
     }
 
-    //FIXME no longer unsafe
-    pub unsafe fn from_ascii_unchecked<B: ?Sized>( name: &'static B ) -> HeaderName
+    pub fn from_ascii_unchecked<B: ?Sized>( name: &'static B ) -> HeaderName
         where B: AsRef<str>
     {
         HeaderName { name: SoftAsciiStr::from_str_unchecked( name.as_ref() ) }
