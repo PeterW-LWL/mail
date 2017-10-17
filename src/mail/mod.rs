@@ -254,6 +254,7 @@ fn auto_gen_multipart(headers: &mut HeaderMap) -> Result<()> {
         .map(|res| {
             let content_type = res?;
             if content_type.get_param(BOUNDARY).is_none() {
+                debug_assert_eq!(content_type.type_(), "multipart");
                 let mut boundary = String::new();
                 write_random_boundary_to(&mut boundary);
                 let mime_string = format!("{};boundary={}", content_type, boundary);
@@ -272,7 +273,10 @@ fn auto_gen_multipart(headers: &mut HeaderMap) -> Result<()> {
             debug_assert!(had_content_type);
             headers.insert(ContentType, content_type)?;
         }
+    } else {
+        bail!("[BUG] multipart does not have content type header, should be enforce by builder")
     }
+
     // we do not care at this point that it's missing
     // checks for quantities are doe after auto generation
     Ok(())
@@ -514,7 +518,8 @@ mod test {
             let mail = Mail {
                 headers: headers!{
                     From: ["random@this.is.no.mail"],
-                    Subject: "hoho"
+                    Subject: "hoho",
+                    ContentType: "multipart/mixed"
                 }.unwrap(),
                 body: MailPart::MultipleBodies {
                     bodies: vec![
