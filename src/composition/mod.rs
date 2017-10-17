@@ -1,8 +1,6 @@
 use std::marker::PhantomData;
 
 use serde::Serialize;
-use rand;
-use rand::Rng;
 use soft_ascii_string::SoftAsciiStr;
 
 use error::*;
@@ -20,7 +18,7 @@ use components::{
     Mailbox,
     Phrase
 };
-use mail::mime::MultipartMime;
+use mail::mime::{ MultipartMime, write_random_boundary_to};
 use mail::{
     Resource,
     Mail,
@@ -382,31 +380,8 @@ fn gen_multipart_mime( subtype: &SoftAsciiStr ) -> Result<MultipartMime> {
     use components::mime::MimeFromStrError;
     //TODO check if subtype is a "valide" type e.g. no " " in ot
 
-    const MULTIPART_BOUNDARY_LENGTH: usize = 30;
-    static CHARS: &[char] = &[
-        '!',      '#', '$', '%', '&', '\'', '(',
-        ')', '*', '+', ',',      '.', '/', '0',
-        '1', '2', '3', '4', '5', '6', '7', '8',
-        '9', ':', ';', '<', '=', '>', '?', '@',
-        'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H',
-        'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P',
-        'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X',
-        'Y', 'Z', '[',      ']', '^', '_', '`',
-        'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h',
-        'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p',
-        'q', 'r', 's', 't', 'u', 'v', 'w', 'x',
-        'y', 'z', '{', '|', '}', '~'
-    ];
-
-
-    // we add =_^ to the boundary, as =_^ is neither valide in base64 nor quoted-printable
-    let mut mime_string = format!( "multipart/{}; boundary=\"=_^", subtype );
-    let mut rng = rand::thread_rng();
-    for _ in 0..MULTIPART_BOUNDARY_LENGTH {
-        mime_string.push( CHARS[ rng.gen_range( 0, CHARS.len() )] )
-    }
-    mime_string.push('"');
-
+    let mut mime_string = format!( "multipart/{}; boundary=", subtype );
+    write_random_boundary_to(&mut mime_string);
     MultipartMime::new(
         //can happen if subtype is invalid
         mime_string.parse()
@@ -414,6 +389,4 @@ fn gen_multipart_mime( subtype: &SoftAsciiStr ) -> Result<MultipartMime> {
             .chain_err(|| ErrorKind::GeneratingMimeFailed )?
     ).chain_err( || ErrorKind::GeneratingMimeFailed )
 }
-
-
 
