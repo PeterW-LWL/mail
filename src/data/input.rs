@@ -1,6 +1,7 @@
 use std::result::{ Result as StdResult };
+use std::ascii::AsciiExt;
 
-use ascii::{ AsciiString, FromAsciiError };
+use soft_ascii_string::SoftAsciiString;
 
 use super::inner_item::{ InnerUtf8, InnerAscii };
 
@@ -19,22 +20,31 @@ impl Input {
     }
 
 
-    pub fn into_ascii_item( self ) -> StdResult<InnerAscii, FromAsciiError<String>> {
-        Ok( match self {
-            Input( InnerUtf8::Owned( string ) ) =>
-                InnerAscii::Owned( AsciiString::from_ascii( string )? ),
-            Input( InnerUtf8::Shared( shared ) ) =>
-                InnerAscii::Owned( AsciiString::from_ascii( String::from( &*shared ) )? )
-        } )
+    pub fn into_ascii_item( self ) -> StdResult<InnerAscii, Input> {
+        match self {
+            Input( InnerUtf8::Owned( string ) ) => {
+                match SoftAsciiString::from_string(string) {
+                    Ok(asciied) => Ok(InnerAscii::Owned(asciied)),
+                    Err(string) => Err(Input(InnerUtf8::Owned(string)))
+                }
+            }
+            Input( InnerUtf8::Shared( shared ) ) => {
+                if shared.is_ascii() {
+                    Ok(InnerAscii::Owned(SoftAsciiString::from_string_unchecked(&*shared)))
+                } else {
+                    Err(Input(InnerUtf8::Shared(shared)))
+                }
+            }
+        }
     }
 
-    pub unsafe fn into_ascii_item_unchecked( self ) -> InnerAscii {
+    pub fn into_ascii_item_unchecked( self ) -> InnerAscii {
         match self {
             Input( InnerUtf8::Owned( string ) ) =>
-                InnerAscii::Owned( AsciiString::from_ascii_unchecked( string ) ),
+                InnerAscii::Owned( SoftAsciiString::from_string_unchecked( string ) ),
             Input( InnerUtf8::Shared( shared ) ) =>
                 InnerAscii::Owned(
-                    AsciiString::from_ascii_unchecked( String::from( &*shared ) ) )
+                    SoftAsciiString::from_string_unchecked(&*shared) )
         }
     }
 

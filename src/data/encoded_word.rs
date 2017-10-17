@@ -1,5 +1,7 @@
 use std::ops::Deref;
 
+use soft_ascii_string::SoftAsciiStr;
+
 use error::*;
 
 use external::vec1::Vec1;
@@ -36,7 +38,7 @@ impl EncodedWord {
     ) {
         //FIXME use the EncodedWordContext
         let mut writer = WriterWrapper::new(
-            ascii_str!{ u t f _8 },
+            SoftAsciiStr::from_str_unchecked("utf8"),
             encoding,
             handle
         );
@@ -56,10 +58,10 @@ impl EncodedWord {
     /// As there is a size limit on encoded words, we might have to split it over multiple
     /// encoded words, therefor we return a vector
     ///
-    //TODO use a Vecor which has up to N elements on the stack, this normally is eith 1 or 2
+    //TODO use a Vector which has up to N elements on the stack, this normally is eith 1 or 2
     // of which both can be on the stack
     pub fn encode_word( word: &str, encoding: EncodedWordEncoding, ctx: EncodedWordContext ) -> Vec1<Self> {
-        let mut writer = VecWriter::new(ascii_str! { u t f _8 }, encoding);
+        let mut writer = VecWriter::new(SoftAsciiStr::from_str_unchecked("utf8"), encoding);
         encoding.encode( word, &mut writer );
         let vec: Vec1<_> = writer.into();
         let vec = vec.into_iter().map( |ascii| EncodedWord {
@@ -145,7 +147,7 @@ impl Deref for EncodedWord {
 
 #[cfg(test)]
 mod test {
-    use ascii::AsciiString;
+    use soft_ascii_string::SoftAsciiString;
     use codec::EncodedWordEncoding;
     use super::*;
     // we do NOT test if encoding/decoding on itself work in this function, it is teste where
@@ -159,8 +161,8 @@ mod test {
 
         assert_eq!( 1, res.len() );
         assert_eq!(
-            "=?utf8?Q?t=C3=A4st?=",
-            &*res[0].inner
+            &*res[0].inner,
+            "=?utf8?Q?t=C3=A4st?="
         );
     }
 
@@ -172,35 +174,35 @@ mod test {
 
         assert_eq!( 1, res.len() );
         assert_eq!(
-            "=?utf8?B?dMOkc3Q=?=",
-            &*res[0].inner
+            &*res[0].inner,
+            "=?utf8?B?dMOkc3Q=?="
         );
     }
 
     #[test]
     fn parse() {
         //NOTE: parse rellys havily on is_encoded_word, which is tested in `::grammar::encoded_word`
-        let asciied = AsciiString::from_ascii( "=?utf8?Q?123?=" ).unwrap();
+        let asciied = SoftAsciiString::from_string_unchecked( "=?utf8?Q?123?=" );
         let ec_res = EncodedWord::parse( asciied.into(), EncodedWordContext::Text );
         assert_eq!( true, ec_res.is_ok() );
         let ec = ec_res.unwrap();
         assert_eq!(
-            "=?utf8?Q?123?=",
-            &*ec.inner
+            &*ec.inner,
+            "=?utf8?Q?123?="
         )
     }
 
     #[test]
     fn parse_err() {
         //NOTE: parse rellys havily on is_encoded_word, which is tested in `::grammar::encoded_word`
-        let asciied = AsciiString::from_ascii( "=?utf8???Q123?=" ).unwrap();
+        let asciied = SoftAsciiString::from_string_unchecked( "=?utf8???Q123?=" );
         let ec_res = EncodedWord::parse( asciied.into() , EncodedWordContext::Text );
         assert_eq!( false, ec_res.is_ok() );
     }
 
     #[test]
     fn decode_base64() {
-        let asciied = AsciiString::from_ascii( "=?utf8?B?dMOkc3Q=?=" ).unwrap();
+        let asciied = SoftAsciiString::from_string_unchecked( "=?utf8?B?dMOkc3Q=?=" );
         let ec = EncodedWord::parse( asciied.into(), EncodedWordContext::Text ).unwrap();
         let dec = ec.decode_word().unwrap();
         assert_eq!(
@@ -211,7 +213,7 @@ mod test {
 
     #[test]
     fn decode_quoted_printable() {
-        let asciied = AsciiString::from_ascii(  "=?utf8?Q?t=C3=A4st?=" ).unwrap();
+        let asciied = SoftAsciiString::from_string_unchecked(  "=?utf8?Q?t=C3=A4st?=" );
         let ec = EncodedWord::parse( asciied.into(), EncodedWordContext::Text ).unwrap();
         let dec = ec.decode_word().unwrap();
         assert_eq!(
@@ -222,28 +224,28 @@ mod test {
 
     #[test]
     fn unknow_encoding() {
-        let asciied = AsciiString::from_ascii( "=?utf8?R?test?=" ).unwrap();
+        let asciied = SoftAsciiString::from_string_unchecked( "=?utf8?R?test?=" );
         let ec = EncodedWord::parse( asciied.into(), EncodedWordContext::Text ).unwrap();
         assert_eq!( false, ec.decode_word().is_ok() );
     }
 
     #[test]
     fn broken_encoding() {
-        let asciied = AsciiString::from_ascii( "=?utf8?Q?ab=_ups?=" ).unwrap();
+        let asciied = SoftAsciiString::from_string_unchecked( "=?utf8?Q?ab=_ups?=" );
         let ec = EncodedWord::parse( asciied.into(), EncodedWordContext::Text ).unwrap();
         assert_eq!( false, ec.decode_word().is_ok() );
     }
 
     #[test]
     fn broken_charset_encoding() {
-        let asciied = AsciiString::from_ascii( "=?utf8?Q?ab=FFups?=" ).unwrap();
+        let asciied = SoftAsciiString::from_string_unchecked( "=?utf8?Q?ab=FFups?=" );
         let ec = EncodedWord::parse( asciied.into(), EncodedWordContext::Text ).unwrap();
         assert_eq!( false, ec.decode_word().is_ok() );
     }
 
     #[test]
     fn multi_char_encoding() {
-        let asciied = AsciiString::from_ascii( "=?utf8?Qnot?abcd?=" ).unwrap();
+        let asciied = SoftAsciiString::from_string_unchecked( "=?utf8?Qnot?abcd?=" );
         let res = EncodedWord::parse( asciied.into() , EncodedWordContext::Text );
         assert_eq!( true, res.is_ok() );
         let dec_res = res.unwrap().decode_word();

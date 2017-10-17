@@ -1,5 +1,5 @@
 
-use ascii::AsciiChar;
+use soft_ascii_string::SoftAsciiChar;
 
 use nom::IResult;
 
@@ -42,12 +42,12 @@ impl EncodableInHeader for  MessageID {
 
     fn encode(&self, handle: &mut EncodeHandle) -> Result<()> {
         handle.mark_fws_pos();
-        handle.write_char( AsciiChar::LessThan )?;
+        handle.write_char( SoftAsciiChar::from_char_unchecked('<') )?;
         match self.message_id {
             SimpleItem::Ascii( ref ascii ) => handle.write_str( ascii )?,
             SimpleItem::Utf8( ref utf8 ) => handle.write_utf8( utf8 )?
         }
-        handle.write_char( AsciiChar::GreaterThan )?;
+        handle.write_char( SoftAsciiChar::from_char_unchecked('>') )?;
         handle.mark_fws_pos();
         Ok( () )
     }

@@ -1,7 +1,6 @@
 use std::fmt;
 
-use ascii::AsciiStr;
-pub use ascii::{  AsciiStr as _AsciiStr };
+use soft_ascii_string::SoftAsciiStr;
 
 use error::*;
 use grammar::is_ftext;
@@ -77,7 +76,7 @@ impl<H> HasHeaderName for H
 ///
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
 pub struct HeaderName {
-    name: &'static AsciiStr
+    name: &'static SoftAsciiStr
 }
 
 impl HeaderName {
@@ -89,18 +88,19 @@ impl HeaderName {
     /// This frees us from doing eith case insensitive comparsion/hash wrt. hash map
     /// lookups, or converting all names to upper/lower case.
     ///
-    pub fn new( name: &'static AsciiStr ) -> Result<Self> {
+    pub fn new( name: &'static SoftAsciiStr ) -> Result<Self> {
         HeaderName::validate_name( name )?;
         Ok( HeaderName { name } )
     }
-    pub unsafe fn from_ascii_unchecked<B: ?Sized>( name: &'static B ) -> HeaderName
-        where B: AsRef<[u8]>
+
+    pub fn from_ascii_unchecked<B: ?Sized>( name: &'static B ) -> HeaderName
+        where B: AsRef<str>
     {
-        HeaderName { name: AsciiStr::from_ascii_unchecked( name ) }
+        HeaderName { name: SoftAsciiStr::from_str_unchecked( name.as_ref() ) }
     }
 
     #[inline(always)]
-    pub fn as_ascii_str( &self ) -> &'static AsciiStr {
+    pub fn as_ascii_str( &self ) -> &'static SoftAsciiStr {
         self.name
     }
     #[inline(always)]
@@ -121,8 +121,8 @@ impl PartialEq<str> for HeaderName {
     }
 }
 
-impl PartialEq<AsciiStr> for HeaderName {
-    fn eq(&self, other: &AsciiStr) -> bool {
+impl PartialEq<SoftAsciiStr> for HeaderName {
+    fn eq(&self, other: &SoftAsciiStr) -> bool {
         self.name == other
     }
 }
@@ -134,7 +134,7 @@ impl HeaderName {
     /// by only allowing names in "snake case" no case
     /// insensitive comparsion or case conversion is needed
     /// for header names
-    fn validate_name( name: &AsciiStr ) -> Result<()> {
+    fn validate_name( name: &SoftAsciiStr ) -> Result<()> {
         let mut begin_of_word = true;
         if name.len() < 1 {
             bail!( "header names must consist of at last 1 character" );
@@ -197,7 +197,8 @@ mod test {
             "(3*4=12)^[{~}]"
         ];
         for case in valid_cases.iter() {
-            assert_ok!( HeaderName::validate_name( AsciiStr::from_ascii( case ).unwrap() ) );
+            assert_ok!(
+                HeaderName::validate_name( SoftAsciiStr::from_str( case ).unwrap() ) );
         }
     }
 
@@ -221,7 +222,7 @@ mod test {
             "Null\0Msg"
         ];
         for case in invalid_cases.iter() {
-            assert_err!( HeaderName::validate_name( AsciiStr::from_ascii( case ).unwrap() ), case );
+            assert_err!( HeaderName::validate_name( SoftAsciiStr::from_str( case ).unwrap() ), case );
         }
     }
 }

@@ -436,6 +436,8 @@ macro_rules! headers {
 
 #[cfg(test)]
 mod test {
+    use soft_ascii_string::SoftAsciiStr;
+
     use components::{
         Mime, Unstructured,
         MailboxList
@@ -458,8 +460,8 @@ mod test {
         def_headers! {
             test_name: validate_header_names,
             scope: components,
-            1 Subject, unsafe { "Subject" }, Mime, None,
-            + Comments, unsafe { "Comments" }, Mime, None
+            1 Subject,  unchecked { "Subject" },  Mime, None,
+            + Comments, unchecked { "Comments" }, Mime, None
         }
     }
 
@@ -691,8 +693,9 @@ mod test {
         type Component = Unstructured;
 
         fn name() -> HeaderName {
-            HeaderName::new(ascii_str!(X Minus C o m m e n t )).unwrap()
+            HeaderName::new(SoftAsciiStr::from_str_unchecked("X-Comment")).unwrap()
         }
+
         const CONTEXTUAL_VALIDATOR: Option<fn(&HeaderMap)-> Result<()>> =
             Some(__validator);
     }

@@ -1,6 +1,6 @@
 use std::ops::Deref;
 
-use ascii::{ AsciiString, AsciiStr };
+use soft_ascii_string::{ SoftAsciiString, SoftAsciiStr };
 
 use error::*;
 use codec::{EncodableInHeader, EncodeHandle};
@@ -20,14 +20,14 @@ pub enum TransferEncoding {
 }
 
 impl TransferEncoding {
-    pub fn name( &self ) -> &AsciiStr {
+    pub fn name( &self ) -> &SoftAsciiStr {
         use self::TransferEncoding::*;
         match *self {
-            _7Bit => ascii_str! { _7 b i t },
-            _8Bit => ascii_str! { _8 b i t },
-            Binary =>  ascii_str! { b i n a r y },
-            QuotedPrintable =>  ascii_str! { q u o t e d Minus p r i n t a b l e },
-            Base64 =>  ascii_str! { b a s e _6 _4 },
+            _7Bit => SoftAsciiStr::from_str_unchecked("7bit"),
+            _8Bit => SoftAsciiStr::from_str_unchecked("8bit"),
+            Binary =>  SoftAsciiStr::from_str_unchecked("binary"),
+            QuotedPrintable => SoftAsciiStr::from_str_unchecked("quoted-printable"),
+            Base64 =>  SoftAsciiStr::from_str_unchecked("base64"),
             Other( ref token ) => &*token
         }
     }
@@ -44,7 +44,7 @@ impl EncodableInHeader for  TransferEncoding {
 
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
-pub struct Token( AsciiString );
+pub struct Token( SoftAsciiString );
 
 impl Token {
 
@@ -58,8 +58,8 @@ impl Token {
 }
 
 impl  Deref for Token {
-    type Target = AsciiStr;
-    fn deref( &self ) -> &AsciiStr {
+    type Target = SoftAsciiStr;
+    fn deref( &self ) -> &SoftAsciiStr {
         &*self.0
     }
 }

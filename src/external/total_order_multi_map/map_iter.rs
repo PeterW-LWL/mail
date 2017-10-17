@@ -124,7 +124,7 @@ impl<'a, K, T, M> Iterator for Group<'a, K, T, M>
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
-        //SAFE see TotalOrderMultiMap safty guarantees/constraints
+        //SAFE see TotalOrderMultiMap safety guarantees/constraints
         self.inner_iter.next().map(|&ptr| unsafe { &*ptr } )
     }
 

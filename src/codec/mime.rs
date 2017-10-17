@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use ascii::{ AsciiStr, AsciiString };
+use soft_ascii_string::{ SoftAsciiStr, SoftAsciiString};
 use grammar::is_token_char;
 use percent_encoding::{
     EncodeSet,
@@ -20,7 +20,7 @@ impl EncodeSet for MimeParamEncodingSet {
 
 /// percent encodes a byte sequence so that it can be used
 /// in a RFC 2231 conform encoded mime header parameter
-pub fn percent_encode_param_value<'a, R>(input: &'a R) -> Cow<'a, AsciiStr>
+pub fn percent_encode_param_value<'a, R>(input: &'a R) -> Cow<'a, SoftAsciiStr>
     where R: ?Sized+AsRef<[u8]>
 {
     let cow: Cow<'a, str> = percent_encode(input.as_ref(), MimeParamEncodingSet).into();
@@ -28,9 +28,9 @@ pub fn percent_encode_param_value<'a, R>(input: &'a R) -> Cow<'a, AsciiStr>
         Cow::Owned(o) =>
             //SAFE: MimeParamEncodingSet makes all non-us-ascii bytes encoded AND
             // percent_encoding::percent_encode always only produces ascii anyway
-            Cow::Owned(unsafe { AsciiString::from_ascii_unchecked(o) }),
+            Cow::Owned(SoftAsciiString::from_string_unchecked(o)),
         Cow::Borrowed(b) =>
-            Cow::Borrowed(unsafe { AsciiStr::from_ascii_unchecked(b) })
+            Cow::Borrowed(SoftAsciiStr::from_str_unchecked(b))
     }
 }
 
@@ -51,6 +51,6 @@ mod test {
     fn no_encode_no_alloc() {
         let input = "full_valid";
         let res = percent_encode_param_value(input);
-        assert_eq!(Cow::Borrowed(input), res);
+        assert_eq!(res, Cow::Borrowed(input));
     }
 }

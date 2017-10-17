@@ -1,5 +1,7 @@
 use std::ops::Deref;
-use ascii::{ AsciiString, AsciiStr };
+use std::ascii::AsciiExt;
+
+use soft_ascii_string::{ SoftAsciiStr, SoftAsciiString};
 
 use super::input::Input;
 use super::inner_item::{ InnerAscii, InnerUtf8 };
@@ -59,7 +61,7 @@ impl Into<String> for SimpleItem {
         use self::SimpleItem::*;
         match self {
             Ascii( aitem ) => {
-                let astring: AsciiString = aitem.into();
+                let astring: SoftAsciiString = aitem.into();
                 astring.into()
             },
             Utf8( string ) => string.into()
@@ -75,15 +77,15 @@ impl<'a> From<&'a str> for SimpleItem {
 
 impl From<String> for SimpleItem {
     fn from( string: String ) -> Self {
-        match AsciiString::from_ascii( string ) {
+        match SoftAsciiString::from_string( string ) {
             Ok( astring ) => SimpleItem::Ascii( InnerAscii::Owned( astring ) ),
-            Err( err ) => SimpleItem::Utf8( InnerUtf8::Owned( err.into_source() ) )
+            Err( orig ) => SimpleItem::Utf8( InnerUtf8::Owned( orig ) )
         }
     }
 }
 
-impl From<AsciiString> for SimpleItem {
-    fn from( astring: AsciiString ) -> Self {
+impl From<SoftAsciiString> for SimpleItem {
+    fn from( astring: SoftAsciiString ) -> Self {
         SimpleItem::Ascii( InnerAscii::Owned( astring ) )
     }
 }
@@ -91,17 +93,16 @@ impl From<AsciiString> for SimpleItem {
 impl From<Input> for SimpleItem {
     fn from(input: Input) -> Self {
         match input {
-            Input( InnerUtf8::Owned( string ) ) => match AsciiString::from_ascii( string ) {
+            Input( InnerUtf8::Owned( string ) ) => match SoftAsciiString::from_string( string ) {
                 Ok( ascii ) => SimpleItem::Ascii( InnerAscii::Owned( ascii ) ),
-                Err( err ) => SimpleItem::Utf8( InnerUtf8::Owned( err.into_source() ) )
+                Err( orig ) => SimpleItem::Utf8( InnerUtf8::Owned( orig ) )
             },
             Input( InnerUtf8::Shared( shared ) ) => {
-                if AsciiStr::from_ascii( &*shared ).is_ok() {
-                    SimpleItem::Ascii( InnerAscii::Owned( unsafe {
-                        AsciiString::from_ascii_unchecked( String::from( &*shared ) )
-                    } ) )
+                if shared.is_ascii() {
+                    let a_shared = shared.map(|s| SoftAsciiStr::from_str_unchecked(s));
+                    SimpleItem::Ascii(InnerAscii::Shared(a_shared))
                 } else {
-                    SimpleItem::Utf8( InnerUtf8::Shared( shared ) )
+                    SimpleItem::Utf8(InnerUtf8::Shared(shared))
                 }
             }
         }

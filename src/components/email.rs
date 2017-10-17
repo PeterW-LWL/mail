@@ -1,4 +1,4 @@
-use ascii::{ AsciiChar };
+use soft_ascii_string::SoftAsciiChar;
 
 use error::*;
 use codec::{self, EncodeHandle, EncodableInHeader };
@@ -60,7 +60,7 @@ impl EncodableInHeader for  Email {
 
     fn encode(&self, handle: &mut EncodeHandle) -> Result<()> {
         self.local_part.encode( handle )?;
-        handle.write_char( AsciiChar::At )?;
+        handle.write_char( SoftAsciiChar::from_char_unchecked('@') )?;
         self.domain.encode( handle )?;
         Ok( () )
     }
@@ -107,8 +107,7 @@ impl FromInput for Domain {
         let item =
             match Domain::check_domain( &*input )? {
                 MailType::Ascii | MailType::Mime8BitEnabled => {
-                    let asciied = unsafe { input.into_ascii_item_unchecked() };
-                    SimpleItem::Ascii( asciied )
+                    SimpleItem::Ascii( input.into_ascii_item_unchecked() )
                 },
                 MailType::Internationalized => {
                     SimpleItem::from_utf8_input( input )

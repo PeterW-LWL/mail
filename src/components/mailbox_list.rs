@@ -1,7 +1,7 @@
 
 
 use error::*;
-use ascii::AsciiChar;
+use soft_ascii_string::SoftAsciiChar;
 use codec::{EncodableInHeader, EncodeHandle};
 
 use external::vec1::Vec1;
@@ -230,7 +230,7 @@ fn encode_list<'a, I>(list_iter: I, handle: &mut EncodeHandle) -> Result<()>
 {
     sep_for!{ mailbox in list_iter;
         sep {
-            handle.write_char( AsciiChar::Comma )?;
+            handle.write_char( SoftAsciiChar::from_char_unchecked(',') )?;
             handle.write_fws();
         };
         mailbox.encode( handle )?;

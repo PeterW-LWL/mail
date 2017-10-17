@@ -3,7 +3,7 @@ use std::fmt;
 use std::borrow::Cow;
 
 use mime;
-use ascii::AsciiStr;
+use soft_ascii_string::SoftAsciiStr;
 
 use error::*;
 use utils::HeaderTryFrom;
@@ -104,7 +104,7 @@ impl EncodableInHeader for  mime::Mime {
         let res = self.to_string();
         handle.write_if_utf8(&*res)
             .handle_condition_failure(|handle| {
-                match AsciiStr::from_ascii(&*res) {
+                match SoftAsciiStr::from_str(&*res) {
                     Ok(asciied) => handle.write_str( asciied ),
                     Err(_err) => bail!("mime containing utf8 in non Internationalized mail")
                 }

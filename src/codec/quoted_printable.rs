@@ -1,4 +1,4 @@
-use ascii::{ AsciiChar, AsciiString };
+use soft_ascii_string::{ SoftAsciiChar, SoftAsciiString };
 use error::*;
 use { quoted_printable as extern_quoted_printable };
 
@@ -6,9 +6,9 @@ use super::traits::EncodedWordWriter;
 
 /// a quoted printable encoding suitable for content transfer encoding,
 /// but _not_ suited for the encoding in encoded words
-pub fn normal_encode<A: AsRef<[u8]>>(data: A) -> AsciiString {
-    let encoded = extern_quoted_printable::encode(data.as_ref());
-    unsafe { AsciiString::from_ascii_unchecked(encoded) }
+pub fn normal_encode<A: AsRef<[u8]>>(data: A) -> SoftAsciiString {
+    let encoded = extern_quoted_printable::encode_to_str(data);
+    SoftAsciiString::from_string_unchecked(encoded)
 }
 
 /// a quoted printable decoding suitable for content transfer encoding
@@ -101,7 +101,7 @@ pub fn encoded_word_encode<'a, I, O>(input: I, out: &mut O )
     let max_payload_len = out.max_payload_len();
     let mut remaining = max_payload_len;
     //WARN: on remaining being > 67
-    let mut buf = [AsciiChar::A; 16];
+    let mut buf = [SoftAsciiChar::from_char_unchecked('X'); 16];
 
     for chunk in input {
         let mut buf_idx = 0;
@@ -118,12 +118,11 @@ pub fn encoded_word_encode<'a, I, O>(input: I, out: &mut O )
                 b'0'...b'9' |
                 b'A'...b'Z' |
                 b'a'...b'z'  => {
-                    //SAFE:  byte can only be one of the chars listed above, which are all ascii
-                    buf[buf_idx] = unsafe { AsciiChar::from_unchecked( byte ) };
+                    buf[buf_idx] = SoftAsciiChar::from_char_unchecked(byte as char);
                     buf_idx += 1;
                 },
                 _otherwise => {
-                    buf[buf_idx] = AsciiChar::Equal;
+                    buf[buf_idx] = SoftAsciiChar::from_char_unchecked('=');
                     buf[buf_idx+1] = lower_nibble_to_hex( byte >> 4 );
                     buf[buf_idx+2] = lower_nibble_to_hex( byte );
                     buf_idx += 3;
@@ -145,21 +144,15 @@ pub fn encoded_word_encode<'a, I, O>(input: I, out: &mut O )
     out.write_ecw_end()
 }
 
-
-macro_rules! ascii_table {
-    ($($ch:ident)*) => {{
-        &[ $(AsciiChar::$ch),* ]
-    }}
-}
-
 #[inline]
-fn lower_nibble_to_hex( half_byte: u8 ) -> AsciiChar {
-    let chars = ascii_table! {
-        _0 _1 _2 _3 _4 _5 _6 _7 _8 _9
-        A B C D E F
-    };
+fn lower_nibble_to_hex( half_byte: u8 ) -> SoftAsciiChar {
+    static CHARS: &[char] = &[
+        '0', '1', '2', '3', '4', '5',
+        '6', '7', '8', '9', 'A', 'B',
+        'C', 'D', 'E', 'F'
+    ];
 
-    chars[ (half_byte & 0x0F) as usize ]
+    SoftAsciiChar::from_char_unchecked(CHARS[ (half_byte & 0x0F) as usize ])
 }
 
 
@@ -167,6 +160,7 @@ fn lower_nibble_to_hex( half_byte: u8 ) -> AsciiChar {
 
 #[cfg(test)]
 mod test {
+    use soft_ascii_string::SoftAsciiStr;
     use codec::EncodedWordEncoding;
     use super::super::writer_impl::VecWriter;
     use super::*;
@@ -174,14 +168,14 @@ mod test {
     #[test]
     fn to_hex() {
         let data = &[
-            (AsciiChar::_0, 0b11110000),
-            (AsciiChar::_0, 0b0 ),
-            (AsciiChar::_7, 0b0111),
-            (AsciiChar::_7, 0b10111),
-            (AsciiChar::F,  0b1111)
+            ('0', 0b11110000),
+            ('0', 0b0 ),
+            ('7', 0b0111),
+            ('7', 0b10111),
+            ('F',  0b1111)
         ];
-        for &(char, byte) in data {
-            assert_eq!( char, lower_nibble_to_hex( byte) );
+        for &(ch, byte) in data {
+            assert_eq!( lower_nibble_to_hex( byte), ch );
         }
 
     }
@@ -192,7 +186,7 @@ mod test {
             fn $name() {
                 let test_data = $data;
                 let mut out = VecWriter::new(
-                    ascii_str!{ u t f _8 },
+                    SoftAsciiStr::from_str_unchecked("utf8"),
                     EncodedWordEncoding::QuotedPrintable
                 );
 

@@ -2,38 +2,89 @@ use std::ops::Deref;
 use std::rc::Rc;
 use std::borrow::ToOwned;
 
-use ascii::{ AsciiString, AsciiStr };
+use soft_ascii_string::{SoftAsciiString, SoftAsciiStr};
 use owning_ref::OwningRef;
 
 use serde;
 
+
+/// InnerAscii is string data container which can contain either a
+/// owned `SoftAsciiString` or a `SoftAsciiStr` reference into a shared
+/// string buffer.
+#[derive(Debug, Clone, Hash, Eq)]
+pub enum InnerAscii {
+    Owned(SoftAsciiString),
+    //by using String+SoftAsciiStr we can eliminate unessesary copies
+    Shared(OwningRef<Rc<String>, SoftAsciiStr>)
+}
+
+impl InnerAscii {
+
+    /// converts this container into on which uses underlying shared data
+    ///
+    /// if the data is already shared nothing is done.
+    /// If not the owned data is converted into the underlying string buffer
+    /// and `OwningRef` is used to enable the shared reference
+    ///
+    /// Note that the underlying buffer is no an `SoftAsciiString` but a
+    /// `String` (from which we happend to know that it fulfills the "is
+    ///  us-ascii" soft constraint). This allows us to have an `InnerAscii`
+    /// share data with a possible non us-ascii string buffer as long as
+    /// the part accessable through the `SoftAsciiStr` is ascii. Or at last
+    /// should be ascii as it's a soft constraint.
+    pub fn into_shared(self) -> Self {
+        match self {
+            InnerAscii::Owned(value) => {
+                let buffer: Rc<String> = Rc::new(value.into());
+                let orf = OwningRef::new(buffer).map(|data: &String| {
+                    // we got it from a SoftAsciiString so no check here
+                    SoftAsciiStr::from_str_unchecked(&**data)
+                });
+                InnerAscii::Shared(orf)
+            }
+            v => v
+        }
+    }
+}
+
+/// InnerUtf8 is string data container which can contain either a
+/// owned `String` or a `str` reference into a shared
+/// string buffer.
+#[derive(Debug, Clone, Hash, Eq)]
+pub enum InnerUtf8 {
+    Owned(String),
+    //by using String+SoftAsciiStr we can eliminate unessesary copies
+    Shared(OwningRef<Rc<String>, str>)
+}
+
+impl InnerUtf8 {
+
+    /// converts this container into on which uses underlying shared data
+    ///
+    /// if the data is already shared nothing is done.
+    /// If not the owned data is converted into the underlying string buffer
+    /// and `OwningRef` is used to enable the shared reference
+    pub fn into_shared(self) -> Self {
+        match self {
+            InnerUtf8::Owned(value) => {
+                let buffer = Rc::new(value);
+                let orf = OwningRef::new(buffer)
+                    .map(|rced| &**rced);
+                InnerUtf8::Shared(orf)
+            }
+            v => v
+        }
+    }
+}
+
+
 macro_rules! inner_impl {
     ($name:ident, $owned_form:ty, $borrowed_form:ty) => (
-
-        /// a InnerItem is something potential appearing in Mail, e.g. an encoded word, an
-        /// atom or a email address, but not some content which has to be represented
-        /// as an encoded word, as such String is a suite representation,
-        #[derive(Debug, Clone, Hash, Eq)]
-        pub enum $name {
-            Owned($owned_form),
-            Shared(OwningRef<Rc<$owned_form>, $borrowed_form>)
-        }
-
         impl $name {
-            pub fn new<S: Into<$owned_form>>( data: S ) -> $name {
+            pub fn new<S: Into<$owned_form>>( data: S ) -> Self {
                 $name::Owned( data.into() )
             }
-
-            pub fn into_shared( self ) -> Self {
-                match self {
-                    $name::Owned( value ) =>
-                        $name::Shared( OwningRef::new( Rc::new( value ) ).map( |rced| &**rced ) ),
-                    v  => v
-                }
-            }
-
         }
-
         impl From<$owned_form> for $name {
             fn from( data: $owned_form ) -> Self {
                 Self::new( data )
@@ -86,12 +137,11 @@ macro_rules! inner_impl {
                 self.as_str()
             }
         }
-
-    )
+    );
 }
 
 
-inner_impl!{ InnerAscii, AsciiString, AsciiStr }
+inner_impl!{ InnerAscii, SoftAsciiString,  SoftAsciiStr }
 inner_impl!{ InnerUtf8, String, str }
 //inner_impl!{ InnerOtherItem, OtherString, OtherStr }
 
@@ -116,27 +166,24 @@ impl InnerUtf8 {
 
 #[cfg(test)]
 mod test {
-    use std::str::FromStr;
     use super::*;
 
     #[test]
     fn inner_ascii_item_eq() {
-        let a = InnerAscii::Owned( AsciiString::from_str( "same" ).unwrap() );
+        let a = InnerAscii::Owned( SoftAsciiString::from_string( "same" ).unwrap() );
         let b = InnerAscii::Shared(
-            OwningRef::new(
-                Rc::new( AsciiString::from_str( "same" ).unwrap() ) )
-                .map(|v| &**v)
+            OwningRef::new(Rc::new("same".to_owned()))
+                .map(|v| SoftAsciiStr::from_str_unchecked(&**v))
         );
         assert_eq!( a, b );
     }
 
     #[test]
     fn inner_ascii_item_neq() {
-        let a = InnerAscii::Owned( AsciiString::from_str( "same" ).unwrap() );
+        let a = InnerAscii::Owned( SoftAsciiString::from_string( "same" ).unwrap() );
         let b = InnerAscii::Shared(
-            OwningRef::new(
-                Rc::new( AsciiString::from_str( "not same" ).unwrap() ) )
-                .map(|v| &**v)
+            OwningRef::new(Rc::new("not same".to_owned()))
+                .map(|v| SoftAsciiStr::from_str_unchecked(&**v))
         );
         assert_ne!( a, b );
     }
@@ -169,7 +216,7 @@ mod test {
 
         assert_eq!(
             "hy",
-            InnerAscii::Owned( ascii_str!{ h y }.to_owned() ).as_str()
+            InnerAscii::Owned( SoftAsciiStr::from_str_unchecked("hy").to_owned() ).as_str()
         );
         assert_eq!(
             "hy",

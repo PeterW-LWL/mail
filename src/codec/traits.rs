@@ -1,11 +1,11 @@
-use ascii::{  AsciiStr, AsciiChar };
+use soft_ascii_string::{ SoftAsciiStr, SoftAsciiChar };
 
 use error::*;
 
 use super::EncodedWordEncoding;
 
 pub trait EncodedWordWriter {
-    fn write_char( &mut self, ch: AsciiChar );
+    fn write_char( &mut self, ch: SoftAsciiChar );
     fn write_charset( &mut self );
     fn encoding( &self ) -> EncodedWordEncoding;
     fn write_ecw_seperator( &mut self );
@@ -19,18 +19,19 @@ pub trait EncodedWordWriter {
     fn max_payload_len( &self ) -> usize;
 
     fn write_ecw_start( &mut self ) {
-        self.write_char( AsciiChar::Equal );
-        self.write_char( AsciiChar::Question );
+        let qm = SoftAsciiChar::from_char_unchecked('?');
+        self.write_char(SoftAsciiChar::from_char_unchecked('='));
+        self.write_char(qm);
         self.write_charset();
-        self.write_char( AsciiChar::Question );
+        self.write_char(qm);
         let acronym = self.encoding().acronym();
         self.write_str( acronym );
-        self.write_char( AsciiChar::Question );
+        self.write_char(qm);
     }
 
     fn write_ecw_end( &mut self ) {
-        self.write_char( AsciiChar::Question );
-        self.write_char( AsciiChar::Equal );
+        self.write_char( SoftAsciiChar::from_char_unchecked('?') );
+        self.write_char( SoftAsciiChar::from_char_unchecked('=') );
     }
 
 
@@ -40,9 +41,9 @@ pub trait EncodedWordWriter {
         self.write_ecw_start();
     }
 
-    fn write_str( &mut self, str: &AsciiStr ) {
-        for char in str {
-            self.write_char(*char)
+    fn write_str( &mut self, s: &SoftAsciiStr ) {
+        for ch in s.chars() {
+            self.write_char(ch)
         }
     }
 }

@@ -2,7 +2,7 @@ use error::*;
 
 use idna;
 
-use ascii::AsciiString;
+use soft_ascii_string::SoftAsciiString;
 
 
 /// uses puny code on given domain to return a ascii representation
@@ -17,14 +17,14 @@ use ascii::AsciiString;
 /// if you puny code the domain `"this seems\0so;wrong"` it
 /// will return `Ok("this seems\0so;wrong")`
 ///
-pub fn puny_code_domain<R: AsRef<str>>( domain: R ) -> Result<AsciiString> {
+pub fn puny_code_domain<R: AsRef<str>>( domain: R ) -> Result<SoftAsciiString> {
     _puny_code_domain(domain.as_ref())
 }
-fn _puny_code_domain( domain: &str ) -> Result<AsciiString> {
+fn _puny_code_domain( domain: &str ) -> Result<SoftAsciiString> {
     match idna::domain_to_ascii( domain ) {
         Ok( asciified ) => {
             //SAFE: well we converted it to ascii, so it's ascii
-            Ok( unsafe { AsciiString::from_ascii_unchecked(asciified) } )
+            Ok( SoftAsciiString::from_string_unchecked(asciified) )
         },
         Err( err ) => {
             //FIXME(UPSTREAM): uts46::Errors does not implement Error... ;=(
@@ -54,8 +54,8 @@ mod test {
 
         let encoded = assert_ok!( puny_code_domain( domain ) );
         assert_eq!(
-            "is_ascii.notadomain",
-            &*encoded
+            &*encoded,
+            "is_ascii.notadomain"
         );
     }
     #[test]
@@ -63,8 +63,8 @@ mod test {
         let domain = "nöt_ascii.ü";
         let encoded = assert_ok!( puny_code_domain(domain) );
         assert_eq!(
-            "xn--nt_ascii-n4a.xn--tda",
-            &*encoded
+            &*encoded,
+            "xn--nt_ascii-n4a.xn--tda"
         );
     }
 }

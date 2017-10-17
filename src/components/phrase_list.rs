@@ -1,4 +1,4 @@
-use ascii::AsciiChar;
+use soft_ascii_string::SoftAsciiChar;
 
 use error::*;
 use codec::{EncodableInHeader, EncodeHandle};
@@ -17,10 +17,12 @@ impl EncodableInHeader for  PhraseList {
     fn encode(&self, handle: &mut EncodeHandle) -> Result<()> {
         sep_for!{ word in self.0.iter();
             sep {
-                //Note that we do not want to write MarkFWS, NowChar, Text " " as the following word might contains
+                //TODO handle this better by collapsing FWS
+                // <= isn't that allready fixed by FWS+ has content on line in Encoder
+                //Note that we do not want to write FWS as the following word might contains
                 // a left_padding with a MarkFWS, NowChar, Text " " but a space if fine
-                handle.write_char( AsciiChar::Comma )?;
-                handle.write_char( AsciiChar::Space )?;
+                handle.write_char( SoftAsciiChar::from_char_unchecked(',') )?;
+                handle.write_char( SoftAsciiChar::from_char_unchecked(' ') )?;
             };
             word.encode( handle )?;
 
