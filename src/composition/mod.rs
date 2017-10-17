@@ -3,7 +3,7 @@ use std::marker::PhantomData;
 use serde::Serialize;
 use rand;
 use rand::Rng;
-use ascii::AsciiStr;
+use soft_ascii_string::SoftAsciiStr;
 
 use error::*;
 use headers::{
@@ -246,7 +246,7 @@ impl BuilderExt for Builder {
         }
 
         let mut builder = Builder
-            ::multipart( gen_multipart_mime( ascii_str!{ a l t e r n a t e })? );
+            ::multipart(gen_multipart_mime(SoftAsciiStr::from_str_unchecked("alternate"))?);
 
         if let Some(headers) = headers.into() {
             builder = builder.headers( headers )?;
@@ -324,7 +324,8 @@ impl BuilderExt for Builder {
         }
 
         let mut builder = Builder
-            ::multipart( gen_multipart_mime( ascii_str!{ r e l a t e d } )? );
+            ::multipart( gen_multipart_mime(
+                SoftAsciiStr::from_str_unchecked("related"))? );
 
         if let Some( headers ) = headers.into() {
             builder = builder.headers( headers )?;
@@ -353,7 +354,8 @@ impl BuilderExt for Builder {
         where HM: Into<Option<HeaderMap>>
     {
 
-        let mut builder = Builder::multipart( gen_multipart_mime( ascii_str!{ m i x e d } )? );
+        let mut builder = Builder::multipart( 
+            gen_multipart_mime( SoftAsciiStr::from_str_unchecked("mixed"))? );
 
         if let Some( headers ) = headers.into() {
             builder = builder.headers( headers )?;
@@ -376,7 +378,7 @@ impl BuilderExt for Builder {
 
 
 
-fn gen_multipart_mime( subtype: &AsciiStr ) -> Result<MultipartMime> {
+fn gen_multipart_mime( subtype: &SoftAsciiStr ) -> Result<MultipartMime> {
     use components::mime::MimeFromStrError;
     //TODO check if subtype is a "valide" type e.g. no " " in ot
 

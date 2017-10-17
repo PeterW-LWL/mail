@@ -17,7 +17,6 @@ branch = "master"
 repository = "1aim/mail-codec"
 
 [dependencies]
-ascii = "0.8.4"
 base64 = "0.6.0"
 chrono = "0.4.0"
 error-chain = "0.11.0"
@@ -28,12 +27,15 @@ mime = "0.3.2"
 nom = "3.1.0"
 owning_ref = "0.3.3"
 percent-encoding = "1.0.0"
-quoted_printable = "0.3.0"
+quoted_printable = "0.4.0"
 rand = "0.3.15"
 scoped-tls = "0.1.0"
 serde = "1.0.10"
 serde_derive = "1.0.10"
 stable_deref_trait = "1.0"
+
+[dependencies.soft-ascii-string]
+git = "https://github.com/1aim/soft-ascii-string"
 
 [dependencies.futures-cpupool]
 optional = true

@@ -1,3 +1,4 @@
+pub use soft_ascii_string::{ SoftAsciiStr as _SoftAsciiStr };
 //    def_headers! {
 //        test_name: validate_header_names,
 //        + ContentType, unsafe { "Content-Type" }, components::ContentType
@@ -70,7 +71,7 @@ macro_rules! def_headers {
             )+
             for name in HEADER_NAMES {
                 let res = $crate::headers::HeaderName::validate_name(
-                    $crate::headers::_AsciiStr::from_ascii(name).unwrap()
+                    $crate::headers::_SoftAsciiStr::from_str(name).unwrap()
                 );
                 if res.is_err() {
                     panic!( "invalid header name: {:?} ({:?})", name, res.unwrap_err() );

@@ -1,6 +1,6 @@
 use std::ops::Deref;
 
-use ascii::AsciiString;
+use soft_ascii_string::SoftAsciiString;
 
 use error::*;
 use grammar::MailType;
@@ -42,7 +42,7 @@ impl QuotedString {
     pub fn quote( input: &str ) -> Result<Self> {
         let (mt, res) = codec::quoted_string::quote(input)?;
         if mt == MailType::Ascii {
-            let asciied = unsafe { AsciiString::from_ascii_unchecked( res ) };
+            let asciied = SoftAsciiString::from_string_unchecked( res );
             Ok( QuotedString( asciied.into() ) )
         } else {
             Ok( QuotedString( SimpleItem::from_utf8( res.into() ) ) )
@@ -92,9 +92,9 @@ impl QuotedString {
 
         if self.is_ascii() {
             //SAFE: if we didn't head any non-ascii-utf8 then we can not get some by unquoting
-            SimpleItem::Ascii( InnerAscii::Owned( unsafe {
-                AsciiString::from_ascii_unchecked( out )
-            }))
+            SimpleItem::Ascii( InnerAscii::Owned(
+                SoftAsciiString::from_string_unchecked( out )
+            ))
         } else {
             SimpleItem::Utf8( InnerUtf8::Owned( out ) )
         }

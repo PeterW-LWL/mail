@@ -1,4 +1,4 @@
-use ascii::AsciiChar;
+use soft_ascii_string::SoftAsciiChar;
 
 use error::*;
 use utils::{HeaderTryFrom, HeaderTryInto};
@@ -27,11 +27,11 @@ impl EncodableInHeader for  Path {
 
     fn encode(&self, handle: &mut EncodeHandle) -> Result<()> {
         handle.mark_fws_pos();
-        handle.write_char( AsciiChar::LessThan )?;
+        handle.write_char(SoftAsciiChar::from_char_unchecked('<'))?;
         if let Some( mail ) = self.0.as_ref() {
             mail.encode( handle )?;
         }
-        handle.write_char( AsciiChar::GreaterThan )?;
+        handle.write_char(SoftAsciiChar::from_char_unchecked('>'))?;
         handle.mark_fws_pos();
         Ok( () )
     }

@@ -1,4 +1,4 @@
-use ascii::{ AsciiChar };
+use soft_ascii_string::SoftAsciiChar;
 
 use error::*;
 use codec::{self, EncodeHandle, EncodableInHeader };
@@ -60,7 +60,7 @@ impl EncodableInHeader for  Email {
 
     fn encode(&self, handle: &mut EncodeHandle) -> Result<()> {
         self.local_part.encode( handle )?;
-        handle.write_char( AsciiChar::At )?;
+        handle.write_char( SoftAsciiChar::from_char_unchecked('@') )?;
         self.domain.encode( handle )?;
         Ok( () )
     }

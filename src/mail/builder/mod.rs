@@ -9,7 +9,7 @@
 //          .build()
 //
 //
-use ascii::AsciiString;
+use soft_ascii_string::SoftAsciiString;
 
 use utils::uneraser_ref;
 use error::*;
@@ -40,7 +40,7 @@ pub struct SinglepartBuilder {
 
 pub struct MultipartBuilder {
     inner: BuilderShared,
-    hidden_text: Option<AsciiString>,
+    hidden_text: Option<SoftAsciiString>,
     bodies: Vec<Mail>
 }
 
@@ -241,7 +241,7 @@ impl MultipartBuilder {
         } else {
             self.inner.build( MailPart::MultipleBodies {
                 bodies: self.bodies,
-                hidden_text: self.hidden_text.unwrap_or( AsciiString::new() ),
+                hidden_text: self.hidden_text.unwrap_or( SoftAsciiString::new() ),
             } )
         }
     }

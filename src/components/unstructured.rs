@@ -1,6 +1,6 @@
 use std::ops::{ Deref, DerefMut};
 
-use ascii::AsciiChar;
+use soft_ascii_string::SoftAsciiChar;
 
 use error::*;
 use grammar::is_vchar;
@@ -75,12 +75,11 @@ impl EncodableInHeader for  Unstructured {
                     // is still semantically ignored BUT, ther cant be any comments here,
                     // as we are in a unstructured header field
                     let mut had_fws = false;
-                    for char in data.chars() {
-                        if char == '\r' || char == '\n' {
+                    for ch in data.chars() {
+                        if ch == '\r' || ch == '\n' {
                             continue;
                         } else if had_fws {
-                            //OPTIMIZE: from_unchecked as char is always a char in this context
-                            handle.write_char( AsciiChar::from( char ).unwrap() )?;
+                            handle.write_char( SoftAsciiChar::from_char_unchecked(ch) )?;
                         } else {
                             //FIXME allow writing fws based on '\t'
                             handle.write_fws();

@@ -1,5 +1,7 @@
 use std::ascii::AsciiExt;
 
+use soft_ascii_string::SoftAsciiStr;
+
 use error::*;
 use codec::{EncodableInHeader, EncodeHandle};
 use utils::{ FileMeta, HeaderTryFrom };
@@ -107,10 +109,10 @@ impl EncodableInHeader for Disposition {
         use self::DispositionKind::*;
         match self.kind {
             Inline => {
-                handle.write_str( ascii_str!{ i n l i n e } )?;
+                handle.write_str(SoftAsciiStr::from_str_unchecked("inline"))?;
             },
             Attachment => {
-                handle.write_str( ascii_str!{ a t t a c h m e n t } )?;
+                handle.write_str(SoftAsciiStr::from_str_unchecked("attachment"))?;
             }
         }
         self.file_meta.encode( handle )?;

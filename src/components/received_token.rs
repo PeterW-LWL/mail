@@ -1,4 +1,4 @@
-use ascii::AsciiChar;
+use soft_ascii_string::SoftAsciiChar;
 
 use error::*;
 use codec::{EncodableInHeader, EncodeHandle};
@@ -24,9 +24,9 @@ impl EncodableInHeader for  ReceivedToken {
             Address( ref addr ) => {
                 // we do not need to use <..> , but I think it's better and it is definitely
                 // not wrong
-                handle.write_char( AsciiChar::LessThan )?;
+                handle.write_char( SoftAsciiChar::from_char_unchecked('<') )?;
                 addr.encode( handle )?;
-                handle.write_char( AsciiChar::GreaterThan )?;
+                handle.write_char( SoftAsciiChar::from_char_unchecked('>') )?;
             },
             Domain( ref domain ) => {
                 domain.encode( handle )?;

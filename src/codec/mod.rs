@@ -1,4 +1,4 @@
-use ascii::{ AsciiStr, AsciiChar};
+use soft_ascii_string::SoftAsciiStr;
 
 pub mod transfer_encoding;
 pub mod quoted_printable;
@@ -28,15 +28,11 @@ impl EncodedWordEncoding {
 
     /// returns the acronym for the given encoding
     /// used in a encoded word
-    pub fn acronym(&self) -> &'static AsciiStr {
+    pub fn acronym(&self) -> &'static SoftAsciiStr {
         use self::EncodedWordEncoding::*;
-
-        static BASE64: &[AsciiChar] = &[ AsciiChar::B ];
-        static QUOTED: &[AsciiChar] = &[ AsciiChar::Q ];
-
         match *self {
-            Base64 => BASE64.into(),
-            QuotedPrintable => QUOTED.into()
+            Base64 => SoftAsciiStr::from_str_unchecked("B"),
+            QuotedPrintable => SoftAsciiStr::from_str_unchecked("Q")
         }
     }
 

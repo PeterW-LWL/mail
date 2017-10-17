@@ -1,4 +1,4 @@
-use ascii::AsciiStr;
+use soft_ascii_string::SoftAsciiStr;
 
 use error::*;
 use codec::{EncodableInHeader, EncodeHandle};
@@ -9,7 +9,7 @@ impl EncodableInHeader for DateTime {
 
     fn encode(&self, handle: &mut EncodeHandle) -> Result<()> {
         let as_str = self.to_rfc2822();
-        let ascii = unsafe { AsciiStr::from_ascii_unchecked( &*as_str ) };
+        let ascii = SoftAsciiStr::from_str_unchecked( &*as_str );
         handle.write_str( ascii )?;
         Ok( () )
     }

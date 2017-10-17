@@ -2,7 +2,7 @@ use std::ops::Deref;
 use std::rc::Rc;
 use std::borrow::ToOwned;
 
-use ascii::{ AsciiString, AsciiStr };
+use soft_ascii_string::{SoftAsciiString, SoftAsciiStr};
 use owning_ref::OwningRef;
 
 use serde;
@@ -91,7 +91,7 @@ macro_rules! inner_impl {
 }
 
 
-inner_impl!{ InnerAscii, AsciiString, AsciiStr }
+inner_impl!{ InnerAscii, SoftAsciiString, SoftAsciiStr }
 inner_impl!{ InnerUtf8, String, str }
 //inner_impl!{ InnerOtherItem, OtherString, OtherStr }
 
@@ -116,15 +116,14 @@ impl InnerUtf8 {
 
 #[cfg(test)]
 mod test {
-    use std::str::FromStr;
     use super::*;
 
     #[test]
     fn inner_ascii_item_eq() {
-        let a = InnerAscii::Owned( AsciiString::from_str( "same" ).unwrap() );
+        let a = InnerAscii::Owned( SoftAsciiString::from_string( "same" ).unwrap() );
         let b = InnerAscii::Shared(
             OwningRef::new(
-                Rc::new( AsciiString::from_str( "same" ).unwrap() ) )
+                Rc::new( SoftAsciiString::from_string( "same" ).unwrap() ) )
                 .map(|v| &**v)
         );
         assert_eq!( a, b );
@@ -132,10 +131,10 @@ mod test {
 
     #[test]
     fn inner_ascii_item_neq() {
-        let a = InnerAscii::Owned( AsciiString::from_str( "same" ).unwrap() );
+        let a = InnerAscii::Owned( SoftAsciiString::from_string( "same" ).unwrap() );
         let b = InnerAscii::Shared(
             OwningRef::new(
-                Rc::new( AsciiString::from_str( "not same" ).unwrap() ) )
+                Rc::new( SoftAsciiString::from_string( "not same" ).unwrap() ) )
                 .map(|v| &**v)
         );
         assert_ne!( a, b );
@@ -169,7 +168,7 @@ mod test {
 
         assert_eq!(
             "hy",
-            InnerAscii::Owned( ascii_str!{ h y }.to_owned() ).as_str()
+            InnerAscii::Owned( SoftAsciiStr::from_str_unchecked("hy").to_owned() ).as_str()
         );
         assert_eq!(
             "hy",

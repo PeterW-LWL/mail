@@ -1,7 +1,21 @@
-use super::*;
+use soft_ascii_string::{
+    SoftAsciiStr,
+    SoftAsciiChar,
+    SoftAsciiString
+};
+
+use codec::{Encoder, EncodableInHeader, EncodeHandle};
+use headers::ContentType;
+use super::{
+    Mail, EncodableMail,
+    Resource,
+};
+
+use error::*;
+
 use mime::BOUNDARY;
-use ascii::IntoAsciiString;
 use headers::HeaderName;
+
 
 ///
 /// # Panics
@@ -44,7 +58,9 @@ fn encode_headers(
 ) -> Result<()> {
     let mut handle = encoder.encode_handle();
     if top {
-        handle.write_str( ascii_str!{ M I M E Minus V e r s i o n Colon Space _1 Dot _0 } )?;
+        handle.write_str(SoftAsciiStr::from_str_unchecked(
+            "MIME-Version: 1.0"
+        ))?;
         handle.finish_header();
     }
 
@@ -69,7 +85,7 @@ fn encode_header(
     component: &EncodableInHeader
 ) -> Result<()> {
     handle.write_str( name.as_ascii_str() )?;
-    handle.write_char( AsciiChar::Colon )?;
+    handle.write_char( SoftAsciiChar::from_char_unchecked(':') )?;
     handle.write_fws();
     component.encode( handle )?;
     handle.finish_header();
@@ -82,6 +98,8 @@ fn encode_header(
 /// on `Mail` to prevent this from happening
 ///
 fn encode_mail_part(mail: &Mail, encoder:  &mut Encoder<Resource> ) -> Result<()> {
+    let minus = SoftAsciiChar::from_char_unchecked('-');
+
     use super::MailPart::*;
     match mail.body {
         SingleBody { ref body } => {
@@ -104,13 +122,15 @@ fn encode_mail_part(mail: &Mail, encoder:  &mut Encoder<Resource> ) -> Result<()
                 }
             };
 
-            let boundary = boundary.into_ascii_string()
-                .chain_err( || "non ascii boundary" )?;
+            let boundary = SoftAsciiString::from_string(boundary)
+                .map_err( |_orig_string| {
+                    ErrorKind::Msg("non ascii boundary".into())
+                })?;
 
             for mail in bodies.iter() {
                 encoder.write_header_line(|handle| {
-                    handle.write_char( AsciiChar::Minus )?;
-                    handle.write_char( AsciiChar::Minus )?;
+                    handle.write_char( minus )?;
+                    handle.write_char( minus )?;
                     handle.write_str( &*boundary )
                 })?;
                 _encode_mail( mail, false, encoder )?;
@@ -118,11 +138,11 @@ fn encode_mail_part(mail: &Mail, encoder:  &mut Encoder<Resource> ) -> Result<()
 
             if bodies.len() > 0 {
                 encoder.write_header_line(|handle| {
-                    handle.write_char( AsciiChar::Minus )?;
-                    handle.write_char( AsciiChar::Minus )?;
+                    handle.write_char( minus )?;
+                    handle.write_char( minus )?;
                     handle.write_str( &*boundary )?;
-                    handle.write_char( AsciiChar::Minus )?;
-                    handle.write_char( AsciiChar::Minus )
+                    handle.write_char( minus )?;
+                    handle.write_char( minus )
                 })?;
             } else {
                 warn!("multipart body with 0 sub bodies")

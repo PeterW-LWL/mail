@@ -1,6 +1,6 @@
 use error::*;
 use {base64 as extern_base64};
-use ascii::{ AsciiString, AsciiChar };
+use soft_ascii_string::{ SoftAsciiString, SoftAsciiChar};
 
 use super::EncodedWordWriter;
 
@@ -12,12 +12,11 @@ const NON_ECW_STRIP_WHITESPACE: bool = true;
 
 
 #[inline]
-pub fn normal_encode<R: AsRef<[u8]>>(input: R) -> AsciiString {
+pub fn normal_encode<R: AsRef<[u8]>>(input: R) -> SoftAsciiString {
     let res = extern_base64::encode_config( input.as_ref(), extern_base64::Config::new(
         CHARSET, USE_PADDING, NON_ECW_STRIP_WHITESPACE, LINE_WRAP
     ));
-    //SAFE: base64 can only have us-ascii characters
-    unsafe { AsciiString::from_ascii_unchecked(res) }
+    SoftAsciiString::from_string_unchecked(res)
 }
 
 #[inline]
@@ -90,9 +89,9 @@ fn _encoded_word_encode<O>( input: &str, out: &mut O )
 
         extern_base64::encode_config_buf(this, config.clone(), &mut buff);
         //FIXME add a write_str method to EncodedWordWriter
-        for char in buff.chars() {
+        for ch in buff.chars() {
             //SAFE: base64 consist of only ascii chars
-            out.write_char(unsafe { AsciiChar::from_unchecked(char) } )
+            out.write_char(SoftAsciiChar::from_char_unchecked(ch))
         }
 
         if rest.len() == 0 {
@@ -116,6 +115,7 @@ pub fn encoded_word_decode<R: AsRef<[u8]>>(input: R) -> Result<Vec<u8>> {
 
 #[cfg(test)]
 mod test {
+    use soft_ascii_string::SoftAsciiStr;
     use codec::writer_impl::VecWriter;
     use codec::EncodedWordEncoding;
     use super::*;
@@ -160,7 +160,10 @@ mod test {
             #[test]
             fn $name() {
                 let test_data = $data;
-                let mut out = VecWriter::new( ascii_str!{ u t f _8 }, EncodedWordEncoding::Base64 );
+                let mut out = VecWriter::new(
+                    SoftAsciiStr::from_str_unchecked("utf8"),
+                    EncodedWordEncoding::Base64
+                );
 
                 encoded_word_encode( test_data, &mut out );
 

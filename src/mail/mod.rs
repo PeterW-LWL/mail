@@ -1,8 +1,8 @@
 use std::ops::Deref;
 use std::fmt;
 
-use codec::{EncodableInHeader, Encoder, Encodable, EncodeHandle};
-use ascii::{ AsciiString, AsciiChar };
+use codec::{EncodableInHeader, Encoder, Encodable};
+use soft_ascii_string::SoftAsciiString;
 use futures::{ Future, Async, Poll };
 
 use error::*;
@@ -48,7 +48,7 @@ pub enum MailPart {
     },
     MultipleBodies {
         bodies: Vec<Mail>,
-        hidden_text: AsciiString
+        hidden_text: SoftAsciiString
     }
 }
 

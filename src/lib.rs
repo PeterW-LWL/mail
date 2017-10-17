@@ -1,7 +1,6 @@
 #![recursion_limit="128"]
 #[macro_use]
 extern crate log;
-extern crate ascii;
 extern crate mime;
 extern crate owning_ref;
 extern crate quoted_printable;
@@ -13,6 +12,7 @@ extern crate base64;
 extern crate rand;
 extern crate percent_encoding;
 extern crate stable_deref_trait;
+extern crate soft_ascii_string;
 
 #[macro_use]
 extern crate serde_derive;

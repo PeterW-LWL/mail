@@ -2,7 +2,7 @@ use std::any::{Any, TypeId};
 use std::fmt::{self, Debug};
 use std::result::{ Result as StdResult };
 
-use ascii::{AsciiStr, AsciiChar};
+use soft_ascii_string::{SoftAsciiStr, SoftAsciiChar};
 
 use error::{Result, Error};
 use grammar::{is_atext, MailType};
@@ -445,10 +445,10 @@ impl<'inner> EncodeHandle<'inner> {
     ///
     /// # Trace (test build only)
     /// does push `NowChar` and then can push `Text`,`CRLF`
-    pub fn write_char(&mut self, ch: AsciiChar) -> Result<()>  {
+    pub fn write_char(&mut self, ch: SoftAsciiChar) -> Result<()>  {
         #[cfg(test)]
         { self.trace.push(TraceToken::NowChar) }
-        self.internal_write_char(ch.as_char())
+        self.internal_write_char(ch.into())
     }
 
     /// writes a ascii str to the underlying buffer
@@ -466,7 +466,7 @@ impl<'inner> EncodeHandle<'inner> {
     /// # Trace (test build only)
     /// does push `NowStr` and then can push `Text`,`CRLF`
     ///
-    pub fn write_str(&mut self, s: &AsciiStr)  -> Result<()>  {
+    pub fn write_str(&mut self, s: &SoftAsciiStr)  -> Result<()>  {
         #[cfg(test)]
         { self.trace.push(TraceToken::NowStr) }
         self.internal_write_str(s.as_str())
@@ -621,7 +621,7 @@ impl<'inner> EncodeHandle<'inner> {
     /// had been there before).
     pub fn write_fws(&mut self) {
         self.mark_fws_pos();
-        let _ = self.write_char(AsciiChar::Space);
+        let _ = self.write_char(SoftAsciiChar::from_char_unchecked(' '));
     }
 
 
@@ -922,7 +922,7 @@ macro_rules! ec_test {
 
 #[cfg(test)]
 mod test {
-    use ascii::{ AsciiChar, AsciiStr};
+    use soft_ascii_string::{ SoftAsciiChar, SoftAsciiStr};
     use error::*;
     use grammar::MailType;
 
@@ -1120,7 +1120,8 @@ mod test {
             let mut encoder = Encoder::new(MailType::Ascii);
             {
                 let mut handle = encoder.encode_handle();
-                assert_ok!(handle.write_str(AsciiStr::from_ascii("Header-One: 12").unwrap()));
+                assert_ok!(
+                    handle.write_str(SoftAsciiStr::from_str_unchecked("Header-One: 12")));
                 handle.undo_header();
             }
             assert_eq!(encoder.sections.len(), 1);
@@ -1133,9 +1134,9 @@ mod test {
             let mut encoder = Encoder::new(MailType::Ascii);
             {
                 let mut handle = encoder.encode_handle();
-                assert_ok!(handle.write_str(AsciiStr::from_ascii("Header-One: 12").unwrap()));
+                assert_ok!(handle.write_str(SoftAsciiStr::from_str("Header-One: 12").unwrap()));
                 handle.finish_header();
-                assert_ok!(handle.write_str(AsciiStr::from_ascii("ups: sa").unwrap()));
+                assert_ok!(handle.write_str(SoftAsciiStr::from_str("ups: sa").unwrap()));
                 handle.undo_header();
             }
             assert_eq!(encoder.sections.len(), 1);
@@ -1148,7 +1149,7 @@ mod test {
             let mut encoder = Encoder::new(MailType::Ascii);
             {
                 let mut handle = encoder.encode_handle();
-                assert_ok!(handle.write_str(AsciiStr::from_ascii("Header-One: 12").unwrap()));
+                assert_ok!(handle.write_str(SoftAsciiStr::from_str("Header-One: 12").unwrap()));
                 handle.finish_header();
             }
             assert_eq!(encoder.sections.len(), 1);
@@ -1161,7 +1162,7 @@ mod test {
             let mut encoder = Encoder::new(MailType::Ascii);
             {
                 let mut handle = encoder.encode_handle();
-                assert_ok!(handle.write_str(AsciiStr::from_ascii("Header-One: 12\r\n").unwrap()));
+                assert_ok!(handle.write_str(SoftAsciiStr::from_str("Header-One: 12\r\n").unwrap()));
                 handle.finish_header();
             }
             assert_eq!(encoder.sections.len(), 1);
@@ -1174,7 +1175,7 @@ mod test {
             let mut encoder = Encoder::new(MailType::Ascii);
             {
                 let mut handle = encoder.encode_handle();
-                assert_ok!(handle.write_str(AsciiStr::from_ascii("Header-One: 12\r\n   ").unwrap()));
+                assert_ok!(handle.write_str(SoftAsciiStr::from_str("Header-One: 12\r\n   ").unwrap()));
                 handle.finish_header();
             }
             assert_eq!(encoder.sections.len(), 1);
@@ -1188,7 +1189,7 @@ mod test {
             let mut encoder = Encoder::new(MailType::Ascii);
             {
                 let mut handle = encoder.encode_handle();
-                assert_ok!(handle.write_str(AsciiStr::from_ascii("Header-One: 12 +\r\n 4").unwrap()));
+                assert_ok!(handle.write_str(SoftAsciiStr::from_str("Header-One: 12 +\r\n 4").unwrap()));
                 handle.finish_header();
             }
             assert_eq!(encoder.sections.len(), 1);
@@ -1202,7 +1203,7 @@ mod test {
             {
                 let mut handle = encoder.encode_handle();
                 assert_ok!(handle.write_str(
-                    AsciiStr::from_ascii("Header-One: 12 +\r\n 4  ").unwrap()));
+                    SoftAsciiStr::from_str("Header-One: 12 +\r\n 4  ").unwrap()));
                 handle.finish_header();
             }
             assert_eq!(encoder.sections.len(), 1);
@@ -1216,7 +1217,7 @@ mod test {
             let mut encoder = Encoder::new(MailType::Ascii);
             {
                 let mut handle = encoder.encode_handle();
-                assert_err!(handle.write_str(AsciiStr::from_ascii("H: \na").unwrap()));
+                assert_err!(handle.write_str(SoftAsciiStr::from_str("H: \na").unwrap()));
                 handle.undo_header()
             }
         }
@@ -1225,7 +1226,7 @@ mod test {
             let mut encoder = Encoder::new(MailType::Ascii);
             {
                 let mut handle = encoder.encode_handle();
-                assert_err!(handle.write_str(AsciiStr::from_ascii("H: \ra").unwrap()));
+                assert_err!(handle.write_str(SoftAsciiStr::from_str("H: \ra").unwrap()));
                 handle.undo_header()
             }
         }
@@ -1235,7 +1236,7 @@ mod test {
             let mut encoder = Encoder::new(MailType::Ascii);
             {
                 let mut handle = encoder.encode_handle();
-                assert_err!(handle.write_str(AsciiStr::from_ascii("H: a\n").unwrap()));
+                assert_err!(handle.write_str(SoftAsciiStr::from_str("H: a\n").unwrap()));
                 handle.undo_header();
             }
         }
@@ -1245,7 +1246,7 @@ mod test {
             let mut encoder = Encoder::new(MailType::Ascii);
             {
                 let mut handle = encoder.encode_handle();
-                assert_ok!(handle.write_str(AsciiStr::from_ascii("H: a\r").unwrap()));
+                assert_ok!(handle.write_str(SoftAsciiStr::from_str("H: a\r").unwrap()));
                 //it's fine not to error in the trailing \r case as we want to write
                 //a \r\n anyway
                 handle.finish_header();
@@ -1261,9 +1262,9 @@ mod test {
             let mut encoder = Encoder::new(MailType::Ascii);
             {
                 let mut handle = encoder.encode_handle();
-                assert_ok!(handle.write_str(AsciiStr::from_ascii("A23456789:").unwrap()));
+                assert_ok!(handle.write_str(SoftAsciiStr::from_str("A23456789:").unwrap()));
                 handle.mark_fws_pos();
-                assert_ok!(handle.write_str(AsciiStr::from_ascii(concat!(
+                assert_ok!(handle.write_str(SoftAsciiStr::from_str(concat!(
                     "20_3456789",
                     "30_3456789",
                     "40_3456789",
@@ -1293,9 +1294,9 @@ mod test {
             let mut encoder = Encoder::new(MailType::Ascii);
             {
                 let mut handle = encoder.encode_handle();
-                assert_ok!(handle.write_str(AsciiStr::from_ascii("A23456789:").unwrap()));
+                assert_ok!(handle.write_str(SoftAsciiStr::from_str("A23456789:").unwrap()));
                 handle.mark_fws_pos();
-                assert_ok!(handle.write_str(AsciiStr::from_ascii(concat!(
+                assert_ok!(handle.write_str(SoftAsciiStr::from_str(concat!(
                     "10_3456789",
                     "20_3456789",
                     "30_3456789",
@@ -1331,9 +1332,9 @@ mod test {
             let mut encoder = Encoder::new(MailType::Ascii);
             {
                 let mut handle = encoder.encode_handle();
-                assert_ok!(handle.write_str(AsciiStr::from_ascii("A23456789:").unwrap()));
+                assert_ok!(handle.write_str(SoftAsciiStr::from_str("A23456789:").unwrap()));
                 handle.mark_fws_pos();
-                assert_ok!(handle.write_str(AsciiStr::from_ascii(concat!(
+                assert_ok!(handle.write_str(SoftAsciiStr::from_str(concat!(
                     "10_3456789",
                     "20_3456789",
                     "30_3456789",
@@ -1343,7 +1344,7 @@ mod test {
                     "70_3456789",
                 )).unwrap()));
                 handle.mark_fws_pos();
-                assert_ok!(handle.write_str(AsciiStr::from_ascii(concat!(
+                assert_ok!(handle.write_str(SoftAsciiStr::from_str(concat!(
                     "10_3456789",
                     "20_3456789",
                     "30_3456789",
@@ -1375,15 +1376,15 @@ mod test {
             {
                 let mut handle = encoder.encode_handle();
                 for x in 0..998 {
-                    if let Err(_) = handle.write_char(AsciiChar::X) {
+                    if let Err(_) = handle.write_char(SoftAsciiChar::from_char_unchecked('X')) {
                         panic!("error when writing char nr.: {:?}", x+1)
                     }
                 }
                 let res = &[
-                    handle.write_char(AsciiChar::X).is_err(),
-                    handle.write_char(AsciiChar::X).is_err(),
-                    handle.write_char(AsciiChar::X).is_err(),
-                    handle.write_char(AsciiChar::X).is_err(),
+                    handle.write_char(SoftAsciiChar::from_char_unchecked('X')).is_err(),
+                    handle.write_char(SoftAsciiChar::from_char_unchecked('X')).is_err(),
+                    handle.write_char(SoftAsciiChar::from_char_unchecked('X')).is_err(),
+                    handle.write_char(SoftAsciiChar::from_char_unchecked('X')).is_err(),
                 ];
                 assert_eq!(
                     res, &[true, true, true, true]
@@ -1556,7 +1557,7 @@ mod test {
         fn drop_after_undo_is_ok() {
             let mut encoder = Encoder::new(MailType::Ascii);
             let mut handle = encoder.encode_handle();
-            assert_ok!(handle.write_str(AsciiStr::from_ascii("Header-One").unwrap()));
+            assert_ok!(handle.write_str(SoftAsciiStr::from_str("Header-One").unwrap()));
             handle.undo_header();
             mem::drop(handle);
         }
@@ -1565,7 +1566,7 @@ mod test {
         fn drop_after_finish_is_ok() {
             let mut encoder = Encoder::new(MailType::Ascii);
             let mut handle = encoder.encode_handle();
-            assert_ok!(handle.write_str(AsciiStr::from_ascii("Header-One: 12").unwrap()));
+            assert_ok!(handle.write_str(SoftAsciiStr::from_str("Header-One: 12").unwrap()));
             handle.finish_header();
             mem::drop(handle);
         }
@@ -1575,7 +1576,7 @@ mod test {
         fn drop_unfinished_panics() {
             let mut encoder = Encoder::new(MailType::Ascii);
             let mut handle = encoder.encode_handle();
-            assert_ok!(handle.write_str(AsciiStr::from_ascii("Header-One:").unwrap()));
+            assert_ok!(handle.write_str(SoftAsciiStr::from_str("Header-One:").unwrap()));
             mem::drop(handle);
         }
 
@@ -1618,8 +1619,8 @@ mod test {
             let mut encoder = Encoder::new(MailType::Internationalized);
             {
                 let mut handle = encoder.encode_handle();
-                assert_ok!(handle.write_str(AsciiStr::from_ascii("Header").unwrap()));
-                assert_ok!(handle.write_char(AsciiChar::Colon));
+                assert_ok!(handle.write_str(SoftAsciiStr::from_str("Header").unwrap()));
+                assert_ok!(handle.write_char(SoftAsciiChar::from_char_unchecked(':')));
                 let mut had_cond_failure = false;
                 assert_ok!(handle.write_if_atext("a(b)c")
                     .handle_condition_failure(|_|{had_cond_failure=true; Ok(())}));

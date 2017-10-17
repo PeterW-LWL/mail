@@ -1,4 +1,4 @@
-use ascii::AsciiChar;
+use soft_ascii_string::SoftAsciiChar;
 
 use error::*;
 use utils::{HeaderTryFrom, HeaderTryInto};
@@ -80,9 +80,9 @@ impl EncodableInHeader for  Mailbox {
             handle.write_fws();
         }
         //for now this always uses the "<user@do.main>" form even if no display-name is given
-        handle.write_char( AsciiChar::LessThan )?;
+        handle.write_char( SoftAsciiChar::from_char_unchecked('<') )?;
         self.email.encode( handle )?;
-        handle.write_char( AsciiChar::GreaterThan )?;
+        handle.write_char( SoftAsciiChar::from_char_unchecked('>') )?;
         Ok( () )
     }
 }
