@@ -78,13 +78,11 @@ impl EncodableInHeader for  Unstructured {
                     for ch in data.chars() {
                         if ch == '\r' || ch == '\n' {
                             continue;
-                        } else if had_fws {
-                            handle.write_char( SoftAsciiChar::from_char_unchecked(ch) )?;
-                        } else {
-                            //FIXME allow writing fws based on '\t'
-                            handle.write_fws();
+                        } else if !had_fws {
+                            handle.mark_fws_pos();
                             had_fws = true;
                         }
+                        handle.write_char( SoftAsciiChar::from_char_unchecked(ch) )?;
                     }
                     if !had_fws {
                         //currently this can only happen if data only consists of '\r','\n'
@@ -176,7 +174,7 @@ mod test {
         Unstructured::from_input("\t\ta  b \t")?
     } => ascii => [
         MarkFWS,
-        Text " \ta",
+        Text "\t\ta",
         MarkFWS,
         Text "  b",
         MarkFWS,
