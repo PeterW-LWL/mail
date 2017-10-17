@@ -14,13 +14,13 @@
 //! Currently limited to Copy types, could support clone types
 //! but would be often quite a bad idea (except for shepish
 //! clonable types like e.g. a `Rc`/`Arc`).
-// a version of TotalOrderMultiMap can be build wich also relies on inner pointer
+// a version of TotalOrderMultiMap could be build wich also relies on inner pointer
 // address stability to cheaply share the keys (would also
 // work with `&'static str` as `&T` is `StableDeref`).
 // The problem is how to handle ownership in that case,
 // so not done for now.
 
-//TODO move in own crate
+extern crate stable_deref_trait;
 
 use std::collections::{ HashMap, hash_map};
 use std::ops::Deref;
@@ -32,11 +32,13 @@ use std::fmt::{self, Debug};
 
 use stable_deref_trait::StableDeref;
 
-use utils::DebugIterableOpaque;
+use self::utils::DebugIterableOpaque;
 pub use self::iter::{ Iter, IterMut };
 pub use self::entry::Entry;
 pub use self::map_iter::{ Keys, GroupedValues };
 
+#[macro_use]
+mod utils;
 mod iter;
 mod entry;
 mod map_iter;

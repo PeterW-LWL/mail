@@ -4,7 +4,7 @@ use soft_ascii_string::SoftAsciiChar;
 use nom::IResult;
 
 use error::*;
-use external::vec1::Vec1;
+use vec1::Vec1;
 use codec::{EncodableInHeader, EncodeHandle};
 
 use data::{ FromInput, Input, SimpleItem };

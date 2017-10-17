@@ -1,5 +1,5 @@
 use error::*;
-use external::vec1::Vec1;
+use vec1::Vec1;
 use codec::{EncodableInHeader, EncodeHandle};
 use grammar::encoded_word::EncodedWordContext;
 

@@ -2,7 +2,7 @@ use soft_ascii_string::SoftAsciiChar;
 
 use error::*;
 use codec::{EncodableInHeader, EncodeHandle};
-use external::vec1::Vec1;
+use vec1::Vec1;
 use utils::{ HeaderTryFrom, HeaderTryInto };
 
 use super::Phrase;

@@ -32,7 +32,8 @@ rand = "0.3.15"
 scoped-tls = "0.1.0"
 serde = "1.0.10"
 serde_derive = "1.0.10"
-stable_deref_trait = "1.0"
+total-order-multi-map = { path="./total-order-multi-map" }
+vec1 = { path="./vec1" }
 
 [dependencies.soft-ascii-string]
 git = "https://github.com/1aim/soft-ascii-string"
@@ -56,3 +57,6 @@ default_impl_fs = ["default_impl_any"]
 default_impl_mail = ["default_impl_cpupool", "default_impl_fs", "default_impl_vfs"]
 default_impl_name_composer = ["default_impl_any"]
 default_impl_vfs = ["default_impl_any"]
+
+[workspace]
+members = ["total-order-multi-map", "vec1"]

@@ -3,7 +3,7 @@ use std::error::{ Error as StdError };
 
 use serde::Serialize;
 
-use external::vec1::Vec1;
+use vec1::Vec1;
 use mail::Resource;
 
 use super::context::Context;

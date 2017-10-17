@@ -11,8 +11,10 @@ extern crate serde;
 extern crate base64;
 extern crate rand;
 extern crate percent_encoding;
-extern crate stable_deref_trait;
 extern crate soft_ascii_string;
+extern crate total_order_multi_map;
+#[cfg_attr(test, macro_use)]
+extern crate vec1;
 
 #[macro_use]
 extern crate serde_derive;
@@ -98,7 +100,7 @@ pub mod template_engine_prelude {
     pub type StdResult<R,E> = ::std::result::Result<R,E>;
     pub use serde::Serialize;
 
-    pub use external::vec1::Vec1;
+    pub use vec1::Vec1;
     pub use mail::{
         Resource
     };

@@ -4,7 +4,7 @@ use soft_ascii_string::SoftAsciiStr;
 
 use error::*;
 
-use external::vec1::Vec1;
+use vec1::Vec1;
 
 use grammar::encoded_word::{
     is_encoded_word,

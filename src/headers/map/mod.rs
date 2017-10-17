@@ -6,7 +6,7 @@ use std::mem;
 use std::collections::HashSet;
 
 
-use external::total_order_multi_map::{
+use total_order_multi_map::{
     self,
     TotalOrderMultiMap, Meta,
     EntryValues
