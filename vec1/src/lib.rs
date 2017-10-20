@@ -251,18 +251,20 @@ impl<A, B> PartialEq<B> for Vec1<A>
 }
 
 
-impl<T, R> Index<R> for Vec1<T>
-    where Vec<T>: Index<R, Output=[T]>
+impl<T, O, R> Index<R> for Vec1<T>
+    where Vec<T>: Index<R, Output=O>,
+          O: ?Sized
 {
-    type Output = [T];
+    type Output = O;
 
-    fn index(&self, index: R) -> &[T] {
+    fn index(&self, index: R) -> &O {
         self.0.index(index)
     }
 }
 
-impl<T, R> IndexMut<R> for Vec1<T>
-    where Vec<T>: IndexMut<R, Output=[T]>
+impl<T, O, R> IndexMut<R> for Vec1<T>
+    where Vec<T>: IndexMut<R, Output=O>,
+          O: ?Sized
 {
     fn index_mut(&mut self, index: R) -> &mut Self::Output {
         self.0.index_mut(index)
@@ -592,6 +594,12 @@ mod test {
                 x + 1
             }));
             assert_eq!(vec, &[2,3,4]);
+        }
+
+        #[test]
+        fn non_slice_indexing_works() {
+            let mut vec = vec1!["a"];
+            assert_eq!(&mut vec[0], &mut "a");
         }
 
 

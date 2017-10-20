@@ -161,7 +161,7 @@ mod test {
 
         assert_eq!( 1, res.len() );
         assert_eq!(
-            &*res[0].inner,
+            res[0].inner.as_str(),
             "=?utf8?Q?t=C3=A4st?="
         );
     }

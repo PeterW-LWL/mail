@@ -239,7 +239,7 @@ fn encode_list<'a, I>(list_iter: I, handle: &mut EncodeHandle) -> Result<()>
 }
 
 deref0!{ +mut OptMailboxList => Vec<Mailbox> }
-deref0!{ +mut MailboxList => Vec<Mailbox> }
+deref0!{ +mut MailboxList => Vec1<Mailbox> }
 
 #[cfg(test)]
 mod test {
