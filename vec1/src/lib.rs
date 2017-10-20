@@ -4,7 +4,8 @@ use std::ops::{ Deref, DerefMut, Index, IndexMut};
 use std::result::{ Result as StdResult };
 use std::error::{ Error as StdError };
 use std::vec::IntoIter;
-use std::iter::IntoIterator;
+use std::iter::{IntoIterator, Extend};
+use std::borrow::{Borrow, BorrowMut};
 
 #[macro_export]
 macro_rules! vec1 {
@@ -39,7 +40,7 @@ impl StdError for Size0Error {
 
 type Vec1Result<T> = StdResult<T, Size0Error>;
 
-#[derive( Debug, Clone, Eq,  Hash )]
+#[derive( Debug, Clone, Eq, Hash, PartialOrd, Ord )]
 pub struct Vec1<T>(Vec<T>);
 
 impl<T> IntoIterator for Vec1<T> {
@@ -269,6 +270,70 @@ impl<T, R> IndexMut<R> for Vec1<T>
     }
 }
 
+impl<T> Borrow<[T]> for Vec1<T> {
+    fn borrow(&self) -> &[T] {
+        self
+    }
+}
+
+impl<T> BorrowMut<[T]> for Vec1<T> {
+    fn borrow_mut(&mut self) -> &mut [T] {
+        self
+    }
+}
+
+impl<T> Borrow<Vec<T>> for Vec1<T> {
+    fn borrow(&self) -> &Vec<T> {
+        &self.0
+    }
+}
+
+impl<'a, T> Extend<&'a T> for Vec1<T>
+    where T: 'a + Copy
+{
+    fn extend<I>(&mut self, iter: I)
+        where I: IntoIterator<Item = &'a T>
+    {
+        self.0.extend(iter)
+    }
+}
+
+impl<T> Extend<T> for Vec1<T> {
+    fn extend<I>(&mut self, iter: I)
+        where I: IntoIterator<Item = T>
+    {
+        self.0.extend(iter)
+    }
+}
+
+impl<T> AsRef<[T]> for Vec1<T> {
+    fn as_ref(&self) -> &[T] {
+        self
+    }
+}
+
+impl<T> AsMut<[T]> for Vec1<T> {
+    fn as_mut(&mut self) -> &mut [T] {
+        self
+    }
+}
+
+impl<T> AsRef<Vec<T>> for Vec1<T> {
+    fn as_ref(&self) -> &Vec<T> {
+        &self.0
+    }
+}
+impl<T> AsRef<Vec1<T>> for Vec1<T> {
+    fn as_ref(&self) -> &Vec1<T> {
+        self
+    }
+}
+
+impl<T> AsMut<Vec1<T>> for Vec1<T> {
+    fn as_mut(&mut self) -> &mut Vec1<T> {
+        self
+    }
+}
 
 
 #[cfg(test)]
@@ -437,6 +502,78 @@ mod test {
         fn impl_index_mut() {
             let mut vec = vec1![ 1,2,3,3];
             assert_eq!(&mut vec[..2], &mut [1,2]);
+        }
+
+        #[test]
+        fn impl_extend() {
+            let mut vec = Vec1::new(1u8);
+            vec.extend([2,3].iter().cloned());
+            assert_eq!(vec, &[1, 2, 3]);
+        }
+
+        #[test]
+        fn impl_extend_ref_copy() {
+            let mut vec = Vec1::new(1u8);
+            vec.extend([2,3].iter());
+            assert_eq!(vec, &[1, 2, 3]);
+        }
+
+        #[test]
+        fn impl_borrow_mut_slice() {
+            fn chk<E, T: BorrowMut<[E]>>(){};
+            chk::<u8, Vec1<u8>>();
+        }
+
+        #[test]
+        fn impl_borrow_slice() {
+            fn chk<E, T: BorrowMut<[E]>>(){};
+            chk::<u8, Vec1<u8>>();
+        }
+
+        #[test]
+        fn impl_as_mut_slice() {
+            fn chk<E, T: AsMut<[E]>>(){};
+            chk::<u8, Vec1<u8>>();
+        }
+
+        #[test]
+        fn impl_as_ref() {
+            fn chk<E, T: AsRef<[E]>>(){};
+            chk::<u8, Vec1<u8>>();
+        }
+        #[test]
+        fn impl_as_mut_slice_self() {
+            fn chk<E, T: AsMut<Vec1<E>>>(){};
+            chk::<u8, Vec1<u8>>();
+        }
+
+        #[test]
+        fn impl_as_ref_self() {
+            fn chk<E, T: AsRef<Vec1<E>>>(){};
+            chk::<u8, Vec1<u8>>();
+        }
+
+        #[test]
+        fn impl_as_ref_vec() {
+            fn chk<E, T: AsRef<Vec<E>>>(){};
+            chk::<u8, Vec1<u8>>();
+        }
+
+        //into iter self, &, &mut
+        #[test]
+        fn impl_into_iter() {
+            let vec = vec1![ 1, 2, 3];
+            assert_eq!(6, vec.into_iter().sum());
+        }
+        #[test]
+        fn impl_into_iter_on_ref() {
+            let vec = vec1![ 1, 2, 3];
+            assert_eq!(6, (&vec).into_iter().sum());
+        }
+        #[test]
+        fn impl_into_iter_on_ref_mut() {
+            let mut vec = vec1![ 1, 2, 3];
+            assert_eq!(6, (&mut vec).into_iter().sum());
         }
 
 
