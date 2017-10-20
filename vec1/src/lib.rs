@@ -1,6 +1,6 @@
 
 use std::fmt;
-use std::ops::{ Deref, DerefMut };
+use std::ops::{ Deref, DerefMut, Index, IndexMut};
 use std::result::{ Result as StdResult };
 use std::error::{ Error as StdError };
 use std::vec::IntoIter;
@@ -251,6 +251,24 @@ impl<A, B> PartialEq<B> for Vec1<A>
 }
 
 
+impl<T, R> Index<R> for Vec1<T>
+    where Vec<T>: Index<R, Output=[T]>
+{
+    type Output = [T];
+
+    fn index(&self, index: R) -> &[T] {
+        self.0.index(index)
+    }
+}
+
+impl<T, R> IndexMut<R> for Vec1<T>
+    where Vec<T>: IndexMut<R, Output=[T]>
+{
+    fn index_mut(&mut self, index: R) -> &mut Self::Output {
+        self.0.index_mut(index)
+    }
+}
+
 
 
 #[cfg(test)]
@@ -409,6 +427,19 @@ mod test {
             let vec = Vec1::with_capacity(1u8, 16);
             assert!(vec.capacity() >= 16);
         }
+
+        #[test]
+        fn impl_index() {
+            let vec = vec1![ 1,2,3,3];
+            assert_eq!(&vec[..2], &[1,2]);
+        }
+        #[test]
+        fn impl_index_mut() {
+            let mut vec = vec1![ 1,2,3,3];
+            assert_eq!(&mut vec[..2], &mut [1,2]);
+        }
+
+
     }
 
 
