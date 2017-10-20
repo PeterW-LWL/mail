@@ -1,9 +1,8 @@
 
-use std::fmt;
+use std::{fmt, vec, slice};
 use std::ops::{ Deref, DerefMut, Index, IndexMut};
 use std::result::{ Result as StdResult };
 use std::error::{ Error as StdError };
-use std::vec::IntoIter;
 use std::iter::{IntoIterator, Extend};
 use std::borrow::{Borrow, BorrowMut};
 
@@ -45,7 +44,7 @@ pub struct Vec1<T>(Vec<T>);
 
 impl<T> IntoIterator for Vec1<T> {
     type Item = T;
-    type IntoIter = IntoIter<T>;
+    type IntoIter = vec::IntoIter<T>;
 
     fn into_iter( self ) -> Self::IntoIter {
         self.0.into_iter()
@@ -335,6 +334,21 @@ impl<T> AsMut<Vec1<T>> for Vec1<T> {
     }
 }
 
+impl<'a, T> IntoIterator for &'a Vec1<T> {
+    type Item = &'a T;
+    type IntoIter = slice::Iter<'a, T>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.iter()
+    }
+}
+impl<'a, T> IntoIterator for &'a mut Vec1<T> {
+    type Item = &'a mut T;
+    type IntoIter = slice::IterMut<'a, T>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.iter_mut()
+    }
+}
+
 
 #[cfg(test)]
 mod test {
@@ -573,7 +587,11 @@ mod test {
         #[test]
         fn impl_into_iter_on_ref_mut() {
             let mut vec = vec1![ 1, 2, 3];
-            assert_eq!(6, (&mut vec).into_iter().sum());
+            assert_eq!(3, (&mut vec).into_iter().fold(0u8, |x, m| {
+                *m = *m + 1;
+                x + 1
+            }));
+            assert_eq!(vec, &[2,3,4]);
         }
 
 
