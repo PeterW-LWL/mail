@@ -6,6 +6,7 @@ use base64;
 use quoted_printable;
 use idna::uts46::{ Errors as PunyCodeErrors };
 use std::fmt::{self, Display};
+use std::path::PathBuf;
 
 #[derive(Debug)]
 pub struct MultipleErrorsWraper {
@@ -38,6 +39,11 @@ error_chain! {
 
 
     errors {
+
+        PathToFileWithoutFileName(path: PathBuf) {
+            description("malformed path for loading a file")
+            display("malformed path for loading a file: {:?}", path)
+        }
 
         MultipleErrors(errors: MultipleErrorsWraper) {
             description("multiple errors happened in the same operation")

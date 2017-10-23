@@ -13,6 +13,8 @@ extern crate rand;
 extern crate percent_encoding;
 extern crate soft_ascii_string;
 extern crate total_order_multi_map;
+extern crate tree_magic;
+
 #[cfg_attr(test, macro_use)]
 extern crate vec1;
 

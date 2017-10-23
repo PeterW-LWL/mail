@@ -2,10 +2,13 @@
 use futures::Future;
 use utils::SendBoxFuture;
 
-use futures_cpupool::CpuPool;
+use futures_cpupool::{ CpuPool, Builder};
 
 use mail::RunElsewhere;
 
+pub fn simple_cpu_pool() -> CpuPool {
+    Builder::new().create()
+}
 
 impl RunElsewhere for CpuPool {
     /// executes the futures `fut` "elswhere" e.g. in a cpu pool
