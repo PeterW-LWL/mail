@@ -67,4 +67,4 @@ default_impl_name_composer = ["default_impl_any"]
 default_impl_vfs = ["default_impl_any"]
 
 [workspace]
-members = ["total-order-multi-map", "vec1"]
+members = ["total-order-multi-map", "vec1", "core"]
