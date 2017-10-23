@@ -454,18 +454,6 @@ mod test {
         assert_eq!( b"=C3=96se", data );
     }
 
-    #[ignore]
-    #[test]
-    fn test_use_name() {
-        unimplemented!();
-    }
-
-    #[ignore]
-    #[test]
-    fn test_sniff_mime() {
-        unimplemented!();
-    }
-
 
     #[test]
     fn from_text_works() {
