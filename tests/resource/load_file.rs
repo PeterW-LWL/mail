@@ -79,7 +79,7 @@ fn does_sniff_pdf_collision() {
     // (it detects it as `text/x-tex` as both can start with `%` followed by
     // utf8 (most pdf's are not valid utf8 so this normally does not happen)
     // the problem is that the pdf match still has a (much) higher wight than
-    // the other one but still does not get choosen as `tree_magic` does not
+    // the other one but still does not get chosen as `tree_magic` does not
     // use whights once it finds a match it's done...
     _does_sniff("/tmp/minimal.pdf", "application/pdf")
 }
@@ -97,7 +97,7 @@ fn get_name_from_path() {
 
     let fbuf: &FileBuffer  = &**tenc_buffer;
 
-    assert_eq!(fbuf.file_meta().file_name, Some("img.png    ".to_owned()));
+    assert_eq!(fbuf.file_meta().file_name, Some("img.png".to_owned()));
 }
 
 #[test]
@@ -114,3 +114,16 @@ fn use_name_is_used() {
     assert_eq!(fbuf.file_meta().file_name, Some("That Image".to_owned()));
 }
 
+#[test]
+fn use_mime_is_used() {
+    let resource =
+        loaded_resource("img.png", None, Some("text/plain; charset=utf8"));
+
+    let tenc_buffer = resource.get_if_encoded()
+        .expect("no problems witht the lock")
+        .expect("it to be encoded");
+
+    let fbuf: &FileBuffer  = &**tenc_buffer;
+
+    assert_eq!(fbuf.content_type(), &"text/plain; charset=utf8");
+}
