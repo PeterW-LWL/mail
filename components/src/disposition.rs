@@ -2,11 +2,12 @@ use std::ascii::AsciiExt;
 
 use soft_ascii_string::SoftAsciiStr;
 
-use error::*;
-use codec::{EncodableInHeader, EncodeHandle};
-use utils::{ FileMeta, HeaderTryFrom };
-use components::mime::create_encoded_mime_parameter;
+use core::error::*;
+use core::codec::{EncodableInHeader, EncodeHandle};
+use core::utils::{ FileMeta, HeaderTryFrom };
 
+use mime_tools::create_encoded_mime_parameter;
+use error::ComponentError::InvalidContentDisposition;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct Disposition {
@@ -62,7 +63,7 @@ impl<'a> HeaderTryFrom<&'a str> for Disposition {
         } else if text.eq_ignore_ascii_case( "Attachment" ) {
             Ok( Disposition::attachment() )
         } else {
-            bail!( "content disposition can either be Inline or Attachment nothing else" )
+            bail!(InvalidContentDisposition(text.to_owned()))
         }
     }
 }

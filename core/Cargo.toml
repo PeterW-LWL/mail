@@ -31,3 +31,8 @@ git = "https://github.com/1aim/soft-ascii-string"
 
 [dependencies.total-order-multi-map]
 path = "../total-order-multi-map"
+
+
+[features]
+default = []
+traceing = []

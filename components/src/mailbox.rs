@@ -1,8 +1,8 @@
 use soft_ascii_string::SoftAsciiChar;
 
-use error::*;
-use utils::{HeaderTryFrom, HeaderTryInto};
-use codec::{EncodableInHeader, EncodeHandle};
+use core::error::*;
+use core::utils::{HeaderTryFrom, HeaderTryInto};
+use core::codec::{EncodableInHeader, EncodeHandle};
 
 use super::Phrase;
 use super::Email;
@@ -90,7 +90,7 @@ impl EncodableInHeader for  Mailbox {
 
 #[cfg(test)]
 mod test {
-    use data::FromInput;
+    use core::data::FromInput;
     use components::{ Email, Phrase };
     use super::*;
 

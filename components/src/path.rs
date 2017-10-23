@@ -1,8 +1,8 @@
 use soft_ascii_string::SoftAsciiChar;
 
-use error::*;
-use utils::{HeaderTryFrom, HeaderTryInto};
-use codec::{EncodableInHeader, EncodeHandle};
+use core::error::*;
+use core::utils::{HeaderTryFrom, HeaderTryInto};
+use core::codec::{EncodableInHeader, EncodeHandle};
 use super::Email;
 
 
@@ -41,7 +41,7 @@ impl EncodableInHeader for  Path {
 #[cfg(test)]
 mod test {
     use super::*;
-    use data::FromInput;
+    use core::data::FromInput;
 
     ec_test!{empty_path, {
         Path( None )

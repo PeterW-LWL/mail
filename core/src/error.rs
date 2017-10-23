@@ -40,6 +40,10 @@ error_chain! {
 
     errors {
 
+        HeaderComponentEncodingFailure {
+            description("encoding header component failed")
+        }
+
         PathToFileWithoutFileName(path: PathBuf) {
             description("malformed path for loading a file")
             display("malformed path for loading a file: {:?}", path)

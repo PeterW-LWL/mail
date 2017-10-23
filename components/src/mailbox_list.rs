@@ -1,11 +1,13 @@
 
-
-use error::*;
-use soft_ascii_string::SoftAsciiChar;
-use codec::{EncodableInHeader, EncodeHandle};
-
 use vec1::Vec1;
-use utils::{ HeaderTryFrom, HeaderTryInto};
+use soft_ascii_string::SoftAsciiChar;
+
+use core::error::*;
+use core::codec::{EncodableInHeader, EncodeHandle};
+use core::utils::{ HeaderTryFrom, HeaderTryInto};
+
+use error::ComponentError::MailboxListSize0;
+
 use super::Mailbox;
 
 #[derive(Debug)]
@@ -60,7 +62,7 @@ fn try_from_into_iter<IT>( mboxes: IT ) -> Result<MailboxList>
     let mut vec = if let Some( first) = iter.next() {
         Vec1::new( first.try_into()? )
     } else {
-        bail!( "header needs at last one mailbox" );
+        bail!(MailboxListSize0);
     };
     for mbox in iter {
         vec.push( mbox.try_into()? );
@@ -243,7 +245,7 @@ deref0!{ +mut MailboxList => Vec1<Mailbox> }
 
 #[cfg(test)]
 mod test {
-    use data::FromInput;
+    use core::data::FromInput;
     use components::{ Mailbox, Email, Phrase };
     use super::*;
 

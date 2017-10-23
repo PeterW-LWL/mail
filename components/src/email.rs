@@ -1,10 +1,10 @@
 use soft_ascii_string::SoftAsciiChar;
 
-use error::*;
-use codec::{self, EncodeHandle, EncodableInHeader };
-use codec::idna;
+use core::error::*;
+use core::codec::{self, EncodeHandle, EncodableInHeader };
+use core::codec::idna;
 
-use grammar::{
+use core::grammar::{
     is_ascii,
     is_atext,
     is_dtext,
@@ -12,8 +12,9 @@ use grammar::{
     MailType
 };
 
-use data::{FromInput, Input, SimpleItem, InnerUtf8 };
+use core::data::{FromInput, Input, SimpleItem, InnerUtf8 };
 
+use error::ComponentError::{InvalidDomainName, InvalidEmail};
 
 /// an email of the form `local-part@domain`
 /// corresponds to RFC5322 addr-spec, so `<`, `>` padding is _not_
@@ -43,7 +44,7 @@ impl FromInput for Email {
                 //1. ownify Input
                 //2. get 2 sub shares split befor/after @
                 let index = shared.find( "@" )
-                    .ok_or_else( ||-> Error { "invalide email".into() } )?; //bail!( "" )
+                    .ok_or_else( || { bail!(InvalidEmail(shared.to_owned())) })?;
 
                 let left = shared.clone().map( |all| &all[..index] );
                 let local_part = LocalPart::from_input( Input( InnerUtf8::Shared( left ) ) )?;
@@ -75,7 +76,7 @@ impl FromInput for LocalPart {
 
 }
 
-impl EncodableInHeader  for LocalPart {
+impl EncodableInHeader for LocalPart {
 
     fn encode(&self, handle: &mut EncodeHandle) -> Result<()> {
         let input: &str = &*self.0;
@@ -132,7 +133,7 @@ impl Domain {
             for char in domain.chars() {
                 if ascii { ascii = is_ascii( char ) }
                 if !( is_dtext( char, MailType::Internationalized) || is_ws( char ) ) {
-                    bail!( "illigal domain-literal: {:?}", domain );
+                    bail!(InvalidDomainName(domain.to_owned()));
                 }
             }
         } else {
@@ -145,7 +146,7 @@ impl Domain {
                 if char == '.' && dot_alowed {
                     dot_alowed = false;
                 } else if !is_atext( char, MailType::Internationalized ) {
-                    bail!( "invalide domain name: {:?}", domain )
+                    bail!(InvalidDomainName(domain.to_owned()));
                 } else {
                     dot_alowed = true;
                 }
@@ -185,7 +186,7 @@ impl EncodableInHeader for  Domain {
 
 #[cfg(test)]
 mod test {
-    use codec::{ Encoder, VecBodyBuf};
+    use core::codec::{ Encoder, VecBodyBuf};
     use super::*;
 
     #[test]

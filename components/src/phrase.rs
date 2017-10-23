@@ -1,9 +1,9 @@
-use error::*;
 use vec1::Vec1;
-use codec::{EncodableInHeader, EncodeHandle};
-use grammar::encoded_word::EncodedWordContext;
+use core::error::*;
+use core::grammar::encoded_word::EncodedWordContext;
+use core::codec::{EncodableInHeader, EncodeHandle};
+use core::data::{ FromInput, Input };
 
-use data::{ FromInput, Input };
 use super::utils::text_partition::{ Partition, partition };
 use super::word::{ Word, do_encode_word };
 use super::{ CFWS, FWS };
@@ -65,7 +65,7 @@ impl EncodableInHeader for  Phrase {
 
 #[cfg(test)]
 mod test {
-    use data::FromInput;
+    use core::data::FromInput;
     use super::Phrase;
 
     ec_test!{ simple, {

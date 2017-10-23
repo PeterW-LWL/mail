@@ -5,10 +5,12 @@ use std::borrow::Cow;
 use mime;
 use soft_ascii_string::SoftAsciiStr;
 
-use error::*;
-use utils::HeaderTryFrom;
-use grammar::{ is_token, MailType};
-use codec::{EncodableInHeader, EncodeHandle, self };
+use core::error::*;
+use core::utils::HeaderTryFrom;
+use core::grammar::{ is_token, MailType};
+use core::codec::{EncodableInHeader, EncodeHandle, self };
+
+use error::ComponentError::InvalidToken;
 
 pub use mime::Mime;
 
@@ -67,7 +69,7 @@ pub fn create_encoded_mime_parameter<K,V>(
 }
 
 pub fn create_mime<T, ST, I, K, V>(_type: T, subtype: ST, params: I, mt: MailType)
-    -> Result<mime::Mime>
+    -> Result<mime_tools::Mime>
     where T: AsRef<str>, ST: AsRef<str>,
           I: IntoIterator<Item=(K, V)>, K: AsRef<str>, V: AsRef<str>
 {
@@ -78,19 +80,19 @@ pub fn create_mime<T, ST, I, K, V>(_type: T, subtype: ST, params: I, mt: MailTyp
 
     //UNWRAP_SAFE: we do not have a unsafe mime constructor so we have to parse
     //it even through it can not be invalid
-    Ok( string.parse::<mime::Mime>().expect("[BUG] mime generator generated invalid mime") )
+    Ok( string.parse::<mime_tools::Mime>().expect("[BUG] mime generator generated invalid mime") )
 }
 
 fn assure_token(s: &str) -> Result<&str> {
     if !is_token(s) {
-        bail!("string {:?} is not a valid token", s);
+        bail!(InvalidToken(s));
     }
     Ok(s)
 }
 
 // as we are in the same package as the definition of HeaderTryFrom
 // this is possible even with orphan rules
-impl<'a> HeaderTryFrom<&'a str> for mime::Mime {
+impl<'a> HeaderTryFrom<&'a str> for mime_tools::Mime {
     fn try_from(val: &'a str) -> Result<Self> {
         val.parse()
             .map_err( |ferr| ErrorKind::ParsingMime( ferr ).into() )
@@ -98,7 +100,7 @@ impl<'a> HeaderTryFrom<&'a str> for mime::Mime {
 }
 
 
-impl EncodableInHeader for  mime::Mime {
+impl EncodableInHeader for  mime_tools::Mime {
 
     fn encode(&self, handle: &mut EncodeHandle) -> Result<()> {
         let res = self.to_string();

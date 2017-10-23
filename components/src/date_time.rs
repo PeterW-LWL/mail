@@ -1,9 +1,9 @@
 use soft_ascii_string::SoftAsciiStr;
 
-use error::*;
-use codec::{EncodableInHeader, EncodeHandle};
+use core::error::*;
+use core::codec::{EncodableInHeader, EncodeHandle};
 
-pub use utils::DateTime;
+pub use core::utils::DateTime;
 
 impl EncodableInHeader for DateTime {
 

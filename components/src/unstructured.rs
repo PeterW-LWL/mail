@@ -2,14 +2,16 @@ use std::ops::{ Deref, DerefMut};
 
 use soft_ascii_string::SoftAsciiChar;
 
-use error::*;
-use grammar::is_vchar;
-use grammar::encoded_word::EncodedWordContext;
-use codec::{EncodeHandle, EncodableInHeader, EncodedWordEncoding};
-use data::{ FromInput, EncodedWord };
+use core::error::*;
+use core::grammar::is_vchar;
+use core::grammar::encoded_word::EncodedWordContext;
+use core::codec::{EncodeHandle, EncodableInHeader, EncodedWordEncoding};
+use core::data::{ FromInput, EncodedWord };
+use core::data::Input;
+
+use error::ComponentError::WSPOnlyPhrase;
 
 use super::utils::text_partition::{partition, Partition};
-use data::Input;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Unstructured {
@@ -99,8 +101,7 @@ impl EncodableInHeader for  Unstructured {
         if had_word {
             Ok( () )
         } else {
-            bail!( concat!( "can not encode WSP only phrase,",
-                            "a phrase is required to contain at last one word" ) );
+            bail!(WSPOnlyPhrase);
         }
 
     }
@@ -109,8 +110,8 @@ impl EncodableInHeader for  Unstructured {
 
 #[cfg(test)]
 mod test {
-    use grammar::MailType;
-    use codec::{Encoder, VecBodyBuf};
+    use core::grammar::MailType;
+    use core::codec::{Encoder, VecBodyBuf};
 
     use super::*;
 

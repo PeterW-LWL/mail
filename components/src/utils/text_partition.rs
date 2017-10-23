@@ -1,5 +1,7 @@
-use error::*;
-use grammar::{is_vchar, is_ws, MailType };
+use core::error::*;
+use core::grammar::{is_vchar, is_ws, MailType };
+
+use error::ComponentError::NeedAtLastOneVCHAR;
 
 #[derive(Copy, Clone)]
 pub enum Partition<'a> {
@@ -42,7 +44,7 @@ pub fn partition<'a>( text: &'a str ) -> Result< Vec< Partition<'a> > > {
                 current_type = SPACE
             }
         } else {
-            bail!( "non encodable character found: {:?}", char );
+            bail!(NeedAtLastOneVCHAR(text.to_owned()));
         }
     }
 

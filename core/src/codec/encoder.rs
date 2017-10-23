@@ -143,7 +143,7 @@ impl<R> Section<R>
 pub struct Encoder<R: BodyBuffer> {
     mail_type: MailType,
     sections: Vec<Section<R>>,
-    #[cfg(test)]
+    #[cfg(feature="traceing")]
     pub trace: Vec<TraceToken>
 }
 
@@ -156,7 +156,7 @@ pub struct Encoder<R: BodyBuffer> {
 /// For example when calling `.write_utf8("hy")`
 /// following tokens will be added:
 /// `[NowUtf8, Text("hy")]`
-#[cfg(test)]
+#[cfg(feature="traceing")]
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum TraceToken {
     MarkFWS,
@@ -186,7 +186,7 @@ impl<B: BodyBuffer> Encoder<B> {
         Encoder {
             mail_type,
             sections: Default::default(),
-            #[cfg(test)]
+            #[cfg(feature="traceing")]
             trace: Vec::new()
         }
     }
@@ -205,14 +205,14 @@ impl<B: BodyBuffer> Encoder<B> {
         if let Some(&Section::String(..)) = self.sections.last() {}
         else {
             self.sections.push(Section::String(String::new()));
-            #[cfg(test)]
+            #[cfg(feature="traceing")]
             { self.trace.push(TraceToken::NewSection) }
         }
 
         if let Some(&mut Section::String(ref mut string)) = self.sections.last_mut() {
-            #[cfg(not(test))]
+            #[cfg(not(feature="traceing"))]
             { EncodeHandle::new(self.mail_type, string) }
-            #[cfg(test)]
+            #[cfg(feature="traceing")]
             { EncodeHandle::new(self.mail_type, string, &mut self.trace) }
         } else {
             //REFACTOR(NLL): with NLL we can combine both if-else blocks not needing unreachable! anymore
@@ -248,13 +248,13 @@ impl<B: BodyBuffer> Encoder<B> {
         if let Some(&Section::String(..)) = self.sections.last() {}
             else {
                 self.sections.push(Section::String(String::new()));
-                #[cfg(test)]
+                #[cfg(feature="traceing")]
                 { self.trace.push(TraceToken::NewSection); }
             }
 
         if let Some(&mut Section::String(ref mut string)) = self.sections.last_mut() {
             string.push_str("\r\n");
-            #[cfg(test)]
+            #[cfg(feature="traceing")]
             { self.trace.push(TraceToken::BlankLine); }
         } else {
             //REFACTOR(NLL): with NLL we can combine both if-else blocks not needing unreachable! anymore
@@ -317,7 +317,7 @@ impl<B: BodyBuffer> Encoder<B> {
 ///
 pub struct EncodeHandle<'a> {
     buffer: &'a mut String,
-    #[cfg(test)]
+    #[cfg(feature="traceing")]
     trace: &'a mut Vec<TraceToken>,
     mail_type: MailType,
     line_start_idx: usize,
@@ -332,11 +332,11 @@ pub struct EncodeHandle<'a> {
     /// line).
     content_before_fws: bool,
     header_start_idx: usize,
-    #[cfg(test)]
+    #[cfg(feature="traceing")]
     trace_start_idx: usize
 }
 
-#[cfg(test)]
+#[cfg(feature="traceing")]
 impl<'a> Drop for EncodeHandle<'a> {
 
     fn drop(&mut self) {
@@ -351,7 +351,7 @@ impl<'a> Drop for EncodeHandle<'a> {
 
 impl<'inner> EncodeHandle<'inner> {
 
-    #[cfg(not(test))]
+    #[cfg(not(feature="traceing"))]
     fn new(
         mail_type: MailType,
         buffer: &'inner mut String,
@@ -369,7 +369,7 @@ impl<'inner> EncodeHandle<'inner> {
         }
     }
 
-    #[cfg(test)]
+    #[cfg(feature="traceing")]
     fn new(
         mail_type: MailType,
         buffer: &'inner mut String,
@@ -399,7 +399,7 @@ impl<'inner> EncodeHandle<'inner> {
         self.content_since_fws = false;
         self.content_before_fws = false;
         self.header_start_idx = start_idx;
-        #[cfg(test)]
+        #[cfg(feature="traceing")]
         { self.trace_start_idx = self.trace.len(); }
     }
 
@@ -429,7 +429,7 @@ impl<'inner> EncodeHandle<'inner> {
     /// # Trace (test build only)
     /// does push a `MarkFWS` Token
     pub fn mark_fws_pos(&mut self) {
-        #[cfg(test)]
+        #[cfg(feature="traceing")]
         { self.trace.push(TraceToken::MarkFWS) }
         self.content_before_fws |= self.content_since_fws;
         self.content_since_fws = false;
@@ -446,7 +446,7 @@ impl<'inner> EncodeHandle<'inner> {
     /// # Trace (test build only)
     /// does push `NowChar` and then can push `Text`,`CRLF`
     pub fn write_char(&mut self, ch: SoftAsciiChar) -> Result<()>  {
-        #[cfg(test)]
+        #[cfg(feature="traceing")]
         { self.trace.push(TraceToken::NowChar) }
         self.internal_write_char(ch.into())
     }
@@ -467,7 +467,7 @@ impl<'inner> EncodeHandle<'inner> {
     /// does push `NowStr` and then can push `Text`,`CRLF`
     ///
     pub fn write_str(&mut self, s: &SoftAsciiStr)  -> Result<()>  {
-        #[cfg(test)]
+        #[cfg(feature="traceing")]
         { self.trace.push(TraceToken::NowStr) }
         self.internal_write_str(s.as_str())
     }
@@ -492,7 +492,7 @@ impl<'inner> EncodeHandle<'inner> {
         -> ConditionalWriteResult<'short, 'inner>
     {
         if self.mail_type().is_internationalized() {
-            #[cfg(test)]
+            #[cfg(feature="traceing")]
             { self.trace.push(TraceToken::NowUtf8) }
             self.internal_write_str(s).into()
         } else {
@@ -502,7 +502,7 @@ impl<'inner> EncodeHandle<'inner> {
 
     pub fn write_utf8(&mut self, s: &str) -> Result<()> {
         if self.mail_type().is_internationalized() {
-            #[cfg(test)]
+            #[cfg(feature="traceing")]
             { self.trace.push(TraceToken::NowUtf8) }
             self.internal_write_str(s).into()
         } else {
@@ -541,7 +541,7 @@ impl<'inner> EncodeHandle<'inner> {
         -> ConditionalWriteResult<'short, 'inner>
     {
         if s.chars().all( |ch| is_atext( ch, self.mail_type() ) ) {
-            #[cfg(test)]
+            #[cfg(feature="traceing")]
             { self.trace.push(TraceToken::NowAText) }
             // the ascii or not aspect is already converted by `is_atext`
             self.internal_write_str(s).into()
@@ -556,7 +556,7 @@ impl<'inner> EncodeHandle<'inner> {
     /// with the mail type, if not used correctly this can write Utf8 to
     /// an Ascii Mail, which is incorrect but has to be safe wrt. rust's safety.
     pub fn write_str_unchecked( &mut self, s: &str) -> Result<()> {
-        #[cfg(test)]
+        #[cfg(feature="traceing")]
         { self.trace.push(TraceToken::NowUnchecked) }
         self.internal_write_str(s)
     }
@@ -580,7 +580,7 @@ impl<'inner> EncodeHandle<'inner> {
     ///   will not generate multiple `End` tokens, just one
     pub fn finish_header(&mut self) {
         self.start_new_line();
-        #[cfg(test)]
+        #[cfg(feature="traceing")]
         { if let Some(&TraceToken::End) = self.trace.last() {}
             else { self.trace.push(TraceToken::End) } }
         self.reinit();
@@ -597,7 +597,7 @@ impl<'inner> EncodeHandle<'inner> {
     ///
     pub fn undo_header(&mut self) {
         self.buffer.truncate(self.header_start_idx);
-        #[cfg(test)]
+        #[cfg(feature="traceing")]
         { self.trace.truncate(self.trace_start_idx); }
         self.reinit();
     }
@@ -646,13 +646,13 @@ impl<'inner> EncodeHandle<'inner> {
     /// removing the blank line (not that WS are only ' ' and '\r')
     fn start_new_line(&mut self) {
         if self.line_has_content() {
-            #[cfg(test)]
+            #[cfg(feature="traceing")]
             { self.trace.push(TraceToken::CRLF) }
 
             self.buffer.push('\r');
             self.buffer.push('\n');
         } else {
-            #[cfg(test)]
+            #[cfg(feature="traceing")]
             {
                 if self.buffer.len() > self.line_start_idx {
                     self.trace.push(TraceToken::TruncateToCRLF);
@@ -716,7 +716,7 @@ impl<'inner> EncodeHandle<'inner> {
         }
 
         self.buffer.push(ch);
-        #[cfg(test)]
+        #[cfg(feature="traceing")]
         {
             //REFACTOR(NLL): just use a `if let`-`else` with NLL's
             let need_new =
@@ -799,7 +799,7 @@ pub trait Encodable<B: BodyBuffer> {
     fn encode( &self, encoder:  &mut Encoder<B>) -> Result<()>;
 }
 
-#[cfg(test)]
+#[cfg(feature="traceing")]
 pub fn simplify_trace_tokens<I: IntoIterator<Item=TraceToken>>(inp: I) -> Vec<TraceToken> {
     use std::mem;
     use self::TraceToken::*;
@@ -842,7 +842,7 @@ pub fn simplify_trace_tokens<I: IntoIterator<Item=TraceToken>>(inp: I) -> Vec<Tr
     out
 }
 
-#[cfg(test)]
+#[cfg(feature="traceing")]
 #[macro_export]
 macro_rules! ec_test {
     ( $name:ident, $inp:block => $mt:tt => [ $($tokens:tt)* ] ) => (
@@ -920,11 +920,20 @@ macro_rules! ec_test {
 //    )
 }
 
-#[cfg(test)]
+
+#[cfg(all(not(feature="traceing"), test))]
+mod test {
+    #[test]
+    fn require_tracing_feature_for_tests() {
+        panic!("the feature tracing is required for tests")
+    }
+}
+
+#[cfg(all(feature="traceing", test))]
 mod test {
     use soft_ascii_string::{ SoftAsciiChar, SoftAsciiStr};
-    use error::*;
-    use grammar::MailType;
+    use core::error::*;
+    use core::grammar::MailType;
 
     use super::TraceToken::*;
     use super::{

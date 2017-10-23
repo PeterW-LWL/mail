@@ -1,0 +1,29 @@
+[package]
+name = "mail-codec-components"
+version = "0.0.1"
+authors = ["Philipp Korber <philippkorber@gmail.com>"]
+description = "TODO"
+documentation = "https://docs.rs/mail-codec-components"
+keywords = []
+categories = []
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/1aim/mail-codec"
+
+[dependencies]
+nom = "3.1.0"
+mime = "0.3.2"
+quick-error = "1.2.1"
+
+
+[dependencies.soft-ascii-string]
+git = "https://github.com/1aim/soft-ascii-string"
+
+[dependencies.mail-codec-core]
+path = "../core"
+
+[dependencies.vec1]
+path = "../vec1"
+
+
+[features]
+traceing = [ "mail-codec-core/traceing" ]

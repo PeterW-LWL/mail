@@ -45,6 +45,9 @@ path = "./vec1"
 [dependencies.mail-codec-core]
 path = "./core"
 
+[dependencies.mail-codec-components]
+path = "./components"
+
 [dev-dependencies]
 serde_json = "1.0.2"
 
@@ -60,6 +63,7 @@ default_impl_fs = ["default_impl_any"]
 default_impl_mail = ["default_impl_cpupool", "default_impl_fs", "default_impl_vfs"]
 default_impl_name_composer = ["default_impl_any"]
 default_impl_vfs = ["default_impl_any"]
+traceing = [ "mail-codec-core/traceing", "mail-codec-components/traceing" ]
 
 [workspace]
-members = ["total-order-multi-map", "vec1", "core"]
+members = ["total-order-multi-map", "vec1", "core", "components"]

@@ -1,15 +1,16 @@
 
-use soft_ascii_string::SoftAsciiChar;
-
 use nom::IResult;
 
-use error::*;
+use soft_ascii_string::SoftAsciiChar;
 use vec1::Vec1;
-use codec::{EncodableInHeader, EncodeHandle};
 
-use data::{ FromInput, Input, SimpleItem };
+use core::error::*;
+use core::codec::{EncodableInHeader, EncodeHandle};
+use core::data::{ FromInput, Input, SimpleItem };
 
-#[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize)]
+use error::ComponentError::InvalidMessageId;
+
+#[derive(Debug, Clone, Hash, Eq, PartialEq)]
 pub struct MessageID {
     message_id: SimpleItem
 }
@@ -30,7 +31,7 @@ impl FromInput for MessageID {
 
         match parse_message_id( &**input ) {
             IResult::Done( "", _msg_id ) => {},
-            other => bail!( "invalid message id \"{:?}\" (parse result: {:?})", input, other )
+            other => bail!(InvalidMessageId(input.as_str().to_owned(), other))
         }
 
 
@@ -73,8 +74,8 @@ impl EncodableInHeader for  MessageIDList {
 
 #[cfg(test)]
 mod test {
-    use grammar::MailType;
-    use codec::{ Encoder, VecBodyBuf };
+    use core::grammar::MailType;
+    use core::codec::{ Encoder, VecBodyBuf };
     use super::*;
 
     ec_test!{ simple, {
@@ -125,7 +126,7 @@ mod test {
 
 mod parser_parts {
     use nom::IResult;
-    use grammar::{is_atext, is_dtext, MailType };
+    use core::grammar::{is_atext, is_dtext, MailType };
 
     pub fn parse_message_id( input: &str) -> IResult<&str, (&str, &str)> {
         do_parse!( input,

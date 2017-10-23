@@ -1,13 +1,13 @@
-use error::*;
-use codec::{
+use core::error::*;
+use core::codec::{
     EncodedWordEncoding,
     EncodableInHeader, EncodeHandle
 };
 
-use grammar::is_atext;
-use grammar::encoded_word::EncodedWordContext;
+use core::grammar::is_atext;
+use core::grammar::encoded_word::EncodedWordContext;
 
-use data::{
+use core::data::{
     FromInput,
     Input,
     EncodedWord,
@@ -96,10 +96,10 @@ pub fn do_encode_word<'a,'b: 'a>(
 mod test {
     use std::mem;
 
-    use grammar::MailType;
-    use codec::{ Encoder, VecBodyBuf, EncodableClosure};
-    use codec::TraceToken::*;
-    use codec::simplify_trace_tokens;
+    use core::grammar::MailType;
+    use core::codec::{ Encoder, VecBodyBuf, EncodableClosure};
+    use core::codec::TraceToken::*;
+    use core::codec::simplify_trace_tokens;
 
     use super::*;
     use super::super::FWS;

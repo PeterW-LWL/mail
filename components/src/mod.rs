@@ -29,8 +29,8 @@ pub use self::cfws::{ CFWS, FWS };
 mod date_time;
 pub use self::date_time::DateTime;
 
-pub mod mime;
-pub use self::mime::Mime;
+pub mod mime_tools;
+pub use self::mime_tools::Mime;
 
 mod path;
 pub use self::path::Path;

@@ -1,9 +1,11 @@
 use soft_ascii_string::SoftAsciiChar;
 
-use error::*;
-use codec::{EncodableInHeader, EncodeHandle};
+use core::error::*;
+use core::codec::{EncodableInHeader, EncodeHandle};
 use vec1::Vec1;
-use utils::{ HeaderTryFrom, HeaderTryInto };
+use core::utils::{ HeaderTryFrom, HeaderTryInto };
+
+use error::ComponentError::PhraseListSize0;
 
 use super::Phrase;
 
@@ -57,7 +59,7 @@ fn try_from_into_iter<IT>( phrases: IT ) -> Result<PhraseList>
     let mut vec = if let Some( first) = iter.next() {
         Vec1::new( first.try_into()? )
     } else {
-        bail!( "header needs at last one mailbox" );
+        bail!(PhraseListSize0);
     };
     for phrase in iter {
         vec.push( phrase.try_into()? );
@@ -95,7 +97,7 @@ impl_header_try_from_array! {
 
 #[cfg(test)]
 mod test {
-    use data::FromInput;
+    use core::data::FromInput;
     use super::*;
 
     ec_test!{ some_phrases, {
