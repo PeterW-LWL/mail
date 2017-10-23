@@ -1,8 +1,11 @@
 #![recursion_limit="128"]
+
+#[cfg_attr(test, macro_use)]
+extern crate mail_codec_core;
+
 #[macro_use]
 extern crate log;
 extern crate mime;
-extern crate owning_ref;
 extern crate quoted_printable;
 extern crate idna;
 extern crate chrono;
@@ -24,23 +27,11 @@ extern crate serde_derive;
 #[macro_use]
 extern crate scoped_tls;
 
-#[macro_use]
-extern crate nom;
-
-#[macro_use]
-extern crate error_chain;
-
 
 #[cfg(feature="default_impl_cpupool")]
 extern crate futures_cpupool;
 
-#[macro_use]
-mod macros;
 
-#[macro_use]
-pub mod utils;
-pub mod error;
-pub mod grammar;
 #[macro_use]
 pub mod external;
 #[cfg_attr(test, macro_use)]

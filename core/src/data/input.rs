@@ -58,12 +58,18 @@ impl<'a> From<&'a str> for Input {
         Input( InnerUtf8::Owned( s.into() ) )
     }
 }
+
 impl From<String> for Input {
     fn from( s: String ) -> Self {
         Input( InnerUtf8::Owned( s ) )
     }
 }
 
+impl Into<String> for Input {
+    fn into(self) -> String {
+        self.0.into()
+    }
+}
 
 deref0!( +mut Input => InnerUtf8 );
 

@@ -1,16 +1,9 @@
-use futures::Future;
-use std::marker::Send;
 use std::any::TypeId;
 use std::cell::RefCell;
 use std::mem;
 use std::fmt::{self, Debug};
 
-#[cfg(test)]
-use futures::sync::oneshot;
-#[cfg(test)]
-use std::time::Duration;
-#[cfg(test)]
-use std::thread;
+
 
 use mime::{ Mime, MULTIPART };
 use error::Error;
@@ -50,18 +43,6 @@ pub fn is_multipart_mime( mime: &Mime ) -> bool {
 }
 
 
-#[cfg(test)]
-pub(crate) fn timeout( s: u32, ms: u32 ) -> oneshot::Receiver<()> {
-    let (timeout_trigger, timeout) = oneshot::channel::<()>();
-
-    thread::spawn( move || {
-        thread::sleep( Duration::new( s as u64, ms * 1_000_000) );
-        //we do not care if it faile i.e. the receiver got dropped
-        let _ = timeout_trigger.send( () );
-    });
-
-    timeout
-}
 
 //TODO replace with std TryFrom once it is stable
 // (either a hard replace, or a soft replace which implements HeaderTryFrom if TryFrom exist)
@@ -81,20 +62,20 @@ impl<F, T> HeaderTryInto<T> for F where T: HeaderTryFrom<F> {
 
 // if the HeaderTryFrom chain is again liked with the From chain this
 // must be removed as it will be carried over by the from chain
-impl<T> HeaderTryFrom<T> for T {
-    fn try_from(val: T) -> Result<Self, Error> {
-        Ok( val )
-    }
-}
+//impl<T> HeaderTryFrom<T> for T {
+//    fn try_from(val: T) -> Result<Self, Error> {
+//        Ok( val )
+//    }
+//}
 
 //FOR some reason if this is there HeaderTryFrom<&str> for Mime wont work
 // EVEN THROUGH mime does not has any other From/Into/HeaderTryFrom/HeaderTryInto
 // implementaion
-//impl<T,F> HeaderTryFrom<F> for T where F: Into<T> {
-//    fn try_from(val: F) -> Result<T, Error> {
-//        Ok( val.into() )
-//    }
-//}
+impl<T,F> HeaderTryFrom<F> for T where F: Into<T> {
+    fn try_from(val: F) -> Result<T, Error> {
+        Ok( val.into() )
+    }
+}
 
 
 
@@ -167,6 +148,6 @@ pub fn uneraser_mut<GOT: 'static, EXP: 'static>(inp: &mut GOT ) -> Option<&mut E
 //    out
 //}
 
-pub type SendBoxFuture<I, E> = Box<Future<Item=I, Error=E>+Send>;
+
 
 

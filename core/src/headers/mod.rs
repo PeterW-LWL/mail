@@ -7,8 +7,8 @@ use grammar::is_ftext;
 
 
 #[macro_use]
-mod default_header;
-pub use self::default_header::*;
+mod header_macro;
+pub use self::header_macro::*;
 
 #[macro_use]
 mod map;

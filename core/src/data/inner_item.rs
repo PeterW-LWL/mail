@@ -140,7 +140,6 @@ macro_rules! inner_impl {
     );
 }
 
-
 inner_impl!{ InnerAscii, SoftAsciiString,  SoftAsciiStr }
 inner_impl!{ InnerUtf8, String, str }
 //inner_impl!{ InnerOtherItem, OtherString, OtherStr }

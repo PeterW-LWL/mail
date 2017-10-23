@@ -14,6 +14,7 @@ const NON_ECW_STRIP_WHITESPACE: bool = true;
 #[inline]
 pub fn normal_encode<R: AsRef<[u8]>>(input: R) -> SoftAsciiString {
     let res = extern_base64::encode_config( input.as_ref(), extern_base64::Config::new(
+        //FIXME: check if line wrap should be used here, I thinks it should
         CHARSET, USE_PADDING, NON_ECW_STRIP_WHITESPACE, LINE_WRAP
     ));
     SoftAsciiString::from_string_unchecked(res)

@@ -438,54 +438,70 @@ macro_rules! headers {
 mod test {
     use soft_ascii_string::SoftAsciiStr;
 
-    use components::{
-        Mime, Unstructured,
-        MailboxList
-    };
-    use headers::{
-        ContentType, Subject,
-        From, To,
-        Comments
-    };
-
     use super::*;
-
+    use components::RawUnstructured;
+    use self::good_headers::*;
     use self::bad_headers::{
         Subject as BadSubject,
         Comments as BadComments
     };
 
-    mod bad_headers {
-        use components;
-        def_headers! {
-            test_name: validate_header_names,
-            scope: components,
-            1 Subject,  unchecked { "Subject" },  Mime, None,
-            + Comments, unchecked { "Comments" }, Mime, None
+    use utils::HeaderTryFrom;
+    use codec::{EncodableInHeader, EncodeHandle};
+
+    #[derive(Debug, Clone, Eq, PartialEq, Hash)]
+    pub struct OtherComponent;
+
+    impl HeaderTryFrom<()> for OtherComponent {
+        fn try_from(_: ()) -> Result<OtherComponent> {
+            Ok(OtherComponent)
+        }
+    }
+    impl EncodableInHeader for OtherComponent {
+        fn encode(&self, _encoder:  &mut EncodeHandle) -> Result<()> {
+            bail!("encoding is not implemented")
         }
     }
 
 
+    mod good_headers {
+        use components;
+        def_headers! {
+            test_name: validate_header_names,
+            scope: components,
+            1 Subject, unchecked { "Subject" }, RawUnstructured, None,
+            + Comments, unchecked { "Comments" }, RawUnstructured, None
+        }
+    }
+
+    mod bad_headers {
+        def_headers! {
+            test_name: validate_header_names,
+            scope: super,
+            1 Subject,  unchecked { "Subject" },  OtherComponent, None,
+            + Comments, unchecked { "Comments" }, OtherComponent, None
+        }
+    }
+
+    const TEXT_1: &str = "Random stuff XD";
+    const TEXT_2: &str = "Having a log of fun, yes a log!";
+
     #[test]
     fn headers_macro() {
         let headers = headers! {
-            ContentType: "text/plain; charset=us-ascii",
-            Subject: "Having a lot of fun",
-            From: [
-                ("Bla Blup", "bla.blub@not.a.domain")
-            ]
+            Comments: TEXT_1,
+            Subject: TEXT_2
         }.unwrap();
 
 
         let count = headers
             // all headers _could_ have multiple values, through neither
             // ContentType nor Subject do have multiple value
-            .get(ContentType)
-            .expect( "content type header must be present" )
-            .map( |h: Result<&Mime>| {
-                // each of the multiple values could have a different
-                // type then H::Component
-                h.expect( "the trait object to be downcastable to H::Component" );
+            .get(Comments)
+            .expect( "where did the header go?" )
+            .map( |h: Result<&RawUnstructured>| {
+                let v = h.expect( "the trait object to be downcastable to RawUnstructured" );
+                assert_eq!(v.as_str(), TEXT_1);
             })
             .count();
         assert_eq!( 1, count );
@@ -493,17 +509,9 @@ mod test {
         let count = headers
             .get(Subject)
             .expect( "content type header must be present" )
-            .map( |h: Result<&Unstructured>| {
-                h.expect( "the trait object to be downcastable to H::Component" );
-            })
-            .count();
-        assert_eq!( 1, count );
-
-        let count = headers
-            .get(From)
-            .expect( "content type header must be present" )
-            .map( |h: Result<&MailboxList>| {
-                h.expect( "the trait object to be downcastable to H::Component" );
+            .map( |h: Result<&RawUnstructured>| {
+                let val = h.expect( "the trait object to be downcastable to H::Component" );
+                assert_eq!(val.as_str(), TEXT_2);
             })
             .count();
         assert_eq!( 1, count );
@@ -515,7 +523,6 @@ mod test {
             Subject: "abc"
         }.unwrap();
 
-        assert_eq!( false, headers.get_single(From).is_some() );
         assert_eq!(
             "abc",
             headers.get_single(Subject)
@@ -532,8 +539,7 @@ mod test {
         }.unwrap();
 
         let res = headers.get_single(BadSubject);
-        assert_eq!( true, res.is_some() );
-        assert_err!( res.unwrap() );
+        assert_err!( res.expect("where did the header go?") );
     }
 
     #[test]
@@ -541,14 +547,14 @@ mod test {
         let headers = headers! {
             Subject: "abc",
             Comments: "1st",
-            BadComments: "text/plain"
+            BadComments: ()
         }.unwrap();
 
 
         let mut res = headers.get(Comments)
             .unwrap();
 
-        assert_eq!((2, Some(2)), res.size_hint());
+        assert_eq!(res.size_hint(), (2, Some(2)));
 
         assert_eq!(
             "1st",
@@ -566,18 +572,18 @@ mod test {
         let headers = headers! {
             Subject: "abc",
             Comments: "1st",
-            BadComments: "text/plain"
+            BadComments: ()
         }.unwrap();
 
 
         let res = headers.get_untyped(Subject::name())
             .unwrap()
-            .map(|entry| entry.downcast_ref::<Unstructured>().unwrap().as_str() )
+            .map(|entry| entry.downcast_ref::<RawUnstructured>().unwrap().as_str() )
             .collect::<Vec<_>>();
 
         assert_eq!(
-            &[ "abc" ],
-            res.as_slice()
+            res.as_slice(),
+            &[ "abc" ]
         );
 
         let mut res = headers.get_untyped(Comments::name()).unwrap();
@@ -585,15 +591,15 @@ mod test {
         assert_eq!((2, Some(2)), res.size_hint());
 
         assert_eq!(
-            "1st",
-            res.next().unwrap().downcast_ref::<Unstructured>().unwrap().as_str()
+            res.next().unwrap().downcast_ref::<RawUnstructured>().unwrap().as_str(),
+            "1st"
         );
 
         assert_eq!((1, Some(1)), res.size_hint());
 
         assert_eq!(
-            "text/plain".to_owned(),
-            format!("{}", res.next().unwrap().downcast_ref::<Mime>().unwrap())
+            res.next().unwrap().downcast_ref::<OtherComponent>().unwrap(),
+            &OtherComponent
         );
 
         assert!(res.next().is_none());
@@ -607,7 +613,7 @@ mod test {
 
         let res = format!("{:?}", headers);
         assert_eq!(
-            "HeaderMap { Subject: Unstructured { text: Input(Owned(\"hy there\")) }, }",
+            "HeaderMap { Subject: RawUnstructured { text: Input(Owned(\"hy there\")) }, }",
             res.as_str()
         );
     }
@@ -615,19 +621,19 @@ mod test {
     #[test]
     fn extend_keeps_order() {
         let mut headers = headers! {
-            To: [ "ab@c" ]
+            XComment: "ab@c"
         }.unwrap();
 
         headers.extend( headers! {
             Subject: "hy there",
-            From: [ "magic@spell" ]
+            Comments: "magic+spell"
         }.unwrap() ).unwrap();
 
         assert_eq!(
             &[
-                "To",
+                "X-Comment",
                 "Subject",
-                "From"
+                "Comments"
             ],
             headers.into_iter()
                 .map(|(name, _val)| name.as_str())
@@ -646,7 +652,7 @@ mod test {
             Comments: "d"
         }.unwrap();
 
-        assert_eq!( false, headers.remove_by_name( From::name() ) );
+        assert_eq!( false, headers.remove_by_name( XComment::name() ) );
         assert_eq!( true, headers.remove_by_name( Subject::name() ) );
 
         assert_eq!( 3, headers.iter().count() );
@@ -690,7 +696,7 @@ mod test {
     struct XComment;
     impl Header for XComment {
         const MAX_COUNT_EQ_1: bool = false;
-        type Component = Unstructured;
+        type Component = RawUnstructured;
 
         fn name() -> HeaderName {
             HeaderName::new(SoftAsciiStr::from_str_unchecked("X-Comment")).unwrap()

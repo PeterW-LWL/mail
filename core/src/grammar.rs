@@ -8,6 +8,7 @@ pub enum MailType {
 }
 
 impl MailType {
+    #[inline]
     pub fn is_internationalized(&self) -> bool {
         *self == MailType::Internationalized
     }
@@ -57,7 +58,7 @@ pub fn is_ascii_vchar( ch: char ) -> bool {
     32 < u32_ch && u32_ch <= 126
 }
 
-//VCHAR as defined by RFC 5243
+/// VCHAR as defined by RFC 5243
 #[inline(always)]
 pub fn is_vchar( ch: char, mt: MailType ) -> bool {
     is_ascii_vchar( ch ) || ( mt == MailType::Internationalized && !is_ascii( ch ) )

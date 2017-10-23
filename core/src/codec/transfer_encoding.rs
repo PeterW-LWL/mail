@@ -1,13 +1,38 @@
 use std::ops::Deref;
 
-use base64;
-
-
-use codec::quoted_printable;
+use codec::{base64, quoted_printable};
+use soft_ascii_string::SoftAsciiStr;
 use error::*;
 use utils::FileBuffer;
-use components::TransferEncoding;
 
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+pub enum TransferEncoding {
+    _7Bit,
+    _8Bit,
+    Binary,
+    QuotedPrintable,
+    Base64,
+    Other( Token ),
+}
+
+impl TransferEncoding {
+    pub fn repr(&self ) -> &SoftAsciiStr {
+        use self::TransferEncoding::*;
+        match *self {
+            _7Bit => SoftAsciiStr::from_str_unchecked("7bit"),
+            _8Bit => SoftAsciiStr::from_str_unchecked("8bit"),
+            Binary =>  SoftAsciiStr::from_str_unchecked("binary"),
+            QuotedPrintable => SoftAsciiStr::from_str_unchecked("quoted-printable"),
+            Base64 =>  SoftAsciiStr::from_str_unchecked("base64"),
+            Other( ref _token ) =>
+                unreachable!("token is not implemented and not constructable from outside")
+        }
+    }
+}
+
+///Token is either a ietf-token or an x-token, but it's usage is not yet supported
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+pub struct Token { _nop: () }
 
 
 
@@ -143,7 +168,7 @@ fn encode_quoted_printable( buffer: FileBuffer ) -> Result<TransferEncodedFileBu
 
 fn encode_base64( buffer: FileBuffer ) -> Result<TransferEncodedFileBuffer> {
     Ok( TransferEncodedFileBuffer::buffer_is_encoded(
-        buffer.with_data( |data| base64::encode_config( &*data, base64::MIME ).into_bytes() ),
+        buffer.with_data( |data| base64::normal_encode(data).into_bytes() ),
         TransferEncoding::Base64
     ) )
 }
