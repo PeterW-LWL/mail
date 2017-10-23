@@ -80,7 +80,7 @@ fn does_sniff_pdf_collision() {
     // utf8 (most pdf's are not valid utf8 so this normally does not happen)
     // the problem is that the pdf match still has a (much) higher wight than
     // the other one but still does not get chosen as `tree_magic` does not
-    // use whights once it finds a match it's done...
+    // use wights once it finds a match it's done...
     _does_sniff("/tmp/minimal.pdf", "application/pdf")
 }
 
