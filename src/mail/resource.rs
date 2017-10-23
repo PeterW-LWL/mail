@@ -6,12 +6,13 @@ use std::mem;
 use std::borrow::Cow;
 
 use mime::Mime;
-
-
+use mime::{TEXT, TEXT_PLAIN, APPLICATION, OCTET_STREAM};
+use tree_magic;
 use futures::{  Future, Poll, Async };
+
 use utils::SendBoxFuture;
 
-use error::{ Error, Result };
+use error::{ Error, ErrorKind, Result, ResultExt };
 
 use codec::transfer_encoding::TransferEncodedFileBuffer;
 use codec::BodyBuffer;
@@ -19,8 +20,7 @@ use components::TransferEncoding;
 use std::marker::PhantomData;
 
 
-use mime::TEXT_PLAIN;
-use utils::FileBuffer;
+use utils::{FileBuffer, FileMeta, DateTime};
 use super::BuilderContext;
 
 
@@ -30,7 +30,7 @@ use super::BuilderContext;
 #[derive( Debug, Clone )]
 pub struct ResourceSpec {
     pub path: PathBuf,
-    pub use_name: Option<PathBuf>,
+    pub use_name: Option<String>,
     pub use_mime: Option<Mime>
 }
 
@@ -46,6 +46,15 @@ pub struct Resource {
     preferred_encoding: Option<TransferEncoding>
 }
 
+#[derive(Debug, Eq, PartialEq, Hash, Clone, Copy)]
+pub enum ResourceState {
+    HasSpec,
+    LoadingFileBuffer,
+    LoadedFileBuffer,
+    EncodingFileBuffer,
+    EncodedFileBuffer,
+    HadError
+}
 
 enum ResourceInner {
     Spec( ResourceSpec ),
@@ -54,6 +63,23 @@ enum ResourceInner {
     EncodingBuffer( SendBoxFuture<TransferEncodedFileBuffer, Error> ),
     TransferEncoded( TransferEncodedFileBuffer ),
     Failed
+}
+
+impl ResourceInner {
+
+    fn state(&self) -> ResourceState {
+        use self::ResourceInner::*;
+        use self::ResourceState::*;
+        match *self {
+            Spec(..) => HasSpec,
+            LoadingBuffer(..) => LoadingFileBuffer,
+            Loaded(..) => LoadedFileBuffer,
+            EncodingBuffer(..) => EncodingFileBuffer,
+            TransferEncoded(..) => EncodedFileBuffer,
+            Failed => HadError
+        }
+    }
+
 }
 
 pub struct Guard<'lock> {
@@ -105,6 +131,11 @@ impl Resource {
         Self::new_inner( ResourceInner::EncodingBuffer( fut ) )
     }
 
+    pub fn state(&self) -> ResourceState {
+        self.read_inner()
+            .map(|inner| inner.state())
+            .unwrap_or(ResourceState::HadError)
+    }
 
     pub fn set_preferred_encoding( &mut self, tenc: TransferEncoding ) {
         self.preferred_encoding = Some( tenc )
@@ -166,7 +197,6 @@ impl Resource {
             Resource::_poll_encoding_completion( moved_out, ctx, &self.preferred_encoding )?;
         mem::replace( &mut *inner, move_back_in );
         Ok( state )
-
     }
 
     fn _poll_encoding_completion<C>(
@@ -193,14 +223,37 @@ impl Resource {
             continue_with = match continue_with {
                 Spec(spec) => {
                     let ResourceSpec { path, use_mime, use_name } = spec;
+                    //we require a name
+                    let name =
+                        if let Some(name) = use_name {
+                            name
+                        } else {
+                            let name = path
+                                .file_name()
+                                .ok_or_else(|| -> Error {
+                                    ErrorKind::PathToFileWithoutFileName(path.to_owned()).into()
+                                })?
+                                .to_string_lossy()
+                                .into_owned();
+                            name
+                        };
                     LoadingBuffer(
-                        ctx.execute( ctx.load_file( Cow::Owned( path ) ).map( move |data| {
-                            //FIXME actually use use_name!
-                            let _ = use_name;
-                            //if let spec.name => buf.file_meta_mut().file_name = Some( name )
-                            //FIXME actually sniff mime is use_mime is none
-                            FileBuffer::new( use_mime.unwrap(), data )
-                        } ) )
+                        ctx.execute(
+                            ctx.load_file( Cow::Owned( path ) )
+                                .and_then(move |bytes| {
+
+                                    //we require a mime/content-type
+                                    let mime = detect_mime(&bytes, use_mime)?;
+
+                                    //use now as read date
+                                    let meta = FileMeta {
+                                        file_name: Some(name),
+                                        read_date: Some(DateTime::now()),
+                                        ..Default::default()
+                                    };
+                                    Ok(FileBuffer::new_with_file_meta(mime, bytes, meta))
+                                })
+                        )
                     )
                 },
 
@@ -258,6 +311,25 @@ impl<'a, C: 'a> Future for ResourceFutureRef<'a, C>
     fn poll( &mut self ) -> Poll<Self::Item, Self::Error> {
         self.resource_ref.poll_encoding_completion( self.ctx_ref )
     }
+}
+
+fn detect_mime<B: AsRef<[u8]>>(buffer: B, use_mime: Option<Mime>) -> Result<Mime> {
+    Ok(if let Some(mime) = use_mime {
+        mime
+    } else {
+        //FIXME tree_magic is far from optimal
+        let mime = tree_magic::from_u8(buffer.as_ref());
+        let mime: Mime = mime.parse()
+            .chain_err( || "[BUG] invalid mime by tree_magic" )?;
+        if mime.type_() == TEXT {
+            bail!("auto-detecting charset is currently not supported");
+        }
+        if mime.type_() == APPLICATION
+            && mime.subtype() == OCTET_STREAM {
+            bail!("auto-detection failed got application/octet-stream")
+        }
+        mime
+    })
 }
 
 
@@ -380,18 +452,6 @@ mod test {
         let data: &[u8] = &*enc_buf;
 
         assert_eq!( b"=C3=96se", data );
-    }
-
-    #[ignore]
-    #[test]
-    fn test_use_name() {
-        unimplemented!();
-    }
-
-    #[ignore]
-    #[test]
-    fn test_sniff_mime() {
-        unimplemented!();
     }
 
 

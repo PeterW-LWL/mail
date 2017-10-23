@@ -1702,6 +1702,59 @@ mod test {
                 Section::String("X-A: 12\r\n".into())
             ])
         }
+
+        #[test]
+        fn douple_write_fws() {
+            let mut encoder = Encoder::new(MailType::Internationalized);
+            let res = encoder.write_header_line(|hdl| {
+                hdl.write_fws();
+                hdl.write_fws();
+                Ok(())
+            });
+            assert_ok!(res);
+            assert_eq!(encoder.trace, vec![
+                NewSection,
+                MarkFWS, NowChar, Text(" ".to_owned()),
+                MarkFWS, NowChar, Text(" ".to_owned()),
+                TruncateToCRLF,
+                End
+            ]);
+            assert_eq!(encoder.sections, vec![
+                Section::String("".to_owned())
+            ])
+        }
+        #[test]
+        fn douple_write_fws_then_long_line() {
+            let long_line = concat!(
+                "10_3456789",
+                "20_3456789",
+                "30_3456789",
+                "40_3456789",
+                "50_3456789",
+                "60_3456789",
+                "70_3456789",
+                "80_3456789",
+            );
+            let mut encoder = Encoder::new(MailType::Internationalized);
+            let res = encoder.write_header_line(|hdl| {
+                hdl.write_fws();
+                hdl.write_fws();
+                hdl.write_utf8(long_line)?;
+                Ok(())
+            });
+            assert_ok!(res);
+            assert_eq!(encoder.trace, vec![
+                NewSection,
+                MarkFWS, NowChar, Text(" ".to_owned()),
+                MarkFWS, NowChar, Text(" ".to_owned()),
+                NowUtf8, Text(long_line.to_owned()),
+                CRLF,
+                End
+            ]);
+            assert_eq!(encoder.sections, vec![
+                Section::String(format!("  {}\r\n", long_line))
+            ])
+        }
     }
 
     ec_test! {
