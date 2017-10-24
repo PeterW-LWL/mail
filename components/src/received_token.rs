@@ -38,13 +38,13 @@ impl EncodableInHeader for  ReceivedToken {
 
 #[cfg(test)]
 mod test {
+    use core::utils::HeaderTryFrom;
     use core::grammar::MailType;
-    use core::data::FromInput;
     use core::codec::{Encoder, VecBodyBuf};
     use super::*;
 
     ec_test!{ a_domain, {
-        Domain::from_input( "random.mailnot" )?
+        Domain::try_from( "random.mailnot" )?
     } => ascii => [
         MarkFWS,
         Text "random.mailnot",
@@ -52,7 +52,7 @@ mod test {
     ]}
 
     ec_test!{ a_address, {
-        let email = Email::from_input( "modnar@random.mailnot")?;
+        let email = Email::try_from( "modnar@random.mailnot")?;
         ReceivedToken::Address( email )
     } => ascii => [
         Text "<",
@@ -67,14 +67,14 @@ mod test {
     ]}
 
     ec_test!{ a_word, {
-        let word = Word::from_input( "simple" )?;
+        let word = Word::try_from( "simple" )?;
         ReceivedToken::Word( word )
     } => ascii => [
         Text "simple"
     ]}
 
     ec_test!{ a_quoted_word, {
-        let word = Word::from_input( "sim ple" )?;
+        let word = Word::try_from( "sim ple" )?;
         ReceivedToken::Word( word )
     } => ascii => [
         Text r#""sim ple""#
@@ -85,7 +85,7 @@ mod test {
     fn no_encoded_word() {
         let mut encoder = Encoder::<VecBodyBuf>::new( MailType::Ascii );
         let mut handle = encoder.encode_handle();
-        let input = ReceivedToken::Word( Word::from_input( "↓right" ).unwrap() );
+        let input = ReceivedToken::Word( Word::try_from( "↓right" ).unwrap() );
         assert_err!(input.encode( &mut handle ));
         handle.undo_header();
     }

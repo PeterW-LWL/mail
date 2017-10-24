@@ -129,7 +129,13 @@ mod test {
     use std::default::Default;
 
     use super::*;
-    use components::DateTime;
+    use core::utils::DateTime;
+
+    pub fn test_time( modif: u32 ) -> DateTime {
+        use chrono::prelude::*;
+        use self::DateTime as DT;
+        DT::new( FixedOffset::east( 3 * 3600 ).ymd( 2013, 8, 6 ).and_hms( 7, 11, modif ) )
+    }
 
     ec_test!{ no_params_inline, {
         Disposition::inline()
@@ -155,9 +161,9 @@ mod test {
     ec_test!{ attachment_all_params, {
         Disposition::new( DispositionKind::Attachment, FileMeta {
             file_name: Some( "random.png".to_owned() ),
-            creation_date: Some( DateTime::test_time( 1 ) ),
-            modification_date: Some( DateTime::test_time( 2 ) ),
-            read_date: Some( DateTime::test_time( 3 ) ),
+            creation_date: Some( test_time( 1 ) ),
+            modification_date: Some( test_time( 2 ) ),
+            read_date: Some( test_time( 3 ) ),
             size: Some( 4096 )
         })
     } => ascii => [

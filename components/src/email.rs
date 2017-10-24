@@ -11,8 +11,8 @@ use core::grammar::{
     is_ws,
     MailType
 };
-
-use core::data::{FromInput, Input, SimpleItem, InnerUtf8 };
+use core::utils::{HeaderTryInto, HeaderTryFrom};
+use core::data::{Input, SimpleItem, InnerUtf8 };
 
 use error::ComponentError::{InvalidDomainName, InvalidEmail};
 
@@ -33,29 +33,46 @@ pub struct LocalPart( Input );
 #[derive(Debug,  Clone, Hash, PartialEq, Eq)]
 pub struct Domain( SimpleItem );
 
-
-impl FromInput for Email {
-
-    fn from_input<I: Into<Input>>( email: I ) -> Result<Self> {
-        let email = email.into().into_shared();
+impl Email {
+    pub fn new<T: HeaderTryInto<Input>>(email: T) -> Result<Self> {
+        let email = email.try_into()?.into_shared();
         match email {
             Input( InnerUtf8::Owned( .. ) ) => unreachable!(),
             Input( InnerUtf8::Shared( shared ) ) => {
                 //1. ownify Input
                 //2. get 2 sub shares split befor/after @
                 let index = shared.find( "@" )
-                    .ok_or_else( || { bail!(InvalidEmail(shared.to_owned())) })?;
+                    .ok_or_else( || { error!(InvalidEmail(shared.to_string())) })?;
 
                 let left = shared.clone().map( |all| &all[..index] );
-                let local_part = LocalPart::from_input( Input( InnerUtf8::Shared( left ) ) )?;
+                let local_part = LocalPart::try_from( Input( InnerUtf8::Shared( left ) ) )?;
                 //index+1 is ok as '@'.utf8_len() == 1
                 let right = shared.map( |all| &all[index+1..] );
-                let domain = Domain::from_input( Input( InnerUtf8::Shared( right ) ) )?;
+                let domain = Domain::try_from( Input( InnerUtf8::Shared( right ) ) )?;
                 Ok( Email { local_part, domain } )
             }
         }
     }
 }
+
+impl<'a> HeaderTryFrom<&'a str> for Email {
+    fn try_from( email: &str ) -> Result<Self> {
+        Email::new(email)
+    }
+}
+
+impl HeaderTryFrom<String> for Email {
+    fn try_from( email: String ) -> Result<Self> {
+        Email::new(email)
+    }
+}
+
+impl HeaderTryFrom<Input> for Email {
+    fn try_from( email: Input ) -> Result<Self> {
+        Email::new(email)
+    }
+}
+
 
 impl EncodableInHeader for  Email {
 
@@ -68,10 +85,12 @@ impl EncodableInHeader for  Email {
 
 }
 
-impl FromInput for LocalPart {
+impl<T> HeaderTryFrom<T> for LocalPart
+    where T: HeaderTryInto<Input>
+{
 
-    fn from_input<I: Into<Input>>( input: I ) -> Result<Self> {
-        Ok( LocalPart( input.into() ) )
+    fn try_from( input: T ) -> Result<Self> {
+        Ok( LocalPart( input.try_into()? ) )
     }
 
 }
@@ -102,11 +121,13 @@ impl EncodableInHeader for LocalPart {
 
 
 
-impl FromInput for Domain {
-    fn from_input<I: Into<Input>>( input: I ) -> Result<Self> {
-        let input = input.into();
+impl<T> HeaderTryFrom<T> for Domain
+    where T: HeaderTryInto<Input>
+{
+    fn try_from( input: T ) -> Result<Self> {
+        let input = input.try_into()?;
         let item =
-            match Domain::check_domain( &*input )? {
+            match Domain::check_domain( input.as_str() )? {
                 MailType::Ascii | MailType::Mime8BitEnabled => {
                     SimpleItem::Ascii( input.into_ascii_item_unchecked() )
                 },
@@ -190,19 +211,19 @@ mod test {
     use super::*;
 
     #[test]
-    fn email_from_input() {
-        let email = Email::from_input( "abc@de.fg" ).unwrap();
+    fn email_try_from() {
+        let email = Email::try_from( "abc@de.fg" ).unwrap();
         assert_eq!(
             Email {
-                local_part: LocalPart::from_input( "abc" ).unwrap(),
-                domain: Domain::from_input( "de.fg" ).unwrap()
+                local_part: LocalPart::try_from( "abc" ).unwrap(),
+                domain: Domain::try_from( "de.fg" ).unwrap()
             },
             email
         )
     }
 
     ec_test!{ local_part_simple, {
-        LocalPart::from_input(  "hans" )?
+        LocalPart::try_from(  "hans" )?
     } => ascii => [
         MarkFWS,
         Text "hans",
@@ -211,7 +232,7 @@ mod test {
 
     //fails tries to write utf8
     ec_test!{ local_part_quoted, {
-        LocalPart::from_input(  "ha ns" )?
+        LocalPart::try_from(  "ha ns" )?
     } => ascii => [
         MarkFWS,
         Text "\"ha ns\"",
@@ -220,7 +241,7 @@ mod test {
 
 
     ec_test!{ local_part_utf8, {
-        LocalPart::from_input( "Jörn" )?
+        LocalPart::try_from( "Jörn" )?
     } => utf8 => [
         MarkFWS,
         Text "Jörn",
@@ -231,13 +252,13 @@ mod test {
     fn local_part_utf8_on_ascii() {
         let mut encoder = Encoder::<VecBodyBuf>::new( MailType::Ascii );
         let mut handle = encoder.encode_handle();
-        let local = LocalPart::from_input( "Jörn" ).unwrap();
+        let local = LocalPart::try_from( "Jörn" ).unwrap();
         assert_err!(local.encode( &mut handle ));
         handle.undo_header();
     }
 
     ec_test!{ domain, {
-        Domain::from_input( "bad.at.domain" )?
+        Domain::try_from( "bad.at.domain" )?
     } => ascii => [
         MarkFWS,
         Text "bad.at.domain",
@@ -245,7 +266,7 @@ mod test {
     ]}
 
     ec_test!{ domain_international, {
-        Domain::from_input( "dömain" )?
+        Domain::try_from( "dömain" )?
     } => utf8 => [
         MarkFWS,
         Text "dömain",
@@ -254,7 +275,7 @@ mod test {
 
 
     ec_test!{ domain_encoded, {
-        Domain::from_input( "dat.ü.dü" )?
+        Domain::try_from( "dat.ü.dü" )?
     } => ascii => [
         MarkFWS,
         Text "dat.xn--tda.xn--d-eha",
@@ -263,7 +284,7 @@ mod test {
 
 
     ec_test!{ email_simple, {
-        Email::from_input( "simple@and.ascii" )?
+        Email::try_from( "simple@and.ascii" )?
     } => ascii => [
         MarkFWS,
         Text "simple",

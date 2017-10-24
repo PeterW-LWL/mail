@@ -3,12 +3,10 @@ use std::fmt;
 use std::borrow::Cow;
 
 use mime;
-use soft_ascii_string::SoftAsciiStr;
 
 use core::error::*;
-use core::utils::HeaderTryFrom;
 use core::grammar::{ is_token, MailType};
-use core::codec::{EncodableInHeader, EncodeHandle, self };
+use core::codec;
 
 use error::ComponentError::InvalidToken;
 
@@ -69,7 +67,7 @@ pub fn create_encoded_mime_parameter<K,V>(
 }
 
 pub fn create_mime<T, ST, I, K, V>(_type: T, subtype: ST, params: I, mt: MailType)
-    -> Result<mime_tools::Mime>
+    -> Result<mime::Mime>
     where T: AsRef<str>, ST: AsRef<str>,
           I: IntoIterator<Item=(K, V)>, K: AsRef<str>, V: AsRef<str>
 {
@@ -80,39 +78,39 @@ pub fn create_mime<T, ST, I, K, V>(_type: T, subtype: ST, params: I, mt: MailTyp
 
     //UNWRAP_SAFE: we do not have a unsafe mime constructor so we have to parse
     //it even through it can not be invalid
-    Ok( string.parse::<mime_tools::Mime>().expect("[BUG] mime generator generated invalid mime") )
+    Ok( string.parse::<mime::Mime>().expect("[BUG] mime generator generated invalid mime") )
 }
 
 fn assure_token(s: &str) -> Result<&str> {
     if !is_token(s) {
-        bail!(InvalidToken(s));
+        bail!(InvalidToken(s.to_owned()));
     }
     Ok(s)
 }
 
-// as we are in the same package as the definition of HeaderTryFrom
-// this is possible even with orphan rules
-impl<'a> HeaderTryFrom<&'a str> for mime_tools::Mime {
-    fn try_from(val: &'a str) -> Result<Self> {
-        val.parse()
-            .map_err( |ferr| ErrorKind::ParsingMime( ferr ).into() )
-    }
-}
+//// as we are in the same package as the definition of HeaderTryFrom
+//// this is possible even with orphan rules
+//impl<'a> HeaderTryFrom<&'a str> for mime::Mime {
+//    fn try_from(val: &'a str) -> Result<Self> {
+//        val.parse()
+//            .map_err( |ferr| ErrorKind::ParsingMime( ferr ).into() )
+//    }
+//}
 
-
-impl EncodableInHeader for  mime_tools::Mime {
-
-    fn encode(&self, handle: &mut EncodeHandle) -> Result<()> {
-        let res = self.to_string();
-        handle.write_if_utf8(&*res)
-            .handle_condition_failure(|handle| {
-                match SoftAsciiStr::from_str(&*res) {
-                    Ok(asciied) => handle.write_str( asciied ),
-                    Err(_err) => bail!("mime containing utf8 in non Internationalized mail")
-                }
-            })
-    }
-}
+//
+//impl EncodableInHeader for  mime::Mime {
+//
+//    fn encode(&self, handle: &mut EncodeHandle) -> Result<()> {
+//        let res = self.to_string();
+//        handle.write_if_utf8(&*res)
+//            .handle_condition_failure(|handle| {
+//                match SoftAsciiStr::from_str(&*res) {
+//                    Ok(asciied) => handle.write_str( asciied ),
+//                    Err(_err) => bail!("mime containing utf8 in non Internationalized mail")
+//                }
+//            })
+//    }
+//}
 
 
 //UPSTREAM(mime): open an issue that FromStrError does not implement Error
@@ -134,12 +132,13 @@ impl Error for MimeFromStrError {
 mod test {
     use super::*;
 
-    ec_test!{simple,{
-        let mime: Mime = "text/wtf;charset=utf8;random=alot".parse().unwrap();
-        mime
-    } => ascii => [
-        Text "text/wtf;charset=utf8;random=alot"
-    ]}
+    //TODO bring back Mime
+//    ec_test!{simple,{
+//        let mime: Mime = "text/wtf;charset=utf8;random=alot".parse().unwrap();
+//        mime
+//    } => ascii => [
+//        Text "text/wtf;charset=utf8;random=alot"
+//    ]}
 
     #[test]
     fn mime_param_simple() {

@@ -97,13 +97,12 @@ impl_header_try_from_array! {
 
 #[cfg(test)]
 mod test {
-    use core::data::FromInput;
     use super::*;
 
     ec_test!{ some_phrases, {
         PhraseList( vec1![
-            Phrase::from_input( "hy there" )?,
-            Phrase::from_input( "magic man" )?
+            Phrase::try_from( "hy there" )?,
+            Phrase::try_from( "magic man" )?
         ])
     } => ascii => [
         Text "hy",

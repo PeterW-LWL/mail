@@ -6,7 +6,8 @@ use vec1::Vec1;
 
 use core::error::*;
 use core::codec::{EncodableInHeader, EncodeHandle};
-use core::data::{ FromInput, Input, SimpleItem };
+use core::data::{ Input, SimpleItem };
+use core::utils::{HeaderTryFrom, HeaderTryInto};
 
 use error::ComponentError::InvalidMessageId;
 
@@ -24,14 +25,17 @@ impl MessageID {
     }
 }
 
-impl FromInput for MessageID {
-    fn from_input<I: Into<Input>>( input: I ) ->  Result<Self> {
+impl<T> HeaderTryFrom<T> for MessageID
+    where T: HeaderTryInto<Input>
+{
+    fn try_from( input: T ) ->  Result<Self> {
         use self::parser_parts::parse_message_id;
-        let input = input.into();
 
-        match parse_message_id( &**input ) {
+        let input = input.try_into()?;
+
+        match parse_message_id( input.as_str() ) {
             IResult::Done( "", _msg_id ) => {},
-            other => bail!(InvalidMessageId(input.as_str().to_owned(), other))
+            _other => bail!(InvalidMessageId(input.as_str().to_owned()))
         }
 
 
@@ -79,7 +83,7 @@ mod test {
     use super::*;
 
     ec_test!{ simple, {
-        MessageID::from_input( "affen@haus" )?
+        MessageID::try_from( "affen@haus" )?
     } => ascii => [
         MarkFWS,
         // there are two "context" one which allows FWS inside (defined = email)
@@ -91,7 +95,7 @@ mod test {
     ]}
 
     ec_test!{ utf8, {
-        MessageID::from_input( "↓@↑.utf8")?
+        MessageID::try_from( "↓@↑.utf8")?
     } => utf8 => [
         MarkFWS,
         Text "<↓@↑.utf8>",
@@ -102,14 +106,14 @@ mod test {
     fn utf8_fails() {
         let mut encoder = Encoder::<VecBodyBuf>::new(MailType::Ascii);
         let mut handle = encoder.encode_handle();
-        let mid = MessageID::from_input( "abc@øpunny.code" ).unwrap();
+        let mid = MessageID::try_from( "abc@øpunny.code" ).unwrap();
         assert_err!(mid.encode( &mut handle ));
         handle.undo_header();
     }
 
     ec_test!{ multipls, {
-        let fst = MessageID::from_input( "affen@haus" )?;
-        let snd = MessageID::from_input( "obst@salat" )?;
+        let fst = MessageID::try_from( "affen@haus" )?;
+        let snd = MessageID::try_from( "obst@salat" )?;
         MessageIDList( vec1! [
             fst,
             snd

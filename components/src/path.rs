@@ -41,7 +41,6 @@ impl EncodableInHeader for  Path {
 #[cfg(test)]
 mod test {
     use super::*;
-    use core::data::FromInput;
 
     ec_test!{empty_path, {
         Path( None )
@@ -52,7 +51,7 @@ mod test {
     ]}
 
     ec_test!{simple_path, {
-        Path( Some( Email::from_input( "abc@de.fg" )? ) )
+        Path( Some( Email::try_from( "abc@de.fg" )? ) )
     } => ascii => [
         MarkFWS,
         Text "<",

@@ -14,6 +14,7 @@ impl DateTime {
         DateTime( date_time.with_timezone( &chrono::Utc ) )
     }
 
+    #[doc(hidden)]
     #[cfg(test)]
     pub fn test_time( modif: u32 ) -> Self {
         use chrono::prelude::*;

@@ -2,7 +2,8 @@ use vec1::Vec1;
 use core::error::*;
 use core::grammar::encoded_word::EncodedWordContext;
 use core::codec::{EncodableInHeader, EncodeHandle};
-use core::data::{ FromInput, Input };
+use core::utils::{HeaderTryFrom, HeaderTryInto};
+use core::data::Input;
 
 use super::utils::text_partition::{ Partition, partition };
 use super::word::{ Word, do_encode_word };
@@ -13,18 +14,20 @@ use super::{ CFWS, FWS };
 #[derive( Debug, Clone, Eq, PartialEq, Hash )]
 pub struct Phrase( pub Vec1<Word> );
 
-impl FromInput for Phrase {
-    fn from_input<I: Into<Input>>( input: I ) -> Result<Self> {
+impl Phrase {
+
+    pub fn new<T: HeaderTryInto<Input>>(input: T) -> Result<Self> {
         //TODO isn't this 90% the same code as used by Unstructured
-        let input = input.into();
+        //TODO it would make much more sense if Input::shared could be taken advantage of
+        let input = input.try_into()?;
 
         //OPTIMIZE: words => shared, then turn partition into shares, too
         let mut last_gap = None;
         let mut words = Vec::new();
-        for partition in partition( &*input )?.into_iter() {
+        for partition in partition( input.as_str() )?.into_iter() {
             match partition {
                 Partition::VCHAR( word ) => {
-                    let mut word = Word::from_input( word )?;
+                    let mut word = Word::try_from( word )?;
                     if let Some( fws ) = last_gap.take() {
                         word.pad_left( fws );
                     }
@@ -48,6 +51,25 @@ impl FromInput for Phrase {
     }
 }
 
+impl<'a> HeaderTryFrom<&'a str> for Phrase {
+    fn try_from( input: &'a str) -> Result<Self> {
+        Phrase::new(input)
+    }
+}
+
+impl HeaderTryFrom<String> for Phrase {
+    fn try_from( input: String) -> Result<Self> {
+        Phrase::new(input)
+    }
+}
+
+impl HeaderTryFrom<Input> for Phrase {
+    fn try_from( input: Input) -> Result<Self> {
+        Phrase::new(input)
+    }
+}
+
+
 
 impl EncodableInHeader for  Phrase {
 
@@ -65,11 +87,11 @@ impl EncodableInHeader for  Phrase {
 
 #[cfg(test)]
 mod test {
-    use core::data::FromInput;
+    use core::utils::HeaderTryFrom;
     use super::Phrase;
 
     ec_test!{ simple, {
-        Phrase::from_input("simple think")?
+        Phrase::try_from("simple think")?
     } => ascii => [
         Text "simple",
         MarkFWS,
@@ -77,7 +99,7 @@ mod test {
     ]}
 
     ec_test!{ with_encoding, {
-        Phrase::from_input(" hm nääds encoding")?
+        Phrase::try_from(" hm nääds encoding")?
     } => ascii => [
         MarkFWS,
         Text " hm",

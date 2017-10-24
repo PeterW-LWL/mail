@@ -90,12 +90,11 @@ impl EncodableInHeader for  Mailbox {
 
 #[cfg(test)]
 mod test {
-    use core::data::FromInput;
-    use components::{ Email, Phrase };
+    use ::{ Email, Phrase };
     use super::*;
 
     ec_test!{ email_only, {
-        let email = Email::from_input( "affen@haus" )?;
+        let email = Email::try_from( "affen@haus" )?;
         Mailbox::from(email)
     } => ascii => [
         Text "<",
@@ -111,8 +110,8 @@ mod test {
 
     ec_test!{ with_display_text, {
         Mailbox {
-            display_name: Some( Phrase::from_input( "ay ya" ).unwrap() ),
-            email: Email::from_input( "affen@haus" ).unwrap(),
+            display_name: Some( Phrase::try_from( "ay ya" ).unwrap() ),
+            email: Email::try_from( "affen@haus" ).unwrap(),
         }
     } => ascii => [
         Text "ay",

@@ -245,8 +245,7 @@ deref0!{ +mut MailboxList => Vec1<Mailbox> }
 
 #[cfg(test)]
 mod test {
-    use core::data::FromInput;
-    use components::{ Mailbox, Email, Phrase };
+    use ::{ Mailbox, Email, Phrase };
     use super::*;
 
 
@@ -259,8 +258,8 @@ mod test {
     ec_test! { single, {
         MailboxList( vec1![
             Mailbox {
-                display_name: Some( Phrase::from_input( "hy ho" )? ),
-                email: Email::from_input( "ran@dom" )?
+                display_name: Some( Phrase::try_from( "hy ho" )? ),
+                email: Email::try_from( "ran@dom" )?
             },
         ] )
     } => ascii => [
@@ -282,12 +281,12 @@ mod test {
     ec_test! { multiple, {
          MailboxList( vec1![
             Mailbox {
-                display_name: Some( Phrase::from_input( "hy ho" )? ),
-                email: Email::from_input( "nar@mod" )?
+                display_name: Some( Phrase::try_from( "hy ho" )? ),
+                email: Email::try_from( "nar@mod" )?
             },
             Mailbox {
                 display_name: None,
-                email: Email::from_input( "ran@dom" )?
+                email: Email::try_from( "ran@dom" )?
             }
         ] )
     } => ascii => [

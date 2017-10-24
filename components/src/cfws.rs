@@ -19,14 +19,14 @@ use core::codec::{EncodableInHeader, EncodeHandle};
 //    pub trailing: Vec<WS>
 //}
 
-#[derive(Debug, Hash, Clone, Eq, PartialEq, Serialize)]
+#[derive(Debug, Hash, Clone, Eq, PartialEq)]
 pub struct FWS;
 
 //NOTE(IMPORTANT): when implementing this I have to assure that encoding CFWS followed by FWS works
 // mainly after using a CR-LF-WSP seq you CAN NOT have another FWS which uses unsolds to a CR-LF-WSP
 // currently we only remember the last FWS and do only make it in a CR-LF-SPACE sequence when we
 // need to, so no problem here for now.
-#[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq)]
 pub enum CFWS {
     //WithComment( Vec1<(Option<FWS>, Comment)>, Option<FWS> ),
     SingleFws( FWS )

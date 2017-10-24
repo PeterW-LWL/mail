@@ -24,6 +24,9 @@ path = "../core"
 [dependencies.vec1]
 path = "../vec1"
 
+[dev-dependencies]
+chrono = "0.4.0"
+
 
 [features]
 traceing = [ "mail-codec-core/traceing" ]

@@ -1,18 +1,18 @@
+use soft_ascii_string::SoftAsciiStr;
+
 use core::error::*;
 use core::codec::{
     EncodedWordEncoding,
-    EncodableInHeader, EncodeHandle
+    EncodableInHeader, EncodeHandle,
+    WriterWrapper
 };
-
-use core::grammar::is_atext;
+use core::grammar::{MailType, is_atext};
 use core::grammar::encoded_word::EncodedWordContext;
+use core::codec::quoted_string;
+use core::utils::{HeaderTryFrom, HeaderTryInto};
+use core::data::Input;
 
-use core::data::{
-    FromInput,
-    Input,
-    EncodedWord,
-    QuotedString
-};
+use error::ComponentError::InvalidWord;
 
 
 use super::CFWS;
@@ -26,13 +26,19 @@ pub struct Word {
     pub right_padding: Option<CFWS>
 }
 
-impl FromInput for Word {
+impl<T> HeaderTryFrom<T> for Word
+    where T: HeaderTryInto<Input>
+{
 
-    fn from_input<I: Into<Input>>( input: I ) -> Result<Self> {
+    fn try_from( input: T ) -> Result<Self> {
+        //TODO there should be a better way, I think I take the grammar to literal here
+        // could not any WSP be a potential FWSP, do we really need this kind of fine gained
+        // control, it feels kind of useless??
+        let input = input.try_into()?;
         //FEATURE_TODO(fail_fast): check if input contains a CTL char,
         //  which is/>>should<< always be an error (through in the standard you could but should
         //  not have them in encoded words)
-        Ok( Word { left_padding: None, input: input.into(), right_padding: None } )
+        Ok( Word { left_padding: None, input, right_padding: None } )
     }
 }
 
@@ -70,20 +76,37 @@ pub fn do_encode_word<'a,'b: 'a>(
     }
 
     let input: &str = &*word.input;
+    let mail_type = handle.mail_type();
+    handle.write_if(input, |input| {
+        (!input.starts_with("=?"))
+            && input.chars().all( |ch| is_atext( ch, mail_type ) )
 
-    let ok = (!input.starts_with("=?")) && word.input.chars()
-        .all( |ch| is_atext( ch, handle.mail_type() ) );
-
-    if ok {
-        handle.write_str_unchecked( input )?;
-    } else {
-        if let Some( ecw_ctx ) = ecw_ctx {
-            EncodedWord::write_into( handle, input,
-                                     EncodedWordEncoding::QuotedPrintable, ecw_ctx );
+    }).handle_condition_failure(|handle| {
+        if let Some( _ecw_ctx ) = ecw_ctx {
+            //FIXME actually use the EncodedWordContext
+            let encoding = EncodedWordEncoding::QuotedPrintable;
+            let mut writer = WriterWrapper::new(
+                encoding,
+                handle
+            );
+            encoding.encode(input, &mut writer);
+            Ok(())
         } else {
-            QuotedString::write_into( handle, input )?;
+            let (target_mail_type, quoted) = quoted_string::quote(input)?;
+            match target_mail_type {
+                MailType::Ascii | MailType::Mime8BitEnabled => {
+                    handle.write_str(SoftAsciiStr::from_str_unchecked(quoted.as_str()))
+                },
+                MailType::Internationalized => {
+                    if handle.mail_type().is_internationalized() {
+                        handle.write_utf8(quoted.as_str())
+                    } else {
+                        bail!(InvalidWord(input.to_owned()))
+                    }
+                }
+            }
         }
-    }
+    })?;
 
     if let Some( pad ) = word.right_padding.as_ref() {
         pad.encode( handle )?;
@@ -105,7 +128,7 @@ mod test {
     use super::super::FWS;
 
     ec_test!{encode_pseudo_encoded_words, {
-        let word = Word::from_input( "=?" )?;
+        let word = Word::try_from( "=?" )?;
         EncodableClosure(move |handle: &mut EncodeHandle| {
             do_encode_word( &word, handle, Some( EncodedWordContext::Text ) )
         })
@@ -114,7 +137,7 @@ mod test {
     ]}
 
     ec_test!{encode_word, {
-        let word = Word::from_input( "a↑b" )?;
+        let word = Word::try_from( "a↑b" )?;
         EncodableClosure(move |handle: &mut EncodeHandle| {
             do_encode_word( &word, handle, Some( EncodedWordContext::Text ) )
         })
@@ -127,14 +150,14 @@ mod test {
     fn encode_fails() {
         let mut encoder = Encoder::<VecBodyBuf>::new(MailType::Ascii);
         let mut handle = encoder.encode_handle();
-        let word = Word::from_input( "a↑b" ).unwrap();
+        let word = Word::try_from( "a↑b" ).unwrap();
         assert_err!(do_encode_word( &word, &mut handle, None ));
         handle.undo_header();
     }
 
 
     ec_test!{quoted_fallback, {
-        let word = Word::from_input( "a\"b" )?;
+        let word = Word::try_from( "a\"b" )?;
         EncodableClosure(move |handle: &mut EncodeHandle| {
             do_encode_word( &word, handle, None )
         })

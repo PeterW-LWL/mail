@@ -10,6 +10,9 @@ extern crate nom;
 #[macro_use]
 extern crate quick_error;
 
+#[cfg(test)]
+extern crate chrono;
+
 #[macro_use]
 mod error;
 
@@ -39,8 +42,6 @@ pub type ContentIDList = MessageIDList;
 mod cfws;
 pub use self::cfws::{ CFWS, FWS };
 
-mod date_time;
-pub use self::date_time::DateTime;
 
 pub mod mime_tools;
 pub use self::mime::Mime;
@@ -51,8 +52,6 @@ pub use self::path::Path;
 mod received_token;
 pub use self::received_token::ReceivedToken;
 
-
-mod transfer_encoding;
 
 pub mod word;
 pub use self::word::Word;

@@ -1,5 +1,4 @@
 use std::io;
-
 use mime::Mime;
 use mime::FromStrError as MimeParsingErr;
 use base64;
@@ -27,6 +26,9 @@ impl Display for MultipleErrorsWraper {
     }
 }
 
+// we do not wan't dependencies to have to import error_chain
+// just to have some of the additional error chaining functions
+pub use error_chain::ChainedError;
 
 #[allow(unused_doc_comment)]
 error_chain! {

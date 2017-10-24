@@ -828,7 +828,8 @@ pub fn simplify_trace_tokens<I: IntoIterator<Item=TraceToken>>(inp: I) -> Vec<Tr
                 NowStr |
                 NowAText |
                 NowUtf8 |
-                NowUnchecked => false,
+                NowUnchecked |
+                NowCondText => false,
                 _ => true
             }
         });

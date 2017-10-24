@@ -1,4 +1,3 @@
-use nom::IResult;
 
 quick_error! {
     #[derive(Debug)]
@@ -21,6 +20,11 @@ quick_error! {
             display("expected \"inline\" or \"attachment\" got {:?}", got)
         }
 
+        InvalidWord(got: String) {
+            description("the given input word can not be encoded in given context")
+            display("expected word valid in context, got {:?}", got)
+        }
+
         InvalidDomainName(got: String) {
             description("given input is not a valid domain name")
             display("expected a valid domain name, got: {:?}", got)
@@ -31,10 +35,9 @@ quick_error! {
             display("expected a valid Email, got: {:?}", got)
         }
 
-        InvalidMessageId(got: String, nom_parse_output: IResult) {
+        InvalidMessageId(got: String) {
             description("given input is not a valid MessageId")
-            display("expected a valid MessageId, got: {:?}  (nom parsed to: {:?})",
-                got, nom_parse_output)
+            display("expected a valid MessageId, got: {:?}", got)
         }
 
         MailboxListSize0 {
@@ -59,5 +62,15 @@ macro_rules! bail {
         use $crate::core::error::{ErrorKind, ResultExt};
         let err: ComponentError = $ce;
         return Err(err).chain_err(||ErrorKind::HeaderComponentEncodingFailure)
+    });
+}
+
+#[macro_export]
+macro_rules! error {
+    ($ce:expr) => ({
+        use $crate::error::ComponentError;
+        use $crate::core::error::{Error, ErrorKind};
+        let err: ComponentError = $ce;
+        Error::with_chain(err, ErrorKind::HeaderComponentEncodingFailure)
     });
 }
