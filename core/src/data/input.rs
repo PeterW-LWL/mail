@@ -3,6 +3,9 @@ use std::ascii::AsciiExt;
 
 use soft_ascii_string::SoftAsciiString;
 
+use utils::HeaderTryFrom;
+use error::*;
+
 use super::inner_item::{ InnerUtf8, InnerAscii };
 
 /// a Input is similar to Item a container data container used in different
@@ -62,6 +65,19 @@ impl<'a> From<&'a str> for Input {
 impl From<String> for Input {
     fn from( s: String ) -> Self {
         Input( InnerUtf8::Owned( s ) )
+    }
+}
+
+impl<'a> HeaderTryFrom<&'a str> for Input
+{
+    fn try_from(val: &'a str) -> Result<Self> {
+        Ok(val.into())
+    }
+}
+impl HeaderTryFrom<String> for Input
+{
+    fn try_from(val: String) -> Result<Self> {
+        Ok(val.into())
     }
 }
 

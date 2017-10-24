@@ -1,12 +1,14 @@
 //! mail-codec-core does not ship with any predefined headers and components
-//! except `RawUnstructured`.
+//! except `RawUnstructured`, `TransferEncoding` and `DateTime`
 
 use soft_ascii_string::SoftAsciiStr;
 
 use error::*;
 use grammar::is_vchar;
+use utils::{DateTime, HeaderTryFrom, HeaderTryInto};
 use data::Input;
 use codec::{EncodeHandle, EncodableInHeader};
+use codec::transfer_encoding::TransferEncoding;
 
 /// A unstructured header field implementation which validates the given input
 /// but does not encode any utf8 even if it would have been necessary (it will
@@ -28,6 +30,15 @@ impl<T> From<T> for RawUnstructured
 {
     fn from(val: T) -> Self {
         RawUnstructured { text: val.into() }
+    }
+}
+
+impl<T> HeaderTryFrom<T> for RawUnstructured
+    where T: HeaderTryInto<Input>
+{
+    fn try_from(val: T) -> Result<Self> {
+        let input: Input = val.try_into()?;
+        Ok( input.into() )
     }
 }
 
@@ -67,3 +78,69 @@ impl EncodableInHeader for RawUnstructured {
         }
     }
 }
+
+
+// we reuse the TransferEncoding as component
+impl EncodableInHeader for  TransferEncoding {
+
+    fn encode(&self, handle: &mut EncodeHandle) -> Result<()> {
+        handle.write_str( self.repr() )?;
+        Ok( () )
+    }
+}
+
+// we implement EncodableInHeader on DateTime, too
+// it just makes thinks simpler
+impl EncodableInHeader for DateTime {
+
+    fn encode(&self, handle: &mut EncodeHandle) -> Result<()> {
+        let as_str = self.to_rfc2822();
+        let ascii = SoftAsciiStr::from_str_unchecked( &*as_str );
+        handle.write_str( ascii )?;
+        Ok( () )
+    }
+}
+
+
+
+#[cfg(test)]
+mod test {
+    use super::{TransferEncoding, DateTime};
+
+    ec_test! {_7bit, {
+        TransferEncoding::_7Bit
+    } => ascii => [
+        Text "7bit"
+    ]}
+
+    ec_test! {_8bit, {
+        TransferEncoding::_8Bit
+    } => ascii => [
+        Text "8bit"
+    ]}
+
+    ec_test!{binary, {
+        TransferEncoding::Binary
+    } => ascii => [
+        Text "binary"
+    ]}
+
+    ec_test!{base64, {
+        TransferEncoding::Base64
+    } => ascii => [
+        Text "base64"
+    ]}
+
+    ec_test!{quoted_printable, {
+        TransferEncoding::QuotedPrintable
+    } => ascii => [
+        Text "quoted-printable"
+    ]}
+
+    ec_test!{ date_time, {
+        DateTime::test_time( 45 )
+    } => ascii => [
+        Text "Tue,  6 Aug 2013 04:11:45 +0000"
+    ]}
+}
+

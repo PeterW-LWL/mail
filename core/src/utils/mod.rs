@@ -60,22 +60,22 @@ impl<F, T> HeaderTryInto<T> for F where T: HeaderTryFrom<F> {
     }
 }
 
-// if the HeaderTryFrom chain is again liked with the From chain this
-// must be removed as it will be carried over by the from chain
-//impl<T> HeaderTryFrom<T> for T {
-//    fn try_from(val: T) -> Result<Self, Error> {
-//        Ok( val )
-//    }
-//}
 
-//FOR some reason if this is there HeaderTryFrom<&str> for Mime wont work
-// EVEN THROUGH mime does not has any other From/Into/HeaderTryFrom/HeaderTryInto
-// implementaion
-impl<T,F> HeaderTryFrom<F> for T where F: Into<T> {
-    fn try_from(val: F) -> Result<T, Error> {
-        Ok( val.into() )
+impl<T> HeaderTryFrom<T> for T {
+    fn try_from(val: T) -> Result<Self, Error> {
+        Ok( val )
     }
 }
+
+// It is not possible to auto-implement HeaderTryFrom for From/Into as
+// this will make new HeaderTryFrom implementations outside of this care
+// nearly impossible making the trait partially useless
+//
+//impl<T, F> HeaderTryFrom<F> for T where F: Into<T> {
+//    fn try_from(val: F) -> Result<T, Error> {
+//        Ok( val.into() )
+//    }
+//}
 
 
 
