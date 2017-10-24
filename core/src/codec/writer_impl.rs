@@ -59,11 +59,17 @@ pub struct WriterWrapper<'a, 'b: 'a>{
 }
 
 impl<'a, 'b: 'a> WriterWrapper<'a, 'b> {
-    pub fn new(charset: &'a SoftAsciiStr,
-               encoding: Encoding,
-               encoder: &'a mut EncodeHandle<'b> ) -> Self
+    pub fn new_with_charset(charset: &'a SoftAsciiStr,
+                            encoding: Encoding,
+                            encoder: &'a mut EncodeHandle<'b> ) -> Self
     {
         WriterWrapper { charset, encoding, encoder_handle: encoder }
+    }
+
+    pub fn new(encoding: Encoding,
+               encoder: &'a mut EncodeHandle<'b> ) -> Self
+    {
+        Self::new_with_charset(SoftAsciiStr::from_str_unchecked("utf8"), encoding, encoder)
     }
 }
 

@@ -248,7 +248,7 @@ impl ValidWithoutQuotationCheck for TokenCheck {
 
 #[cfg(test)]
 mod test {
-    use core::grammar::{ is_vchar, is_qtext};
+    use grammar::{ is_vchar, is_qtext};
     use super::*;
 
 

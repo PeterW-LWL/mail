@@ -167,6 +167,7 @@ pub enum TraceToken {
     NowStr,
     NowAText,
     NowUtf8,
+    NowCondText,
     NowUnchecked,
     NewSection,
     End,
@@ -548,7 +549,24 @@ impl<'inner> EncodeHandle<'inner> {
         } else {
             ConditionalWriteResult::ConditionFailure(self)
         }
+    }
 
+    /// passes the input `s` to the condition evaluation function `cond` and
+    /// then writes it _without additional checks_ to the buffer if `cond` returned
+    /// true
+    ///
+    pub fn write_if<'short, FN>(&'short mut self, s: &str, cond: FN)
+        -> ConditionalWriteResult<'short, 'inner>
+        where FN: FnOnce(&str) -> bool
+    {
+        if cond(s) {
+            #[cfg(feature="traceing")]
+            { self.trace.push(TraceToken::NowCondText) }
+            // the ascii or not aspect is already converted by `is_atext`
+            self.internal_write_str(s).into()
+        } else {
+            ConditionalWriteResult::ConditionFailure(self)
+        }
     }
 
     //TODO remove once SoftAsciiString lands
@@ -932,8 +950,8 @@ mod test {
 #[cfg(all(feature="traceing", test))]
 mod test {
     use soft_ascii_string::{ SoftAsciiChar, SoftAsciiStr};
-    use core::error::*;
-    use core::grammar::MailType;
+    use error::*;
+    use grammar::MailType;
 
     use super::TraceToken::*;
     use super::{

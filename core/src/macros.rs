@@ -22,7 +22,6 @@ macro_rules! assert_ok {
     });
 }
 
-#[cfg(test)]
 #[macro_export]
 macro_rules! assert_err {
     ($val:expr) => ({
