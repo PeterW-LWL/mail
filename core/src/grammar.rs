@@ -145,7 +145,6 @@ pub fn is_qtext( ch: char, mt: MailType ) -> bool {
         '#'...'[' |
         //not '\\' [d:92]
         ']'...'~' => true,
-        //obs-qtext
         _ => mt == MailType::Internationalized && !is_ascii( ch )
     }
 }

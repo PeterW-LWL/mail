@@ -569,10 +569,28 @@ impl<'inner> EncodeHandle<'inner> {
         }
     }
 
-    //TODO remove once SoftAsciiString lands
     /// writes a string to the encoder without checking if it is compatible
     /// with the mail type, if not used correctly this can write Utf8 to
     /// an Ascii Mail, which is incorrect but has to be safe wrt. rust's safety.
+    ///
+    /// Use it as a replacement for cases similar to following:
+    ///
+    /// ```ignore
+    /// check_if_text_if_valid(text)?;
+    /// if mail_type.is_internationalized() {
+    ///     handle.write_utf8(text)?;
+    /// } else {
+    ///     handle.write_str(SoftAsciiStr::from_str_unchecked(text))?;
+    /// }
+    /// ```
+    /// ==> instead ==>
+    /// ```ignore
+    /// check_if_text_if_valid(text)?;
+    /// handle.wite_str_unchecked(text)?;
+    /// ```
+    ///
+    /// through is gives a different tracing its roughly equivalent.
+    ///
     pub fn write_str_unchecked( &mut self, s: &str) -> Result<()> {
         #[cfg(feature="traceing")]
         { self.trace.push(TraceToken::NowUnchecked) }
