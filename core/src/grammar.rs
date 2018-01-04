@@ -30,7 +30,8 @@ impl MailType {
 ///  => <0x7F && != 0x3A
 #[inline(always)]
 pub fn is_ftext( ch: char ) -> bool {
-    (ch as u32) < 127 && ch != ':'
+    let bch = ch as u32;
+    bch > 32 && bch < 127 && ch != ':'
 }
 
 ///WS as defined by RFC 5234
