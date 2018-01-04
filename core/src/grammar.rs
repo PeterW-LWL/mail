@@ -257,6 +257,7 @@ pub mod encoded_word {
     pub fn try_parse_encoded_word_parts( word: &str, ctx: EncodedWordContext )
                                          -> Result<(&str, &str, &str)>
     {
+        //FIXME[BUG] why is the char validator not used
         let char_validator = ctx.char_validator();
         // Note we could get a possible speed up by making rustc generate
         // a different function for each Context, inlining ALL char tests
