@@ -11,6 +11,8 @@ extern crate soft_ascii_string;
 extern crate base64;
 extern crate quoted_printable;
 extern crate idna;
+extern crate quoted_string;
+extern crate media_type_parser_utils;
 extern crate percent_encoding;
 extern crate vec1;
 extern crate serde;
