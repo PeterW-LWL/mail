@@ -1,4 +1,5 @@
 use std::ops::Deref;
+#[allow(unused_imports)]
 use std::ascii::AsciiExt;
 
 use soft_ascii_string::{ SoftAsciiStr, SoftAsciiString};
