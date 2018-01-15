@@ -49,7 +49,7 @@ pub fn find_encoding( buffer: &FileBuffer ) -> TransferEncoding {
 
 
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone)]
 pub struct TransferEncodedFileBuffer {
     inner: FileBuffer,
     encoding: TransferEncoding

@@ -29,7 +29,7 @@ impl Input {
             Input( InnerUtf8::Owned( string ) ) => {
                 match SoftAsciiString::from_string(string) {
                     Ok(asciied) => Ok(InnerAscii::Owned(asciied)),
-                    Err(string) => Err(Input(InnerUtf8::Owned(string)))
+                    Err(err) => Err(Input(InnerUtf8::Owned(err.into_source())))
                 }
             }
             Input( InnerUtf8::Shared( shared ) ) => {

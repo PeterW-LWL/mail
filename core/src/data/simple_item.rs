@@ -80,7 +80,7 @@ impl From<String> for SimpleItem {
     fn from( string: String ) -> Self {
         match SoftAsciiString::from_string( string ) {
             Ok( astring ) => SimpleItem::Ascii( InnerAscii::Owned( astring ) ),
-            Err( orig ) => SimpleItem::Utf8( InnerUtf8::Owned( orig ) )
+            Err( err ) => SimpleItem::Utf8( InnerUtf8::Owned( err.into_source() ) )
         }
     }
 }
@@ -96,7 +96,7 @@ impl From<Input> for SimpleItem {
         match input {
             Input( InnerUtf8::Owned( string ) ) => match SoftAsciiString::from_string( string ) {
                 Ok( ascii ) => SimpleItem::Ascii( InnerAscii::Owned( ascii ) ),
-                Err( orig ) => SimpleItem::Utf8( InnerUtf8::Owned( orig ) )
+                Err( err ) => SimpleItem::Utf8( InnerUtf8::Owned( err.into_source() ) )
             },
             Input( InnerUtf8::Shared( shared ) ) => {
                 if shared.is_ascii() {

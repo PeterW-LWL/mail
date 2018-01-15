@@ -3,9 +3,7 @@ use std::cell::RefCell;
 use std::mem;
 use std::fmt::{self, Debug};
 
-
-
-use mime::{ Mime, MULTIPART };
+use mime::{AnyMediaType, MULTIPART};
 use error::Error;
 
 mod buffer;
@@ -38,7 +36,7 @@ impl<I> Debug for DebugIterableOpaque<I>
 }
 
 
-pub fn is_multipart_mime( mime: &Mime ) -> bool {
+pub fn is_multipart_mime( mime: &AnyMediaType) -> bool {
     mime.type_() == MULTIPART
 }
 

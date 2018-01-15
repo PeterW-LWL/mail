@@ -1,11 +1,12 @@
 use std::io;
-use mime::Mime;
-use mime::FromStrError as MimeParsingErr;
+use std::fmt::{self, Display};
+use std::path::PathBuf;
+
 use base64;
 use quoted_printable;
 use idna::uts46::{ Errors as PunyCodeErrors };
-use std::fmt::{self, Display};
-use std::path::PathBuf;
+use mime::AnyMediaType;
+use mime::error::ParserError;
 
 #[derive(Debug)]
 pub struct MultipleErrorsWraper {
@@ -39,7 +40,6 @@ error_chain! {
         DecodeQuotedPrintable(quoted_printable::QuotedPrintableError);
     }
 
-
     errors {
 
         HeaderComponentEncodingFailure {
@@ -61,7 +61,7 @@ error_chain! {
             display("failed to a the field {:?} to the header map", name)
         }
         //mime_error does not impl (std)Error so no chaining possible
-        ParsingMime( mime_error: MimeParsingErr ) {
+        ParsingMime( mime_error: ParserError ) {
             description( "parsing mime failed" )
             display( "parsing mime failed ({:?})", mime_error )
         }
@@ -90,7 +90,7 @@ error_chain! {
             display( "{:?} is not a valid header name", name )
         }
 
-        NotMultipartMime( mime: Mime ) {
+        NotMultipartMime( mime: AnyMediaType ) {
             description( "expected a multipart mime for a multi part body" )
             display( _self ) -> ( "{}, got: {}", _self.description(), mime )
         }
@@ -99,7 +99,7 @@ error_chain! {
             description( "multipart boundary is missing" )
         }
 
-        NotSinglepartMime( mime: Mime ) {
+        NotSinglepartMime( mime: AnyMediaType ) {
             description( "expected a non-multipart mime for a non-multipart body" )
             display( _self ) -> ( "{}, got: {}", _self.description(), mime )
         }

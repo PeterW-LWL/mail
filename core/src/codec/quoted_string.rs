@@ -4,7 +4,7 @@ use quoted_string::spec::{
     WithoutQuotingValidator
 };
 
-use media_type_parser_utils::quoted_string_spec;
+use media_type_parser_utils::quoted_string;
 use grammar::MailType;
 
 /// A Quoted String specification in context of Mail ([rfc5322](https://tools.ietf.org/html/rfc5322#section-2.2.3))
@@ -17,8 +17,8 @@ use grammar::MailType;
 pub struct MailQsSpec;
 
 impl GeneralQSSpec for MailQsSpec {
-    type Quoting = quoted_string_spec::NormalQuoting;
-    type Parsing = quoted_string_spec::MimeParsing;
+    type Quoting = quoted_string::NormalQuoting;
+    type Parsing = quoted_string::MimeParsing;
 }
 
 
@@ -31,11 +31,11 @@ impl GeneralQSSpec for MailQsSpec {
 pub struct InternationalizedMailQsSpec;
 
 impl GeneralQSSpec for InternationalizedMailQsSpec {
-    type Quoting = quoted_string_spec::NormalUtf8Quoting;
-    type Parsing = quoted_string_spec::MimeParsingUtf8;
+    type Quoting = quoted_string::NormalUtf8Quoting;
+    type Parsing = quoted_string::MimeParsingUtf8;
 }
 
-pub use self::quoted_string_spec::MimeTokenValidator as UnquotedTokenValidator;
+pub use self::quoted_string::MimeTokenValidator as UnquotedTokenValidator;
 
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
