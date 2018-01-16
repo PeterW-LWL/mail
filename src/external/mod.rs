@@ -2,3 +2,4 @@
 //! the glue can depend on `utils`,`error` and `grammar`
 
 
+struct MediaType;
