@@ -86,7 +86,7 @@ quick_error! {
     }
 }
 
-#[macro_export]
+
 macro_rules! bail {
     ($ce:expr) => ({
         use $crate::error::ComponentError;
@@ -96,7 +96,7 @@ macro_rules! bail {
     });
 }
 
-#[macro_export]
+
 macro_rules! error {
     ($ce:expr) => ({
         use $crate::error::ComponentError;
