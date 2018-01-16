@@ -37,8 +37,8 @@ pub type ContentIDList = MessageIDList;
 mod cfws;
 pub use self::cfws::{ CFWS, FWS };
 
-//mod media_type;
-//pub use self::media_type::*;
+mod media_type;
+pub use self::media_type::*;
 
 mod path;
 pub use self::path::Path;

@@ -1,4 +1,4 @@
-//use mime::error::ParserError;
+use mime::error::ParserError;
 
 quick_error! {
     #[derive(Debug)]
@@ -74,10 +74,10 @@ quick_error! {
             display("need at last one VCHAR in input got: {:?}", got)
         }
 
-//        ParsingMimeFailed(err: ParserError) {
-//            description("parsing mime failed")
-//            display("parsing mime failed: {}", err)
-//        }
+        ParsingMediaTypeFailed(err: ParserError) {
+            description("parsing media type failed")
+            display("parsing media type failed: {}", err)
+        }
 
 //        MimeSectionOverflow {
 //            description("can not process a mime parameter split into more than 256 sections")
