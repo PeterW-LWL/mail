@@ -4,7 +4,7 @@ use quoted_string::spec::{
     WithoutQuotingValidator
 };
 
-use media_type_parser_utils::quoted_string;
+use media_type_impl_utils::quoted_string;
 use grammar::MailType;
 
 /// A Quoted String specification in context of Mail ([rfc5322](https://tools.ietf.org/html/rfc5322#section-2.2.3))
