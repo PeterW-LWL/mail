@@ -15,7 +15,6 @@ nom = "3.1.0"
 error-chain = "0.11.0"
 owning_ref = "0.3.3"
 chrono = "0.4.0"
-mime = { git="https://github.com/1aim/mime", branch="parser_revamp" }
 base64 = "0.6.0"
 quoted_printable = "0.4.0"
 idna = "0.1.4"
@@ -25,6 +24,12 @@ serde_derive = "1.0.10"
 quoted-string = { git="https://github.com/1aim/quoted-string", version="0.5"}
 media-type-impl-utils = { git="https://github.com/1aim/media-type-impl-utils" }
 soft-ascii-string = "0.2"
+
+[dependencies.mime]
+git="https://github.com/1aim/mime"
+branch="parser_revamp"
+features=["expose-param-utils"]
+version="0.4.0"
 
 [dependencies.vec1]
 path = "../vec1"
