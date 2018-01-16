@@ -1,9 +1,9 @@
 use soft_ascii_string::SoftAsciiChar;
 
-use core::error::*;
-use core::codec::{self, EncodeHandle, EncodableInHeader };
-use core::codec::idna;
+use mime::spec::{MimeSpec, Ascii, Internationalized, Modern};
+use quoted_string::quote_if_needed;
 
+use core::error::*;
 use core::grammar::{
     is_ascii,
     is_atext,
@@ -11,10 +11,13 @@ use core::grammar::{
     is_ws,
     MailType
 };
+use core::codec::{EncodeHandle, EncodableInHeader };
+use core::codec::idna;
 use core::utils::{HeaderTryInto, HeaderTryFrom};
 use core::data::{Input, SimpleItem, InnerUtf8 };
+use core::codec::quoted_string::UnquotedDotAtomTextValidator;
 
-use error::ComponentError::{InvalidDomainName, InvalidEmail};
+use error::ComponentError::{InvalidDomainName, InvalidEmail, InvalidLocalPart};
 
 /// an email of the form `local-part@domain`
 /// corresponds to RFC5322 addr-spec, so `<`, `>` padding is _not_
@@ -101,17 +104,17 @@ impl EncodableInHeader for LocalPart {
         let input: &str = &*self.0;
         let mail_type = handle.mail_type();
 
-        let (got_mt, res) = codec::quoted_string::quote_if_needed(
-            input,
-            codec::quoted_string::DotAtomTextCheck::new(mail_type),
-            mail_type
-        )?;
+        let mut validator = UnquotedDotAtomTextValidator::new(mail_type);
 
-        debug_assert!(!(got_mt == MailType::Internationalized && mail_type == MailType::Ascii));
+        let res = if mail_type.is_internationalized() {
+            quote_if_needed::<MimeSpec<Internationalized, Modern>, _>(input, &mut validator)
+        } else {
+            quote_if_needed::<MimeSpec<Ascii, Modern>, _>(input, &mut validator)
+        }.map_err(|_qs_err| error!(InvalidLocalPart(input.into())))?;
+
 
         handle.mark_fws_pos();
-        // if mail_type == Ascii quote_if_needed already made sure this
-        // is ascii (or returned an error if not)
+        // if mail_type == Ascii quote_if_needed already made sure it's ascii
         // it also made sure it is valid as it is either `dot-atom-text` or `quoted-string`
         handle.write_str_unchecked(&*res)?;
         handle.mark_fws_pos();

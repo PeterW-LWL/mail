@@ -1,4 +1,5 @@
-use soft_ascii_string::SoftAsciiStr;
+
+use quoted_string;
 
 use core::error::*;
 use core::codec::{
@@ -6,9 +7,10 @@ use core::codec::{
     EncodableInHeader, EncodeHandle,
     WriterWrapper
 };
-use core::grammar::{MailType, is_atext};
+use core::codec::quoted_string::{MailQsSpec, InternationalizedMailQsSpec};
+use core::grammar::is_atext;
 use core::grammar::encoded_word::EncodedWordContext;
-use core::codec::quoted_string;
+//use core::codec::quoted_string;
 use core::utils::{HeaderTryFrom, HeaderTryInto};
 use core::data::Input;
 
@@ -92,19 +94,17 @@ pub fn do_encode_word<'a,'b: 'a>(
             encoding.encode(input, &mut writer);
             Ok(())
         } else {
-            let (target_mail_type, quoted) = quoted_string::quote(input)?;
-            match target_mail_type {
-                MailType::Ascii | MailType::Mime8BitEnabled => {
-                    handle.write_str(SoftAsciiStr::from_str_unchecked(quoted.as_str()))
-                },
-                MailType::Internationalized => {
-                    if handle.mail_type().is_internationalized() {
-                        handle.write_utf8(quoted.as_str())
-                    } else {
-                        bail!(InvalidWord(input.to_owned()))
-                    }
-                }
-            }
+            let mail_type = handle.mail_type();
+            let res =
+                if mail_type.is_internationalized() {
+                    //spec needed is mime internationlized
+                    quoted_string::quote::<InternationalizedMailQsSpec>(input)
+                } else {
+                    //spec is mime
+                    quoted_string::quote::<MailQsSpec>(input)
+                };
+            let quoted = res.map_err(|_err| error!(InvalidWord(input.into())))?;
+            handle.write_str_unchecked(&*quoted)
         }
     })?;
 

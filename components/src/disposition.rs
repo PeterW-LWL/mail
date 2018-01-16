@@ -1,14 +1,19 @@
+#[allow(unused_imports)]
 use std::ascii::AsciiExt;
+use std::borrow::Cow;
 
 use soft_ascii_string::SoftAsciiStr;
+use mime::push_params_to_buffer;
+use mime::spec::{MimeSpec, Ascii, Modern, Internationalized};
 
 use core::error::*;
 use core::codec::{EncodableInHeader, EncodeHandle};
 use core::utils::{ FileMeta, HeaderTryFrom };
 
-use mime_tools::create_encoded_mime_parameter;
+
 use error::ComponentError::InvalidContentDisposition;
 
+/// Disposition Component mainly used for the Content-Disposition header (rfc2183)
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct Disposition {
     kind: DispositionKind,
@@ -75,31 +80,47 @@ impl<'a> HeaderTryFrom<&'a str> for Disposition {
 impl EncodableInHeader for DispositionParameters {
 
     fn encode(&self, handle: &mut EncodeHandle) -> Result<()> {
-        let mt = handle.mail_type();
-        let mut out = String::new();
+        let mut params = Vec::<(&str, Cow<str>)>::new();
         if let Some(filename) = self.file_name.as_ref() {
-            create_encoded_mime_parameter(
-                "filename", filename, &mut out, mt)?;
+            params.push(("filename", Cow::Borrowed(filename)));
         }
         if let Some(creation_date) = self.creation_date.as_ref() {
-            create_encoded_mime_parameter(
-                "creation-date", creation_date.to_rfc2822(), &mut out, mt)?;
+            params.push(("creation-date", Cow::Owned(creation_date.to_rfc2822())));
         }
         if let Some(date) = self.modification_date.as_ref() {
-            create_encoded_mime_parameter(
-                "modification-date", date.to_rfc2822(), &mut out, mt)?;
+            params.push(("modification-date", Cow::Owned(date.to_rfc2822())));
         }
         if let Some(date) = self.read_date.as_ref() {
-            create_encoded_mime_parameter(
-                "read-date", date.to_rfc2822(), &mut out, mt)?;
+            params.push(("read-date", Cow::Owned(date.to_rfc2822())));
         }
         if let Some(size) = self.size.as_ref() {
-            create_encoded_mime_parameter(
-                "size", size.to_string(), &mut out, mt)?;
+            params.push(("size", Cow::Owned(size.to_string())));
         }
-        //TODO this function will be removed so do it differently
-        handle.write_str_unchecked(&*out)?;
-        Ok( () )
+
+        //TODO instead do optCFWS ; spCFWS <name>=<value>
+        // so that soft line brakes can be done
+        let mut buff = String::new();
+        let res =
+            if handle.mail_type().is_internationalized() {
+                push_params_to_buffer::<MimeSpec<Internationalized, Modern>, _, _, _>(
+                    &mut buff, params
+                )
+            } else {
+                push_params_to_buffer::<MimeSpec<Ascii, Modern>, _, _, _>(
+                    &mut buff, params
+                )
+            };
+
+        match res {
+            Err(_) => {
+                bail!(InvalidContentDisposition(buff));
+            },
+            Ok(_) => {
+                handle.write_str_unchecked(&*buff)?;
+            }
+        }
+
+        Ok(())
     }
 }
 
@@ -155,7 +176,7 @@ mod test {
             ..Default::default()
         })
     } => ascii => [
-        Text "attachment;filename=\"this is nice\""
+        Text "attachment; filename=\"this is nice\""
     ]}
 
     ec_test!{ attachment_all_params, {
@@ -168,11 +189,11 @@ mod test {
         })
     } => ascii => [
         Text concat!( "attachment",
-            ";filename=random.png",
-            ";creation-date=\"Tue,  6 Aug 2013 04:11:01 +0000\"",
-            ";modification-date=\"Tue,  6 Aug 2013 04:11:02 +0000\"",
-            ";read-date=\"Tue,  6 Aug 2013 04:11:03 +0000\"",
-            ";size=4096" ),
+            "; filename=random.png",
+            "; creation-date=\"Tue,  6 Aug 2013 04:11:01 +0000\"",
+            "; modification-date=\"Tue,  6 Aug 2013 04:11:02 +0000\"",
+            "; read-date=\"Tue,  6 Aug 2013 04:11:03 +0000\"",
+            "; size=4096" ),
     ]}
 
     //TODO: (1 allow FWS or so in parameters) (2 utf8 file names)

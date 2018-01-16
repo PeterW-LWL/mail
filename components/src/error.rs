@@ -1,3 +1,4 @@
+//use mime::error::ParserError;
 
 quick_error! {
     #[derive(Debug)]
@@ -8,10 +9,10 @@ quick_error! {
                 "can not encode WSP only phrase a phrase is required to contain at last one VCHAR")
         }
 
-        InvalidToken(got: String) {
-            description("given input was not a valid token (syntax)")
-            display("expected valid token (syntax) got: {:?}", got)
-        }
+//        InvalidToken(got: String) {
+//            description("given input was not a valid token (syntax)")
+//            display("expected valid token (syntax) got: {:?}", got)
+//        }
 
         InvalidContentDisposition(got: String) {
             description(
@@ -30,6 +31,11 @@ quick_error! {
             display("expected a valid domain name, got: {:?}", got)
         }
 
+        InvalidLocalPart(got: String) {
+            description("the local part (likely of an email) is invalid")
+            display("expected a valid local part, got: {:?}", got)
+        }
+
         InvalidEmail(got: String) {
             description("given input is not a valid Email")
             display("expected a valid Email, got: {:?}", got)
@@ -39,6 +45,21 @@ quick_error! {
             description("given input is not a valid MessageId")
             display("expected a valid MessageId, got: {:?}", got)
         }
+
+//        InvalidMime(got: String) {
+//            description("mime can be parsed by mime crate but is still invalid")
+//            display("expected valid mime type, got: {:?}", got)
+//        }
+
+//        InvalidMimeRq(got: String) {
+//            description(concat!(
+//                "invalid mime, through could be valid with ",
+//                "requoting/encoding parameter sections which is not supported"))
+//            display(concat!(
+//                "invalid mime, through could be valid with ",
+//                "requoting/encoding parameter sections which is not supported",
+//                ": {:?}"), got)
+//        }
 
         MailboxListSize0 {
             description("a mailbox list consist of at last one phrase, not 0")
@@ -52,6 +73,16 @@ quick_error! {
             description("given input did contain 0 VCHAR's but at last 1 was required")
             display("need at last one VCHAR in input got: {:?}", got)
         }
+
+//        ParsingMimeFailed(err: ParserError) {
+//            description("parsing mime failed")
+//            display("parsing mime failed: {}", err)
+//        }
+
+//        MimeSectionOverflow {
+//            description("can not process a mime parameter split into more than 256 sections")
+//        }
+
     }
 }
 
