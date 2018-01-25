@@ -19,20 +19,23 @@ use utils::is_multipart_mime;
 /// The boundary will be picked from ascii `VCHAR`'s (us-ascii >= 33 and <= 126) but
 /// following `VCHAR`'s are excluded `'"'`, `'-'` and `'\\'`.
 pub fn create_random_boundary() -> String {
-    const MULTIPART_BOUNDARY_LENGTH: usize = 30;
+    const MULTIPART_BOUNDARY_LENGTH: usize = 70;
+    // boundary chars based on rfc2046, excluding " "
+    // (it can be used in any place _except_ the last)
+    debug_assert!(4 <= MULTIPART_BOUNDARY_LENGTH && MULTIPART_BOUNDARY_LENGTH <= 70);
     static CHARS: &[char] = &[
-        '!',      '#', '$', '%', '&', '\'', '(',
-        ')', '*', '+', ',',      '.', '/', '0',
+                                      '\'', '(',
+        ')',      '+', ',',      '.', '/', '0',
         '1', '2', '3', '4', '5', '6', '7', '8',
-        '9', ':', ';', '<', '=', '>', '?', '@',
+        '9', ':',           '=',      '?',
         'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H',
         'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P',
         'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X',
-        'Y', 'Z', '[',      ']', '^', '_', '`',
+        'Y', 'Z',                     '_',
         'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h',
         'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p',
         'q', 'r', 's', 't', 'u', 'v', 'w', 'x',
-        'y', 'z', '{', '|', '}', '~'
+        'y', 'z',
     ];
 
     // we add =_^ to the boundary, as =_^ is neither valid in base64 nor quoted-printable
