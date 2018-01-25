@@ -1,5 +1,5 @@
 
-# mail-codec &emsp; [![Build Status](https://travis-ci.org/1aim/mail_codec.svg?branch=master)](https://travis-ci.org/1aim/mail_codec)
+# mail-codec-composition &emsp; [![Build Status](https://travis-ci.org/1aim/mail_codec.svg?branch=master)](https://travis-ci.org/1aim/mail_codec)
 
 **TODO**
 
@@ -8,7 +8,7 @@
 TODO
 
 
-Documentation can be [viewed on docs.rs](https://docs.rs/mail-codec).
+Documentation can be [viewed on docs.rs](https://docs.rs/mail-codec-composition).
 
 
 ## License

@@ -6,14 +6,14 @@ use soft_ascii_string::SoftAsciiStr;
 use core::utils::HeaderTryFrom;
 use core::error::{Result, ErrorKind, ResultExt};
 use core::header::HeaderMap;
-use mheaders::{
+use headers::{
     From, To,
     Subject,
     ContentId,
     ContentDisposition
 };
 
-use mheaders::components::{
+use headers::components::{
     Disposition,
     Unstructured,
     Mailbox,

@@ -2,19 +2,14 @@
 authors = ["Philipp Korber <p.korber@1aim.com>"]
 categories = []
 description = "TODO"
-documentation = "https://docs.rs/mail-codec"
+documentation = "https://docs.rs/mail-codec-composition"
 keywords = ["mail", "codec", "mime", "smtp"]
 license = "MIT OR Apache-2.0"
-name = "mail-codec"
+name = "mail-codec-composition"
 readme = "./README.md"
-repository = "https://github.com/1aim/mail-codec"
+repository = "https://github.com/1aim/mail-codec-composition"
 version = "0.1.0"
 
-[badges]
-
-[badges.travis-ci]
-branch = "master"
-repository = "1aim/mail-codec"
 
 [dependencies]
 futures = "0.1.14"
@@ -25,6 +20,7 @@ serde = "1.0.10"
 serde_derive = "1.0.10"
 vec1 = { git="https://github.com/1aim/vec1" }
 total-order-multi-map = { git="https://github.com/1aim/total-order-multi-map" }
+mail-codec = { git="https://github.com/1aim/mail-codec" }
 mail-codec-core = { git="https://github.com/1aim/mail-codec-core" }
 mail-codec-headers = { git="https://github.com/1aim/mail-codec-headers" }
 error-chain = "0.11.0"
@@ -36,9 +32,6 @@ git="https://github.com/1aim/mime"
 branch="parser_revamp"
 version="0.4.0"
 
-[dependencies.tree_magic]
-version = "0.2.0"
-features = ["staticmime"]
 
 [dependencies.futures-cpupool]
 optional = true
@@ -50,13 +43,8 @@ serde_json = "1.0.2"
 [features]
 debug_trace_tokens = []
 default = ["default_impl"]
-default_impl = ["default_impl_mail", "default_impl_compose"]
-default_impl_any = []
-default_impl_component_id = ["default_impl_any"]
-default_impl_compose = ["default_impl_name_composer", "default_impl_component_id"]
-default_impl_cpupool = ["futures-cpupool", "default_impl_any"]
-default_impl_fs = ["default_impl_any"]
-default_impl_mail = ["default_impl_cpupool", "default_impl_fs", "default_impl_vfs"]
+default_impl = ["default_impl_name_composer", "default_impl_component_id"]
 default_impl_name_composer = ["default_impl_any"]
-default_impl_vfs = ["default_impl_any"]
-traceing = [ "mail-codec-core/traceing", "mail-codec-headers/traceing" ]
+default_impl_component_id = ["default_impl_any"]
+default_impl_any = []
+traceing = [ "mail-codec/traceing" ]
