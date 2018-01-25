@@ -111,18 +111,17 @@ fn encode_mail_part(mail: &Mail, encoder:  &mut Encoder<Resource> ) -> Result<()
             if hidden_text.len() > 0 {
                 warn!("hidden_text fields in multipart bodies are currently not encoded")
             }
-            let boundary: String = {
-                //FIXME there has to be a better way
-                // yes if the boundary is missing just genrate one!
-                if let Some( mime ) = mail.headers.get_single(ContentType) {
+            let boundary;
+            if let Some( media_type ) = mail.headers.get_single(ContentType) {
+                boundary = media_type?.get_param(BOUNDARY)
+                    //FIXME is [BUG] ok here? it should be handled by the uper layers but
+                    // it's just a should ...
+                    .ok_or_else( ||-> Error { "[BUG] boundary gone missing".into() } )?
+                    .to_content()
+            } else {
+                bail!( "Content-Type header gone missing" )
+            }
 
-                    mime?.get_param(BOUNDARY)
-                        .ok_or_else( ||-> Error { "[BUG] boundary gone missing".into() } )?
-                        .to_string()
-                } else {
-                    bail!( "Content-Type header gone missing" )
-                }
-            };
 
             let boundary = SoftAsciiString::from_string(boundary)
                 .map_err( |_orig_string| {
