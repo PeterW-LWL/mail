@@ -2,22 +2,23 @@ use std::ops::Deref;
 
 use rand;
 use rand::Rng;
-use mime::Mime;
 
-use error::*;
-use utils::{ is_multipart_mime, HeaderTryInto };
+use mheaders::components::MediaType;
 
+use core::error::{ErrorKind, Result, ResultExt};
+use core::HeaderTryInto;
+
+use utils::is_multipart_mime;
 
 /// write a random sequence of chars valide for and boundary to the output buffer
 ///
-/// The boundary will be quoted, i.e. start and end with `'"'`.
+/// Note that it might be required to quote the boundary.
 /// The boundary (excluding quotations) will start with `"=_^"` which is neither
-/// valid for base64 nore quoted-printable encoding.
+/// valid for base64 nor quoted-printable encoding.
 ///
 /// The boundary will be picked from ascii `VCHAR`'s (us-ascii >= 33 and <= 126) but
 /// following `VCHAR`'s are excluded `'"'`, `'-'` and `'\\'`.
-pub fn write_random_boundary_to(out: &mut String) {
-    //TODO(CONFIG): make this configurable
+pub fn create_random_boundary() -> String {
     const MULTIPART_BOUNDARY_LENGTH: usize = 30;
     static CHARS: &[char] = &[
         '!',      '#', '$', '%', '&', '\'', '(',
@@ -34,85 +35,94 @@ pub fn write_random_boundary_to(out: &mut String) {
         'y', 'z', '{', '|', '}', '~'
     ];
 
-    // we add =_^ to the boundary, as =_^ is neither valide in base64 nor quoted-printable
-    out.push_str("\"=_^");
+    // we add =_^ to the boundary, as =_^ is neither valid in base64 nor quoted-printable
+    let mut out = String::with_capacity(MULTIPART_BOUNDARY_LENGTH);
+    out.push_str("=_^");
     let mut rng = rand::thread_rng();
-    for _ in 0..MULTIPART_BOUNDARY_LENGTH {
+    for _ in 3..MULTIPART_BOUNDARY_LENGTH {
         out.push( CHARS[ rng.gen_range( 0, CHARS.len() )] )
     }
-    out.push('"');
+    out
 }
 
 
 #[derive(Debug)]
-pub struct SinglepartMime( Mime );
+pub struct SinglepartMime( MediaType );
 
 impl SinglepartMime {
-    pub fn new( mime: Mime ) -> Result<Self> {
+    pub fn new( mime: MediaType ) -> Result<Self> {
         if !is_multipart_mime( &mime ) {
             Ok( SinglepartMime( mime ) )
         } else {
-            Err( ErrorKind::NotSinglepartMime( mime ).into() )
+            Err( ErrorKind::NotSinglepartMime( mime.into() ).into() )
         }
     }
 }
 
-impl HeaderTryInto<Mime> for SinglepartMime {
-    fn try_into(self) -> Result<Mime> {
+impl HeaderTryInto<MediaType> for SinglepartMime {
+    fn try_into(self) -> Result<MediaType> {
         Ok( self.0 )
     }
 }
 
-impl Into<Mime> for SinglepartMime {
-    fn into( self ) -> Mime {
+impl Into<MediaType> for SinglepartMime {
+    fn into( self ) -> MediaType {
         self.0
     }
 }
 
 impl Deref for SinglepartMime {
-    type Target = Mime;
+    type Target = MediaType;
 
-    fn deref( &self ) -> &Mime {
+    fn deref( &self ) -> &MediaType {
         &self.0
     }
 }
 
 #[derive(Debug)]
-pub struct MultipartMime( Mime );
+pub struct MultipartMime( MediaType );
 
 impl MultipartMime {
 
-    pub fn new( mime: Mime ) -> Result<Self> {
+    pub fn new( mime: MediaType ) -> Result<Self> {
         if is_multipart_mime( &mime ) {
             Ok( MultipartMime( mime ) )
         }  else {
-            Err( ErrorKind::NotMultipartMime( mime ).into() )
+            Err( ErrorKind::NotMultipartMime( mime.into() ).into() )
         }
 
     }
 }
 
-impl HeaderTryInto<Mime> for MultipartMime {
-    fn try_into(self) -> Result<Mime> {
+impl HeaderTryInto<MediaType> for MultipartMime {
+    fn try_into(self) -> Result<MediaType> {
         Ok( self.0 )
     }
 }
 
-impl Into<Mime> for MultipartMime {
-    fn into( self ) -> Mime {
+impl Into<MediaType> for MultipartMime {
+    fn into( self ) -> MediaType {
         self.0
     }
 }
 
 impl Deref for MultipartMime {
-    type Target = Mime;
+    type Target = MediaType;
 
-    fn deref( &self ) -> &Mime {
+    fn deref( &self ) -> &MediaType {
         &self.0
     }
 }
 
-
+pub fn gen_multipart_mime<A>( subtype: A ) -> Result<MultipartMime>
+    where A: AsRef<str>
+{
+    let boundary = create_random_boundary();
+    let media_type = MediaType::new_with_params("multipart", subtype.as_ref(), vec![
+        ("boundary", &*boundary)
+    ]).chain_err(|| ErrorKind::GeneratingMimeFailed)?;
+    Ok(MultipartMime(media_type))
+}
 
 #[cfg(test)]
 mod test {
@@ -121,32 +131,28 @@ mod test {
         use super::super::*;
 
         #[test]
-        fn boundary_is_quoted() {
-            let mut out = String::new();
-            write_random_boundary_to(&mut out);
-            assert!(out.starts_with("\""));
-            assert!(out.ends_with("\""));
+        fn boundary_is_not_quoted() {
+            let out = create_random_boundary();
+            assert!(!out.starts_with("\""));
+            assert!(!out.ends_with("\""));
         }
 
         #[test]
         fn boundary_start_special() {
-            let mut out = String::new();
-            write_random_boundary_to(&mut out);
-            assert!(out.starts_with("\"=_^"));
+            let out = create_random_boundary();
+            assert!(out.starts_with("=_^"));
         }
 
         #[test]
         fn boundary_has_a_resonable_length() {
-            let mut out = String::new();
-            write_random_boundary_to(&mut out);
+            let out = create_random_boundary();
             assert!(out.len() > 22 && out.len() < 100);
         }
 
         #[test]
         fn boundary_does_not_contain_space_or_slach_or_quotes() {
             // while it could contain them it's recommended not to do it
-            let mut out = String::new();
-            write_random_boundary_to(&mut out);
+            let out = create_random_boundary();
 
             for ch in out[1..out.len()-1].chars() {
                 assert!(ch as u32 >= 33);

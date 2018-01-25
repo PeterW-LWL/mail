@@ -6,8 +6,8 @@ use futures::Future;
 
 use mail_codec::mail_builder_prelude::*;
 use mail_codec::resource_prelude::*;
-
 use mail_codec::default_impl::SimpleBuilderContext;
+use mail_codec::mail::mime::gen_multipart_mime;
 
 fn get_some_resource() -> Resource {
     Resource::from_text("abcd↓efg".into())
@@ -22,8 +22,7 @@ fn _main() -> Result<()> {
 
     let builder_ctx = SimpleBuilderContext::default();
 
-    let mail = Builder::multipart(
-            MultipartMime::new( "multipart/related; boundary=\"=_abc\"".parse().unwrap() )? )
+    let mail = Builder::multipart( gen_multipart_mime("related")? )
         .header( Subject, "that ↓ will be encoded " )?
         .header( From, [ "tim@tom.nixdomain" ])?
         .body( Builder::singlepart( get_some_resource() ).build()? )?

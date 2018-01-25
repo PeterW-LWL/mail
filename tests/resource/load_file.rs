@@ -2,7 +2,8 @@ use std::path::Path;
 
 use futures::{Future, future};
 
-use mail_codec::utils::FileBuffer;
+use mail_codec::MediaType;
+use mail_codec::file_buffer::FileBuffer;
 use mail_codec::mail::{
     Resource, ResourceSpec, ResourceState,
     CompositeBuilderContext,
@@ -26,7 +27,7 @@ fn loaded_resource(path: &str, use_name: Option<&str>, use_mime: Option<&str>) -
     let spec = ResourceSpec {
         path: Path::new(path).to_owned(),
         use_name: use_name.map(|s|s.to_owned()),
-        use_mime: use_mime.map(|s|s.parse().unwrap()),
+        use_mime: use_mime.map(|s| MediaType::parse(s).unwrap()),
     };
     let mut resource = Resource::from_spec(spec);
     let ctx = context!();
@@ -48,7 +49,7 @@ fn _does_sniff(sub_path: &str, content_type: &str) {
         .expect("it to be encoded");
 
     let fbuf: &FileBuffer  = &**tenc_buffer;
-    assert_eq!(fbuf.content_type(), &content_type);
+    assert_eq!(fbuf.content_type().as_str_repr(), content_type);
 }
 
 #[test]
@@ -125,5 +126,5 @@ fn use_mime_is_used() {
 
     let fbuf: &FileBuffer  = &**tenc_buffer;
 
-    assert_eq!(fbuf.content_type(), &"text/plain; charset=utf8");
+    assert_eq!(fbuf.content_type().as_str_repr(), "text/plain; charset=utf8");
 }

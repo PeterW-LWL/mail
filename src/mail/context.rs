@@ -7,7 +7,7 @@ use std::borrow::Cow;
 use futures::{ future, Future, IntoFuture };
 use utils::SendBoxFuture;
 
-use error::*;
+use core::error::*;
 
 
 pub trait FileLoader {

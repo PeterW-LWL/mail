@@ -6,9 +6,9 @@ use std::borrow::Cow;
 use futures::Future;
 use utils::SendBoxFuture;
 
-use error::*;
+use core::error::*;
 use mail::{ FileLoader, RunElsewhere, BuilderContext };
-use components::{ Mailbox,  MessageID };
+use mheaders::components::{ Mailbox,  MessageID };
 
 pub struct MailSendContext {
     pub from: Mailbox,

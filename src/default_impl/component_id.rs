@@ -1,9 +1,9 @@
 
 use rand::{ self, Rng };
 
-use error::*;
-use components::MessageID;
-use data::FromInput;
+use core::error::Result;
+use core::utils::HeaderTryFrom;
+use mheaders::components::MessageID;
 
 use composition::ContentIdGen;
 
@@ -29,7 +29,7 @@ impl ContentIdGen for RandomContentId {
         let mut msg_id = rng.gen_ascii_chars().take( 10 ).collect::<String>();
         msg_id.push( '@' );
         msg_id += &*self.postfix;
-        MessageID::from_input( msg_id )
+        MessageID::try_from(msg_id)
     }
 }
 

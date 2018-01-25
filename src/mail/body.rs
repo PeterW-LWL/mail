@@ -4,8 +4,8 @@ use std::fmt;
 use utils::SendBoxFuture;
 use futures::Async;
 
-use error::*;
-use codec::transfer_encoding::TransferEncodedFileBuffer;
+use core::error::*;
+use core::codec::transfer_encoding::TransferEncodedFileBuffer;
 
 
 pub type FutureBuf = SendBoxFuture<TransferEncodedFileBuffer, Error>;
@@ -146,9 +146,9 @@ impl From<TransferEncodedFileBuffer> for Body {
 
 #[cfg(test)]
 mod test {
-    use components::TransferEncoding;
+    use mheaders::components::TransferEncoding;
     use mime::TEXT_PLAIN;
-    use utils::buffer::FileBuffer;
+    use core::utils::buffer::FileBuffer;
     use futures::{ self, Future };
 
 

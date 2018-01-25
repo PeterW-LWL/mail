@@ -11,7 +11,6 @@ use template_engine::Teng;
 
 use mail_codec::composition_prelude::*;
 use mail_codec::resource_prelude::*;
-
 use mail_codec::default_impl::{ SimpleContext, NoNameComposer};
 
 fn main() {
@@ -38,8 +37,8 @@ fn _main() -> Result<()> {
     };
 
     let from_to = MailSendContext {
-        from: Email::from_input( "my@sender.yupyup" )?.into(),
-        to: Email::from_input( "goblin@dog.spider" )?.into(),
+        from: Email::try_from( "my@sender.yupyup" )?.into(),
+        to: Email::try_from( "goblin@dog.spider" )?.into(),
         subject: "Dear randomness".into(),
     };
 

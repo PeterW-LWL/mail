@@ -6,11 +6,11 @@ use std::borrow::Cow;
 use futures::Future;
 use futures_cpupool::{ CpuPool, Builder };
 
-use error::*;
+use core::error::*;
 use utils::SendBoxFuture;
 use mail::{ FileLoader, RunElsewhere, CompositeBuilderContext };
 use composition::ContentIdGen;
-use components::MessageID;
+use mheaders::components::MessageID;
 
 use super::VFSFileLoader;
 use super::RandomContentId;

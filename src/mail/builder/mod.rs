@@ -2,7 +2,7 @@
 //     .multipart( MultipartMime ) -> MultipartBuilder
 //          .set_header( Header )?
 //          .set_body( |builder| builder.singlepart( ... )...build() )?
-//          .set_body( |builder| builder.multipart( Mime )...build() )?
+//          .set_body( |builder| builder.multipart( MediaType )...build() )?
 //          .build()?
 //     .singlepart( Resource ) -> SinglePartBuilder
 //          .set_header( Header )
@@ -11,16 +11,17 @@
 //
 use soft_ascii_string::SoftAsciiString;
 
-use utils::uneraser_ref;
-use error::*;
-use codec::EncodableInHeader;
-use utils::{ is_multipart_mime, HeaderTryInto };
-use headers::{
-    HeaderMap, Header,
+use core::utils::uneraser_ref;
+use core::error::*;
+use core::codec::EncodableInHeader;
+use core::{ HeaderTryInto, Header, HeaderMap};
+use mheaders::{
     ContentType,
     ContentTransferEncoding
 };
-use components::Mime;
+use mheaders::components::MediaType;
+
+use utils::is_multipart_mime;
 
 use super::mime::MultipartMime;
 use super::resource::Resource;
@@ -129,7 +130,7 @@ pub fn check_header<H>(
     match H::name().as_str() {
         "Content-Type" => {
             if is_multipart {
-                let mime: &Mime = uneraser_ref(hbody)
+                let mime: &MediaType = uneraser_ref(hbody)
                     .ok_or_else( || "custom Content-Type headers are not supported" )?;
                 if !is_multipart_mime( mime ) {
                     return Err( ErrorKind::ContentTypeAndBodyIncompatible.into() )
@@ -257,8 +258,8 @@ mod test {
     // - above tests but wrt. set_headers/headers
 
     mod check_header {
-        use components::TransferEncoding;
-        use headers::{
+        use mheaders::components::TransferEncoding;
+        use mheaders::{
             ContentType,
             ContentTransferEncoding,
         };
@@ -296,8 +297,8 @@ mod test {
     }
 
     mod check_multiple_headers {
-        use components::TransferEncoding;
-        use headers::{
+        use mheaders::components::TransferEncoding;
+        use mheaders::{
             ContentType,
             ContentTransferEncoding,
         };

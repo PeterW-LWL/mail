@@ -5,7 +5,7 @@ use std::borrow::Cow;
 
 use futures::{ Future, future };
 
-use error::*;
+use core::error::*;
 use mail::FileLoader;
 
 

@@ -1,22 +1,23 @@
 #![recursion_limit="128"]
 
-#[cfg_attr(test, macro_use)]
-extern crate mail_codec_core;
+#[macro_use]
+extern crate mail_codec_core as core;
+extern crate mail_codec_headers as mheaders;
+
+#[macro_use]
+extern crate error_chain;
 
 #[macro_use]
 extern crate log;
 extern crate mime;
-extern crate quoted_printable;
-extern crate idna;
-extern crate chrono;
 extern crate futures;
 extern crate serde;
-extern crate base64;
 extern crate rand;
-extern crate percent_encoding;
 extern crate soft_ascii_string;
 extern crate total_order_multi_map;
 extern crate tree_magic;
+extern crate chrono;
+
 
 #[cfg_attr(test, macro_use)]
 extern crate vec1;
@@ -31,52 +32,52 @@ extern crate scoped_tls;
 #[cfg(feature="default_impl_cpupool")]
 extern crate futures_cpupool;
 
-
-#[macro_use]
-pub mod external;
-#[cfg_attr(test, macro_use)]
-pub mod codec;
-pub mod data;
-pub mod components;
-#[macro_use]
-pub mod headers;
+mod utils;
 pub mod mail;
 pub mod composition;
+pub mod file_buffer;
 
 #[cfg(feature="default_impl_any")]
 pub mod default_impl;
 
+pub mod headers {
+    pub use mheaders::*;
+}
+
+pub use mheaders::components::MediaType;
+
 pub mod mail_builder_prelude {
-    pub type Encoder = ::codec::Encoder<::mail::Resource>;
-    pub use error::*;
-    pub use grammar::MailType;
-    pub use codec::{EncodableInHeader, Encodable, EncodeHandle};
-    pub use data::FromInput;
-    pub use headers::*;
-    pub use components::*;
+    pub type Encoder = ::core::codec::Encoder<::mail::Resource>;
+    pub use core::*;
+    pub use core::error::*;
+    pub use core::grammar::MailType;
+    pub use core::codec::{EncodableInHeader, Encodable, EncodeHandle};
+    pub use mheaders::*;
+    pub use mheaders::components::*;
     pub use mail::Builder;
     pub use mail::mime::MultipartMime;
 }
 
 
 pub mod resource_prelude {
-    pub use utils::FileBuffer;
-    pub use utils::FileMeta;
+    pub use file_buffer::FileBuffer;
+    pub use core::utils::FileMeta;
     pub use mail::{ Resource, ResourceSpec };
     pub use composition::{ Embedding, Attachment, EmbeddingWithCID };
 }
 
 pub mod composition_prelude {
-    pub type Encoder = ::codec::Encoder<::mail::Resource>;
-    pub use error::*;
-    pub use grammar::MailType;
-    pub use data::FromInput;
-    pub use components::{
+    pub type Encoder = ::core::codec::Encoder<::mail::Resource>;
+    pub use core::*;
+    pub use core::error::*;
+    pub use core::grammar::MailType;
+    pub use mheaders::components::{
         Mailbox,
         Email,
-        TransferEncoding
+        TransferEncoding,
+        MediaType
     };
-    pub use codec::{
+    pub use core::codec::{
         EncodableInHeader,
         EncodeHandle,
         Encodable

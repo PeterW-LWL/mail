@@ -282,7 +282,7 @@ or does it simply fail?
 just before encoding singlepart bodies, resource is resolved,
 therefore:
 
-1. we now have the Mime + File meta + TransferEncoding
+1. we now have the MediaType + File meta + TransferEncoding
 2. add* ContentType header to headers
 3. add* ContentTransferEncoding header to headers
 4. add* file meta infor to ContentDisposition header if it exists

@@ -1,27 +1,28 @@
 use std::ops::Deref;
 use std::fmt;
 
-use mime::{Mime, BOUNDARY};
+use mheaders::components::MediaType;
+use mime::BOUNDARY;
 
-use codec::{EncodableInHeader, Encoder, Encodable};
+use core::codec::{EncodableInHeader, Encoder, Encodable};
 use soft_ascii_string::SoftAsciiString;
 use futures::{ Future, Async, Poll };
 
-use error::*;
-use utils::HeaderTryInto;
-use headers::{
-    Header, HeaderMap,
+use core::error::{Result, Error};
+use core::utils::HeaderTryInto;
+use core::header::{Header, HeaderMap};
+use mheaders::{
     ContentType, From,
     ContentTransferEncoding,
     Date, MessageId
 };
-use components::DateTime;
+use mheaders::components::DateTime;
 
 use self::builder::{
     check_header,
     check_multiple_headers,
 };
-use self::mime::write_random_boundary_to;
+use self::mime::gen_multipart_mime;
 
 pub use self::builder::{
     Builder, MultipartBuilder, SinglepartBuilder
@@ -250,18 +251,18 @@ fn insert_generated_headers(mail: &mut Mail) -> Result<()> {
 
 fn auto_gen_multipart(headers: &mut HeaderMap) -> Result<()> {
     // ask following: <has content type header?><is correct type?><needs new mime?>
-    let current: Option<Result<Option<Mime>>> = headers.get_single(ContentType)
+    let current: Option<Result<Option<MediaType>>> = headers.get_single(ContentType)
         .map(|res| {
             let content_type = res?;
             if content_type.get_param(BOUNDARY).is_none() {
+                //TODO keep other params, use set_param / param_entry
                 debug_assert_eq!(content_type.type_(), "multipart");
-                let mut boundary = String::new();
-                write_random_boundary_to(&mut boundary);
-                let mime_string = format!("{};boundary={}", content_type, boundary);
-                let new_content_type: Mime = mime_string.parse()
-                    .chain_err( || "[BUG] mime invalidated by adding boundary" )?;
-                Ok(Some(new_content_type))
+                let media_type: MediaType = gen_multipart_mime(content_type.subtype())?.into();
+                Ok(Some(media_type))
             } else {
+                //FIXME is there any context where this is Ok, i.e. where we would want user
+                // provided boundary strings? I mean this is a possible atack vector under some
+                // cicumstances, maybe?
                 Ok(None)
             }
         });
@@ -327,7 +328,8 @@ mod test {
     mod Mail {
         #![allow(non_snake_case)]
         use super::super::*;
-        use headers::{
+        use mheaders::components::TransferEncoding;
+        use mheaders::{
             Subject, Comments
         };
         use futures::future;
@@ -413,7 +415,7 @@ mod test {
             };
 
             assert_err!(
-                mail.set_header(ContentTransferEncoding, ::components::TransferEncoding::Base64));
+                mail.set_header(ContentTransferEncoding, TransferEncoding::Base64));
             //Note: a more fine grained test is done in ::mail::builder::test
             assert_err!(mail.set_header(ContentType, "text/plain"));
             assert_err!(mail.set_header(ContentType, "multipart/plain"));
@@ -467,11 +469,11 @@ mod test {
         #![allow(non_snake_case)]
         use super::super::*;
         use chrono::{Utc, TimeZone};
-        use components::{
+        use mheaders::components::{
             TransferEncoding,
             DateTime
         };
-        use headers::{
+        use mheaders::{
             From, ContentType, ContentTransferEncoding,
             Date, Subject
         };
@@ -502,7 +504,7 @@ mod test {
                 .unwrap()
                 .unwrap();
 
-            assert_eq!(res, &"text/plain;charset=utf8");
+            assert_eq!(res.as_str_repr(), "text/plain;charset=utf8");
 
             let res = headers.get_single(ContentTransferEncoding)
                 .unwrap()
@@ -549,7 +551,7 @@ mod test {
                     .unwrap()
                     .unwrap();
 
-                assert_eq!(res, &"text/plain;charset=utf8");
+                assert_eq!(res.as_str_repr(), "text/plain;charset=utf8");
 
                 let res = headers.get_single(ContentTransferEncoding)
                     .unwrap()
@@ -643,7 +645,7 @@ mod test {
             let ct = headers.get_single(ContentType)
                 .expect("there has to be a ContentType header");
             let ct = assert_ok!(ct);
-            let pm = format!("no boundary on: {}", ct);
+            let pm = format!("no boundary on: {}", ct.as_str_repr());
             assert!(ct.get_param(::mime::BOUNDARY).is_some(), pm);
         }
     }

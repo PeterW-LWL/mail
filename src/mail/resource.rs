@@ -1,3 +1,4 @@
+use std::marker::PhantomData;
 use std::path::PathBuf;
 use std::fmt;
 use std::sync::{ Arc, RwLock, RwLockWriteGuard, RwLockReadGuard };
@@ -5,22 +6,19 @@ use std::ops::Deref;
 use std::mem;
 use std::borrow::Cow;
 
-use mime::Mime;
-use mime::{TEXT, TEXT_PLAIN, APPLICATION, OCTET_STREAM};
+use mime::{TEXT, APPLICATION, OCTET_STREAM};
 use tree_magic;
 use futures::{  Future, Poll, Async };
 
-use utils::SendBoxFuture;
+use core::error::{ Error, ErrorKind, Result, ResultExt };
+use core::codec::BodyBuffer;
+use core::utils::FileMeta;
 
-use error::{ Error, ErrorKind, Result, ResultExt };
-
-use codec::transfer_encoding::TransferEncodedFileBuffer;
-use codec::BodyBuffer;
-use components::TransferEncoding;
-use std::marker::PhantomData;
+use mheaders::components::{MediaType, TransferEncoding};
 
 
-use utils::{FileBuffer, FileMeta, DateTime};
+use utils::{SendBoxFuture, now};
+use file_buffer::{FileBuffer, TransferEncodedFileBuffer};
 use super::BuilderContext;
 
 
@@ -31,7 +29,7 @@ use super::BuilderContext;
 pub struct ResourceSpec {
     pub path: PathBuf,
     pub use_name: Option<String>,
-    pub use_mime: Option<Mime>
+    pub use_mime: Option<MediaType>
 }
 
 #[derive(Debug)]
@@ -102,10 +100,11 @@ impl Resource {
 
     pub fn from_text(text: String ) -> Self {
         //UNWRAP_SAFE: this is a valid mime, if not this will be coucht by the tests
-        let mime: Mime = "text/plain;charset=utf8".parse().unwrap();
-        let buf = FileBuffer::new( mime, text.into_bytes() );
+        let content_type = MediaType::parse("text/plain;charset=utf8").unwrap();
+        let buf = FileBuffer::new( content_type, text.into_bytes() );
         Resource::from_buffer( buf )
     }
+
     #[inline]
     pub fn from_spec( spec: ResourceSpec ) -> Self {
         Self::new_inner( ResourceInner::Spec( spec ) )
@@ -248,7 +247,7 @@ impl Resource {
                                     //use now as read date
                                     let meta = FileMeta {
                                         file_name: Some(name),
-                                        read_date: Some(DateTime::now()),
+                                        read_date: Some(now()),
                                         ..Default::default()
                                     };
                                     Ok(FileBuffer::new_with_file_meta(mime, bytes, meta))
@@ -296,7 +295,9 @@ impl Resource {
 
     /// mainly for testing
     pub fn empty_text() -> Self {
-        Resource::from_buffer( FileBuffer::new( TEXT_PLAIN, Vec::new() ) )
+        //OPTIMIZE use const MediaType once aviable
+        let text_plain = MediaType::new("text","plain").unwrap();
+        Resource::from_buffer( FileBuffer::new( text_plain, Vec::new() ) )
     }
 
 }
@@ -313,22 +314,22 @@ impl<'a, C: 'a> Future for ResourceFutureRef<'a, C>
     }
 }
 
-fn detect_mime<B: AsRef<[u8]>>(buffer: B, use_mime: Option<Mime>) -> Result<Mime> {
+fn detect_mime<B: AsRef<[u8]>>(buffer: B, use_mime: Option<MediaType>) -> Result<MediaType> {
     Ok(if let Some(mime) = use_mime {
         mime
     } else {
         //FIXME tree_magic is far from optimal
-        let mime = tree_magic::from_u8(buffer.as_ref());
-        let mime: Mime = mime.parse()
-            .chain_err( || "[BUG] invalid mime by tree_magic" )?;
-        if mime.type_() == TEXT {
+        let media_type = tree_magic::from_u8(buffer.as_ref());
+        let media_type: MediaType = MediaType::parse(media_type)
+            .chain_err( || "[BUG] invalid media_type by tree_magic" )?;
+        if media_type.type_() == TEXT {
             bail!("auto-detecting charset is currently not supported");
         }
-        if mime.type_() == APPLICATION
-            && mime.subtype() == OCTET_STREAM {
+        if media_type.type_() == APPLICATION
+            && media_type.subtype() == OCTET_STREAM {
             bail!("auto-detection failed got application/octet-stream")
         }
-        mime
+        media_type
     })
 }
 
@@ -412,7 +413,7 @@ mod test {
         let spec = ResourceSpec {
             path: "/test/me.yes".into(),
             use_name: None,
-            use_mime: Some( "text/plain;charset=us-ascii".parse().unwrap() ) 
+            use_mime: Some( MediaType::parse("text/plain;charset=us-ascii").unwrap() )
         };
 
         let mut resource = Resource::from_spec( spec );
@@ -438,7 +439,7 @@ mod test {
         let spec = ResourceSpec {
             path: "/test/me.yes".into(),
             use_name: None,
-            use_mime: Some( "text/plain;charset=utf8".parse().unwrap() )
+            use_mime: Some( MediaType::parse("text/plain;charset=utf8").unwrap() )
         };
 
         let mut resource = Resource::from_spec( spec );

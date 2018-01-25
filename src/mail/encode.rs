@@ -3,18 +3,19 @@ use soft_ascii_string::{
     SoftAsciiChar,
     SoftAsciiString
 };
+use mime::BOUNDARY;
 
-use codec::{Encoder, EncodableInHeader, EncodeHandle};
-use headers::ContentType;
+use core::error::{Result, ErrorKind, Error};
+use core::codec::{Encoder, EncodableInHeader, EncodeHandle};
+use core::header::{HeaderName};
+use mheaders::ContentType;
+
 use super::{
     Mail, EncodableMail,
     Resource,
 };
 
-use error::*;
 
-use mime::BOUNDARY;
-use headers::HeaderName;
 
 
 ///

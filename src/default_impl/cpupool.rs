@@ -25,7 +25,7 @@ impl RunElsewhere for CpuPool {
 #[cfg(test)]
 mod test {
     use futures_cpupool::Builder;
-    use error::*;
+    use core::error::*;
     use super::*;
 
     #[test]

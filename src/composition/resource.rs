@@ -3,8 +3,8 @@ use std::result::{ Result as StdResult };
 
 use serde::{ self, Serialize, Serializer };
 
-use error::*;
-use components::ContentID;
+use core::error::*;
+use mheaders::components::ContentID;
 use mail::Resource;
 use composition::ContentIdGen;
 

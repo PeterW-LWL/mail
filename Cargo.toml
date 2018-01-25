@@ -26,12 +26,14 @@ serde_derive = "1.0.10"
 vec1 = { git="https://github.com/1aim/vec1" }
 total-order-multi-map = { git="https://github.com/1aim/total-order-multi-map" }
 mail-codec-core = { git="https://github.com/1aim/mail-codec-core" }
-mail-codec-components = { git="https://github.com/1aim/mail-codec-components" }
+mail-codec-headers = { git="https://github.com/1aim/mail-codec-headers" }
+error-chain = "0.11.0"
+chrono = "0.4.0"
+soft-ascii-string = "0.2.0"
 
 [dependencies.mime]
 git="https://github.com/1aim/mime"
 branch="parser_revamp"
-features=["expose-param-utils"]
 version="0.4.0"
 
 [dependencies.tree_magic]
@@ -41,9 +43,6 @@ features = ["staticmime"]
 [dependencies.futures-cpupool]
 optional = true
 version = "0.1.5"
-
-[dependencies.soft-ascii-string]
-git = "https://github.com/1aim/soft-ascii-string"
 
 [dev-dependencies]
 serde_json = "1.0.2"
@@ -60,4 +59,4 @@ default_impl_fs = ["default_impl_any"]
 default_impl_mail = ["default_impl_cpupool", "default_impl_fs", "default_impl_vfs"]
 default_impl_name_composer = ["default_impl_any"]
 default_impl_vfs = ["default_impl_any"]
-traceing = [ "mail-codec-core/traceing", "mail-codec-components/traceing" ]
+traceing = [ "mail-codec-core/traceing", "mail-codec-headers/traceing" ]

@@ -3,29 +3,29 @@ use std::marker::PhantomData;
 use serde::Serialize;
 use soft_ascii_string::SoftAsciiStr;
 
-use error::*;
-use headers::{
-    HeaderMap,
+use core::utils::HeaderTryFrom;
+use core::error::{Result, ErrorKind, ResultExt};
+use core::header::HeaderMap;
+use mheaders::{
     From, To,
     Subject,
     ContentId,
     ContentDisposition
 };
 
-use components::{
+use mheaders::components::{
     Disposition,
     Unstructured,
     Mailbox,
-    Phrase
+    Phrase,
 };
-use mail::mime::{ MultipartMime, write_random_boundary_to};
+use mail::mime::gen_multipart_mime;
 use mail::{
     Resource,
     Mail,
     Builder
 };
 
-use data::FromInput;
 
 pub use self::context::*;
 pub use self::templates::*;
@@ -121,13 +121,13 @@ impl<T, C, CP, D> Compositor<T, C, CP, D>
             let mut to_mailbox = sctx.to;
             if to_mailbox.display_name.is_none() {
                 if let Some( new_name ) = self.name_composer.compose_name( data ) {
-                    let phrase = Phrase::from_input( new_name )?;
+                    let phrase = Phrase::try_from( new_name )?;
                     to_mailbox.display_name = Some( phrase );
                 }
             }
             to_mailbox
         };
-        let subject = Unstructured::from_input( sctx.subject )?;
+        let subject = Unstructured::try_from( sctx.subject )?;
         //TODO implement some replacement
 //        data.see_from_mailbox( &from_mailbox );
 //        data.see_to_mailbox( &to_mailbox );
@@ -372,21 +372,5 @@ impl BuilderExt for Builder {
 
         builder.build()
     }
-}
-
-
-
-fn gen_multipart_mime( subtype: &SoftAsciiStr ) -> Result<MultipartMime> {
-    use components::mime::MimeFromStrError;
-    //TODO check if subtype is a "valide" type e.g. no " " in ot
-
-    let mut mime_string = format!( "multipart/{}; boundary=", subtype );
-    write_random_boundary_to(&mut mime_string);
-    MultipartMime::new(
-        //can happen if subtype is invalid
-        mime_string.parse()
-            .map_err( |err| MimeFromStrError( err ) )
-            .chain_err(|| ErrorKind::GeneratingMimeFailed )?
-    ).chain_err( || ErrorKind::GeneratingMimeFailed )
 }
 
