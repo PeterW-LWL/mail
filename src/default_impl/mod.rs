@@ -10,14 +10,9 @@ mod component_id;
 pub use self::component_id::*;
 
 
-#[cfg(all(
-    feature="default_impl_cpupool",
-    feature="default_impl_vfs",
-    feature="default_impl_component_id"))]
+#[cfg(all(feature="default_impl_simple_context"))]
 mod simple_context;
-#[cfg(all(
-    feature="default_impl_cpupool",
-    feature="default_impl_vfs",
-    feature="default_impl_component_id"))]
+
+#[cfg(all(feature="default_impl_simple_context"))]
 pub use self::simple_context::*;
 

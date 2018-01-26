@@ -33,14 +33,24 @@ branch="parser_revamp"
 version="0.4.0"
 
 
+[dependencies.futures-cpupool]
+optional = true
+version = "0.1.5"
+
 [dev-dependencies]
 serde_json = "1.0.2"
 
 [features]
 debug_trace_tokens = []
 default = ["default_impl"]
-default_impl = ["default_impl_name_composer", "default_impl_component_id"]
-default_impl_name_composer = ["default_impl_any"]
-default_impl_component_id = ["default_impl_any"]
-default_impl_any = []
+default_impl = [
+    "default_impl_name_composer", "default_impl_component_id",
+    "default_impl_simple_context"
+]
+default_impl_name_composer = []
+default_impl_component_id = []
+default_impl_simple_context = [
+    "mail-codec/default_impl_cpupool", "mail-codec/default_impl_vfs",
+    "default_impl_component_id", "futures-cpupool"
+]
 traceing = [ "mail-codec/traceing" ]

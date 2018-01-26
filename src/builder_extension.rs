@@ -1,11 +1,11 @@
-use soft_ascii_string::SoftAsciiStr;
+use media_type::{MULTIPART, ALTERNATIVE, RELATED, MIXED};
 
 use core::error::{Result, ErrorKind};
 use core::header::HeaderMap;
 
 use headers::{ContentId, ContentDisposition};
 use headers::components::Disposition;
-use mail::mail::mime::gen_multipart_mime;
+use mail::MediaType;
 use mail::{Resource, Mail, Builder};
 
 use resource::{EmbeddingWithCID, BodyWithEmbeddings, Attachment};
@@ -74,8 +74,7 @@ impl BuilderExt for Builder {
             _n => {}
         }
 
-        let mut builder = Builder
-        ::multipart(gen_multipart_mime(SoftAsciiStr::from_str_unchecked("alternate"))?);
+        let mut builder = Builder::multipart(MediaType::new(MULTIPART, ALTERNATIVE)?)?;
 
         if let Some(headers) = headers.into() {
             builder = builder.headers( headers )?;
@@ -152,9 +151,7 @@ impl BuilderExt for Builder {
             bail!( "this function except at last one embedding" )
         }
 
-        let mut builder = Builder
-        ::multipart( gen_multipart_mime(
-            SoftAsciiStr::from_str_unchecked("related"))? );
+        let mut builder = Builder::multipart( MediaType::new(MULTIPART,RELATED)?)?;
 
         if let Some( headers ) = headers.into() {
             builder = builder.headers( headers )?;
@@ -183,8 +180,7 @@ impl BuilderExt for Builder {
         where HM: Into<Option<HeaderMap>>
     {
 
-        let mut builder = Builder::multipart(
-            gen_multipart_mime( SoftAsciiStr::from_str_unchecked("mixed"))? );
+        let mut builder = Builder::multipart(MediaType::new(MULTIPART, MIXED)?)?;
 
         if let Some( headers ) = headers.into() {
             builder = builder.headers( headers )?;

@@ -7,7 +7,7 @@ extern crate mail_codec_headers as headers;
 #[macro_use]
 extern crate error_chain;
 extern crate log;
-extern crate mime;
+extern crate mime as media_type;
 extern crate futures;
 extern crate serde;
 extern crate rand;
@@ -19,7 +19,8 @@ extern crate vec1;
 extern crate serde_derive;
 #[macro_use]
 extern crate scoped_tls;
-
+#[cfg(feature="default_impl_simple_context")]
+extern crate futures_cpupool;
 
 mod builder_extension;
 pub use self::builder_extension::{
@@ -53,8 +54,6 @@ pub use self::template::{
     Template, TemplateEngine
 };
 
-
-#[cfg(feature="default_impl_any")]
 pub mod default_impl;
 
 pub mod resource_prelude {

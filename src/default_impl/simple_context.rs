@@ -6,13 +6,13 @@ use std::borrow::Cow;
 use futures::Future;
 use futures_cpupool::{ CpuPool, Builder };
 
-use core::error::*;
-use utils::SendBoxFuture;
-use mail::{ FileLoader, RunElsewhere, CompositeBuilderContext };
-use composition::ContentIdGen;
-use mheaders::components::MessageID;
+use core::error::Result;
+use headers::components::MessageID;
+use mail::utils::SendBoxFuture;
+use mail::context::{ FileLoader, RunElsewhere, CompositeBuilderContext };
+use mail::default_impl::VFSFileLoader;
 
-use super::VFSFileLoader;
+use context::ContentIdGen;
 use super::RandomContentId;
 
 
@@ -97,8 +97,8 @@ impl ContentIdGen for SimpleContext {
 
 #[cfg(test)]
 mod test {
-    use mail::BuilderContext;
-    use composition::Context;
+    use mail::context::BuilderContext;
+    use context::Context;
 
     use super::SimpleContext;
 

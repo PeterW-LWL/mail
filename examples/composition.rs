@@ -1,4 +1,5 @@
-extern crate mail_codec;
+extern crate mail_codec as mail;
+extern crate mail_codec_composition as compose;
 extern crate futures;
 extern crate mime;
 extern crate serde;
@@ -9,9 +10,10 @@ extern crate serde_derive;
 use futures::Future;
 use template_engine::Teng;
 
-use mail_codec::composition_prelude::*;
-use mail_codec::resource_prelude::*;
-use mail_codec::default_impl::{ SimpleContext, NoNameComposer};
+use compose::composition_prelude::*;
+use compose::resource_prelude::*;
+use compose::default_impl::{SimpleContext, NoNameComposer};
+
 
 fn main() {
     _main().unwrap();
@@ -86,7 +88,7 @@ struct Resort {
 
 mod template_engine {
     use serde_json;
-    use mail_codec::template_engine_prelude::*;
+    use compose::template_engine_prelude::*;
 
     /// Example template engine which turns everything into a json blob
     pub struct Teng;
