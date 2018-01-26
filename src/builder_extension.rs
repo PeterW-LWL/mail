@@ -3,25 +3,12 @@ use soft_ascii_string::SoftAsciiStr;
 use core::error::{Result, ErrorKind};
 use core::header::HeaderMap;
 
-use headers::{
-    ContentId,
-    ContentDisposition
-};
-use headers::components::{
-    Disposition,
-};
-
+use headers::{ContentId, ContentDisposition};
+use headers::components::Disposition;
 use mail::mail::mime::gen_multipart_mime;
-use mail::{
-    Resource,
-    Mail,
-    Builder
-};
+use mail::{Resource, Mail, Builder};
 
-use resource::{
-    EmbeddingWithCID,
-    Attachments, BodyWithEmbeddings,
-};
+use resource::{EmbeddingWithCID, BodyWithEmbeddings, Attachment};
 
 
 /// Ext. Trait which adds helper methods to the Builder type.
@@ -49,7 +36,7 @@ pub trait BuilderExt {
 
     fn create_with_attachments<HM>(
         body: Mail,
-        attachments: Attachments,
+        attachments: Vec<Attachment>,
         headers: HM
     ) -> Result<Mail>
         where HM: Into<Option<HeaderMap>>;
@@ -190,7 +177,7 @@ impl BuilderExt for Builder {
 
     fn create_with_attachments<HM>(
         body: Mail,
-        attachments: Attachments,
+        attachments: Vec<Attachment>,
         headers: HM
     )  -> Result<Mail>
         where HM: Into<Option<HeaderMap>>

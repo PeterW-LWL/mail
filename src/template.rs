@@ -6,8 +6,8 @@ use serde::Serialize;
 use vec1::Vec1;
 use mail::Resource;
 
-use super::context::Context;
-use super::resource::{ Attachments, Embeddings };
+use resource::{Embedding, Attachment};
+use context::Context;
 
 ///
 /// # Why is Context a generic of the Type?
@@ -31,6 +31,6 @@ pub trait TemplateEngine<C: Context> {
 
 pub struct Template {
     pub body: Resource,
-    pub embeddings: Embeddings,
-    pub attachments: Attachments
+    pub embeddings: Vec<Embedding>,
+    pub attachments: Vec<Attachment>
 }

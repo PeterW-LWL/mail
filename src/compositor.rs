@@ -13,7 +13,7 @@ use utils::SerializeOnly;
 use context::{Context, MailSendContext};
 use resource::{
     EmbeddingWithCID, Attachment,
-    BodyWithEmbeddings, Attachments,
+    BodyWithEmbeddings,
     with_resource_sidechanel
 };
 use builder_extension::BuilderExt;
@@ -123,7 +123,7 @@ impl<T, C, CP, D> Compositor<T, C, CP, D>
     /// 1. a single list of attachments as they are not body specific
     /// 2. a list of Resource+Embedding pair representing the different (sub-) bodies
     pub fn preprocess_templates( &self, templates: Vec<Template> )
-                                 -> Result<(Vec<BodyWithEmbeddings>, Attachments)>
+                                 -> Result<(Vec<BodyWithEmbeddings>, Vec<Attachment>)>
     {
         let mut bodies = Vec::new();
         let mut attachments = Vec::new();
@@ -145,7 +145,7 @@ impl<T, C, CP, D> Compositor<T, C, CP, D>
     pub fn build_mail( &self,
                        bodies: Vec<BodyWithEmbeddings>,
                        embeddings: Vec<EmbeddingWithCID>,
-                       attachments: Attachments,
+                       attachments: Vec<Attachment>,
                        core_headers: HeaderMap
     ) -> Result<Mail> {
         let mail = match attachments.len() {

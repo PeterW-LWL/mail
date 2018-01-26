@@ -10,8 +10,6 @@ use mail::Resource;
 use context::ContentIdGen;
 
 pub type BodyWithEmbeddings = (Resource, Vec<EmbeddingWithCID>);
-pub type Embeddings = Vec<Embedding>;
-pub type Attachments = Vec<Attachment>;
 
 #[derive(Debug)]
 pub struct Embedding {
@@ -238,7 +236,7 @@ impl Into<(ContentID, Resource)> for EmbeddingWithCID {
 
 struct ExtractionDump {
     embeddings: Vec<EmbeddingWithCID>,
-    attachments: Attachments,
+    attachments: Vec<Attachment>,
     //BLOCKED(unsized_thread_locals): use ContentIdGen instead in another thread_local when possible
     cid_gen: Box<ContentIdGen>
 }
@@ -254,7 +252,7 @@ scoped_thread_local!(static EXTRACTION_DUMP: RefCell<ExtractionDump> );
 /// This might be a strange approach, but this allows you to "just" embed Embedding/Attachment
 /// types in data struct and still handle them correctly when passing them to a template
 /// engine without having to explicitly implement a trait allowing interation of all
-/// (even transistive) contained Embeddings/Attachments
+/// (even transistive) contained Vec<Embeddings>/Vec<Attachment>
 ///
 /// # Returns
 ///

@@ -43,9 +43,9 @@ pub use self::context::{
 
 mod resource;
 pub use self::resource::{
-    Embedding, EmbeddingWithCID, Attachment,
-    //TODO check if really needed
-    Embeddings, Attachments, BodyWithEmbeddings
+    Embedding, EmbeddingWithCID,
+    Attachment,
+    BodyWithEmbeddings
 };
 
 mod template;
