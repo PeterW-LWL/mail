@@ -3,7 +3,7 @@ use std::result::{ Result as StdResult };
 
 use serde::{ self, Serialize, Serializer };
 
-use core::error::*;
+use core::error::Result;
 use headers::components::ContentID;
 use mail::Resource;
 
@@ -105,9 +105,20 @@ impl EmbeddingWithCID {
         EmbeddingWithCID { resource, content_id }
     }
 
-    //FIXME: impl getter/settter etc.
-    pub fn resource( &self ) -> &Resource {
+    pub fn resource(&self) -> &Resource {
         &self.resource
+    }
+
+    pub fn resource_mut(&mut self) -> &mut Resource {
+        &mut self.resource
+    }
+
+    pub fn content_id(&self) -> &ContentID {
+        &self.content_id
+    }
+
+    pub fn content_id_mut(&mut self) -> &mut ContentID {
+        &mut self.content_id
     }
 }
 
