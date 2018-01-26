@@ -4,12 +4,13 @@ use std::path::Path;
 use std::borrow::Cow;
 
 use futures::Future;
-use utils::SendBoxFuture;
+use mail::utils::SendBoxFuture;
 
-use core::error::*;
-use mail::{ FileLoader, RunElsewhere, BuilderContext };
-use mheaders::components::{ Mailbox,  MessageID };
+use core::error::Result;
+use mail::context::{ FileLoader, RunElsewhere, BuilderContext };
+use headers::components::{ Mailbox,  MessageID };
 
+//TODO rename
 pub struct MailSendContext {
     pub from: Mailbox,
     pub to: Mailbox,
@@ -29,10 +30,6 @@ impl<T: ContentIdGen> ContentIdGen for Arc<T> {
         self.deref().new_content_id()
     }
 }
-
-
-
-
 
 pub struct ComposedContext<CIG, BC> {
     id_gen: CIG,

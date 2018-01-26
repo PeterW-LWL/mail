@@ -4,10 +4,12 @@ use std::result::{ Result as StdResult };
 use serde::{ self, Serialize, Serializer };
 
 use core::error::*;
-use mheaders::components::ContentID;
+use headers::components::ContentID;
 use mail::Resource;
-use composition::ContentIdGen;
 
+use context::ContentIdGen;
+
+pub type BodyWithEmbeddings = (Resource, Vec<EmbeddingWithCID>);
 pub type Embeddings = Vec<Embedding>;
 pub type Attachments = Vec<Attachment>;
 
@@ -232,17 +234,6 @@ struct ExtractionDump {
 
 scoped_thread_local!(static EXTRACTION_DUMP: RefCell<ExtractionDump> );
 
-
-#[derive(Serialize)]
-pub struct SerializeOnly<T: Serialize> {
-    data: T
-}
-
-impl<T: Serialize> SerializeOnly<T> {
-    pub fn new( data: T ) -> Self {
-        SerializeOnly { data }
-    }
-}
 
 ///
 /// use this to get access to Embedding/Attachment Resources while serializing

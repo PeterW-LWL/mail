@@ -3,9 +3,9 @@ use rand::{ self, Rng };
 
 use core::error::Result;
 use core::utils::HeaderTryFrom;
-use mheaders::components::MessageID;
+use headers::components::MessageID;
 
-use composition::ContentIdGen;
+use context::ContentIdGen;
 
 #[derive( Debug, Clone, Hash, Eq, PartialEq )]
 pub struct RandomContentId {

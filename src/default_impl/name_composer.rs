@@ -1,5 +1,5 @@
 
-use composition::NameComposer;
+use compositor::NameComposer;
 
 
 #[derive(Debug, Clone, Copy)]
