@@ -57,6 +57,12 @@ pub use self::template::{
 #[cfg(feature="default_impl_any")]
 pub mod default_impl;
 
+pub mod resource_prelude {
+    pub use mail::file_buffer::FileBuffer;
+    pub use core::utils::FileMeta;
+    pub use mail::{ Resource, ResourceSpec };
+    pub use ::{ Embedding, Attachment, EmbeddingWithCID };
+}
 
 pub mod composition_prelude {
     pub type Encoder = ::core::codec::Encoder<::mail::Resource>;
