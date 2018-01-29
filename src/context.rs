@@ -8,13 +8,26 @@ use mail::utils::SendBoxFuture;
 
 use core::error::Result;
 use mail::context::{ FileLoader, RunElsewhere, BuilderContext };
-use headers::components::{ Mailbox,  MessageID };
+use headers::components::{ Mailbox, MailboxList,  MessageID };
 
 //TODO rename
 pub struct MailSendContext {
-    pub from: Mailbox,
-    pub to: Mailbox,
+    pub sender: Mailbox,
+    pub other_from: Vec<Mailbox>,
+    pub to: MailboxList,
     pub subject: String
+}
+
+impl MailSendContext {
+
+    pub fn new(from: Mailbox, to: Mailbox, subject: String) -> Self {
+        MailSendContext {
+            sender: from,
+            other_from: Vec::new(),
+            to: MailboxList(vec1![ to ]),
+            subject,
+        }
+    }
 }
 
 pub trait ContentIdGen {

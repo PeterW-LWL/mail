@@ -10,6 +10,9 @@ extern crate serde_derive;
 use futures::Future;
 use template_engine::Teng;
 
+//IDEFIX: code inspection is sadly not clever enough to handle glob imported type overrides
+// and would "hint" that Result in _main should have two type arguments instead of one
+use compose::composition_prelude::Result;
 use compose::composition_prelude::*;
 use compose::resource_prelude::*;
 use compose::default_impl::{SimpleContext, NoNameComposer};
@@ -38,11 +41,11 @@ fn _main() -> Result<()> {
         ]
     };
 
-    let from_to = MailSendContext {
-        from: Email::try_from( "my@sender.yupyup" )?.into(),
-        to: Email::try_from( "goblin@dog.spider" )?.into(),
-        subject: "Dear randomness".into(),
-    };
+    let from_to = MailSendContext::new(
+        Email::try_from( "my@sender.yupyup" )?.into(),
+        Email::try_from( "goblin@dog.spider" )?.into(),
+        "Dear randomness".into()
+    );
 
     let mail = composer.compose_mail(
         from_to,

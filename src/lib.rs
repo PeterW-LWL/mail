@@ -14,6 +14,7 @@ extern crate rand;
 extern crate soft_ascii_string;
 extern crate total_order_multi_map;
 extern crate chrono;
+#[macro_use]
 extern crate vec1;
 #[macro_use]
 extern crate serde_derive;
