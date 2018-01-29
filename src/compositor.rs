@@ -128,12 +128,11 @@ impl<T, C, CP, D> Compositor<T, C, CP, D>
         let mut bodies = Vec::new();
         let mut attachments = Vec::new();
         for template in templates {
-            let mut with_cid = Vec::with_capacity( template.embeddings.len() );
-            for embedding in template.embeddings.into_iter() {
-                with_cid.push( embedding.with_cid_assured( &self.context )? )
-            }
+            let embeddings = template.embeddings.into_iter()
+                .map(|embedding| embedding.with_cid_assured(&self.context))
+                .collect::<Result<Vec<_>>>()?;
 
-            bodies.push( (template.body, with_cid) );
+            bodies.push( (template.body, embeddings) );
             attachments.extend( template.attachments );
         }
         Ok( (bodies, attachments) )
