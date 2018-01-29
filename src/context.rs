@@ -10,7 +10,11 @@ use core::error::Result;
 use mail::context::{ FileLoader, RunElsewhere, BuilderContext };
 use headers::components::{ Mailbox, MailboxList,  MessageID };
 
-//TODO rename
+//TODO maybe convert into a mail address bilder supporting
+// From(1+), To(1+), Subject, Bcc, Cc
+// e.g. .cc(Mailbox).bcc(Mailbox).from(Mailbox).to(Mailbox)
+//      .sender(Mailbox) //adds Mailbox at pos 0 as sender overides previous sender if there is one
+//      .to(Mailbox) //adds other_from
 pub struct MailSendContext {
     pub sender: Mailbox,
     pub other_from: Vec<Mailbox>,
