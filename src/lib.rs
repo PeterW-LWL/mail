@@ -87,8 +87,8 @@ pub mod composition_prelude {
 }
 
 pub mod template_engine_prelude {
-    pub type StdError = ::std::error::Error;
-    pub type StdResult<R,E> = ::std::result::Result<R,E>;
+    pub use ::std::error::Error as StdError;
+    pub use ::std::result::Result as StdResult;
     pub use serde::Serialize;
 
     pub use vec1::Vec1;
