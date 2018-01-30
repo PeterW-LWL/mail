@@ -22,6 +22,9 @@ extern crate serde_derive;
 extern crate scoped_tls;
 #[cfg(feature="default_impl_simple_context")]
 extern crate futures_cpupool;
+#[cfg(feature="tera-bindings")]
+extern crate tera;
+
 
 mod builder_extension;
 pub use self::builder_extension::{
@@ -58,6 +61,8 @@ pub mod default_impl;
 
 #[cfg(feature="render-template-engine")]
 pub mod render_template_engine;
+#[cfg(feature="tera-bindings")]
+pub mod tera;
 
 
 //################# preludes ###########################

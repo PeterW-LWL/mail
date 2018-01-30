@@ -1,5 +1,7 @@
 use std::{result, error};
 use std::fmt::{self, Display};
+use std::path::PathBuf;
+
 use core::error::{Error as MailError};
 
 pub type Result<T, E> = result::Result<T, Error<E>>;
@@ -50,6 +52,33 @@ impl<R> Display for Error<R>
                 err.fmt(fter)
             }
             RenderError(ref re) => <R as fmt::Display>::fmt(re, fter)
+        }
+    }
+}
+
+
+#[derive(Debug)]
+pub enum SpecError {
+    /// error if the path is not a valid string
+    StringPath(PathBuf)
+}
+
+impl error::Error for SpecError {
+    fn description(&self) -> &str {
+        use self::SpecError::*;
+        match *self {
+            StringPath(_) => "path must also be valid string"
+        }
+    }
+}
+
+impl Display for SpecError {
+    fn fmt(&self, fter: &mut fmt::Formatter) -> fmt::Result {
+        use self::SpecError::*;
+        match *self {
+            StringPath(ref path) => {
+                write!(fter, "path must also be valid string, got: {}", path.display())
+            }
         }
     }
 }

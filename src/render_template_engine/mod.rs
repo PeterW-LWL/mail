@@ -1,13 +1,15 @@
 use std::path::{Path, PathBuf};
 use std::collections::HashMap;
 use std::borrow::Cow;
+use std::mem::replace;
+
 use serde::{Serialize, Serializer};
 
 use ::template_engine_prelude::*;
 use mail::file_buffer::FileBuffer;
 use mail::MediaType;
 
-use self::error::{Error, Result};
+use self::error::{SpecError, Error, Result};
 
 
 mod error;
@@ -61,7 +63,7 @@ impl<R, C> TemplateEngine<C> for RenderTemplateEngine<R>
             let rendered = {
                 // make CIds available to render engine
                 let data = DataWrapper { data, cids: &embeddings };
-                let path = template.path(spec.base_path());
+                let path = template.path(spec);
                 self.render_engine.render(&*path, data)
                     .map_err(|re| Error::RenderError(re))?
             };
@@ -101,8 +103,8 @@ pub struct TemplateSpec {
     ///
     /// Note that it is used as part of a render_id for RenderEngine and therefore
     /// has to be a valid utf-8 string, instead of Path.
-    pub base_path: String,
-    pub templates: Vec1<SubTemplateSpec>
+    base_path: String,
+    templates: Vec1<SubTemplateSpec>
 }
 
 impl TemplateSpec {
@@ -118,13 +120,40 @@ impl TemplateSpec {
 //        // 6. no attachments
 //    }
 
+    pub fn new<P>(base_path: P, templates: Vec1<SubTemplateSpec>) -> StdResult<Self, SpecError>
+        where P: AsRef<Path>
+    {
+        let mut tmp = String::new();
+        // reuse as validator, as empty string does not allocate, so this is fine
+        string_path_set(&mut tmp, base_path.as_ref())?;
+        Ok(TemplateSpec {
+            base_path: tmp,
+            templates,
+        })
+    }
+
     pub fn templates(&self) -> &Vec1<SubTemplateSpec> {
         &self.templates
     }
 
-    pub fn base_path(&self) -> &str {
+    pub fn templates_mut(&mut self) -> &mut Vec1<SubTemplateSpec> {
+        &mut self.templates
+    }
+
+    pub fn str_base_path(&self) -> &str {
         &self.base_path
     }
+
+    pub fn base_path(&self) -> &Path {
+        Path::new(&self.base_path)
+    }
+
+    pub fn set_base_path<P>(&mut self, new_path: P) -> StdResult<PathBuf, SpecError>
+        where P: AsRef<Path>
+    {
+        string_path_set(&mut self.base_path, new_path.as_ref())
+    }
+
 }
 
 #[derive(Debug)]
@@ -147,27 +176,63 @@ pub struct SubTemplateSpec {
 
 impl SubTemplateSpec {
 
-    pub fn path(&self, base_path: &str) -> Cow<str> {
+    pub fn new<P>(path: P,
+                  media_type: MediaType,
+                  embeddings: HashMap<String, ResourceSpec>,
+                  attachments: Vec<ResourceSpec>
+    ) -> StdResult<Self, SpecError>
+        where P: AsRef<Path>
+    {
+        let mut tmp = String::new();
+        //ok as empty string does not allocate
+        string_path_set(&mut tmp, path.as_ref())?;
+        Ok(SubTemplateSpec {
+            path: tmp,
+            media_type, embeddings, attachments
+        })
+    }
+
+    pub fn path(&self, base: &TemplateSpec) -> Cow<str> {
         if Path::new(&*self.path).is_absolute() {
             Cow::Borrowed(&*self.path)
         } else {
-            let full_path: PathBuf = Path::new(base_path).join(&self.path);
+            let full_path: PathBuf = Path::new(base.str_base_path()).join(&self.path);
             //UNWRAP_SAFE: we create the Path by joinging to strings
             Cow::Owned(full_path.into_os_string().into_string().unwrap())
         }
+    }
+
+    pub fn set_path<P>(&mut self, new_path: P) -> StdResult<PathBuf, SpecError>
+        where P: AsRef<Path>
+    {
+        string_path_set(&mut self.path, new_path.as_ref())
     }
 
     pub fn media_type(&self) -> &MediaType {
         &self.media_type
     }
 
+    pub fn set_media_type(&mut self, media_type: MediaType) -> MediaType {
+        //we might wan't to add restrictions at some point,e.g. no multipart mediatype
+        replace(&mut self.media_type, media_type)
+    }
+
     pub fn embeddings(&self) -> &HashMap<String, ResourceSpec> {
         &self.embeddings
     }
 
-    pub fn attachments(&self) -> &[ResourceSpec] {
+    pub fn embedding_mut(&mut self) -> &mut HashMap<String, ResourceSpec> {
+        &mut self.embeddings
+    }
+
+    pub fn attachments(&self) -> &Vec<ResourceSpec> {
         &self.attachments
     }
+
+    pub fn attachments_mut(&mut self) -> &mut Vec<ResourceSpec> {
+        &mut self.attachments
+    }
+
 }
 
 
@@ -190,4 +255,13 @@ fn cid_mapped_serialize<'a, S>(
     serializer.collect_map(cids.iter().map(|(k, v)| {
         (k, v.content_id().as_str())
     }))
+}
+
+pub fn string_path_set(field: &mut String, new_path: &Path) -> StdResult<PathBuf, SpecError> {
+    if let Some(path) = new_path.to_str() {
+        let old = replace(field, path.to_owned());
+        Ok(PathBuf::from(old))
+    } else {
+        Err(SpecError::StringPath(new_path.to_owned()))
+    }
 }
