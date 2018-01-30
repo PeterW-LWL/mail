@@ -103,13 +103,13 @@ mod template_engine {
     }
 
     impl<C: Context> TemplateEngine<C> for Teng {
-        type TemplateId = &'static str;
+        type TemplateId = str;
         type Error = serde_json::Error;
 
         fn templates<D: Serialize>(
             &self,
             _ctx: &C,
-            _id: Self::TemplateId,
+            _id: &Self::TemplateId,
             data: D
         ) -> StdResult<Vec1<Template>, Self::Error> {
             // Note: we can use `_ctx` to if we really need to, e.g. to generate ContentID's,

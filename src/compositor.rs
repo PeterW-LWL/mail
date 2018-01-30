@@ -68,7 +68,7 @@ impl<T, C, CP, D> Compositor<T, C, CP, D>
     /// composes a mail based on the given template_id, data and send_context
     pub fn compose_mail( &self,
                          send_context: MailSendContext,
-                         template_id: T::TemplateId,
+                         template_id: &T::TemplateId,
                          data: D,
     ) -> Result<Mail> {
 
@@ -90,7 +90,7 @@ impl<T, C, CP, D> Compositor<T, C, CP, D>
         self.build_mail( bodies, embeddings, attachments, core_headers )
     }
 
-    pub fn use_template_engine( &self, template_id: T::TemplateId, data: D )
+    pub fn use_template_engine( &self, template_id: &T::TemplateId, data: D )
                                 -> Result<( Vec<BodyWithEmbeddings>, Vec<EmbeddingWithCID>, Vec<Attachment> )>
     {
         let ( (bodies, mut attachments), embeddings, attachments2 ) =

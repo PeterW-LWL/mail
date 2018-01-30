@@ -21,10 +21,10 @@ use context::Context;
 /// current server configuration, preventing the need for the
 /// template engine to store a handle to it/copy of it itself.
 pub trait TemplateEngine<C: Context> {
-    type TemplateId;
+    type TemplateId: ?Sized;
     type Error: StdError + Send + 'static;
 
-    fn templates<D: Serialize>( &self,  ctx: &C, id: Self::TemplateId, data: D )
+    fn templates<D: Serialize>( &self,  ctx: &C, id: &Self::TemplateId, data: D )
                                 -> StdResult< Vec1<Template>, Self::Error >;
 }
 
