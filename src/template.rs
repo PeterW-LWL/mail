@@ -26,7 +26,7 @@ pub trait TemplateEngine<C: Context> {
     type Error: StdError + Send + 'static;
 
     fn templates<D: Serialize>(
-        &self,  ctx: &C, id: &Self::TemplateId, data: D
+        &self,  ctx: &C, id: &Self::TemplateId, data: &D
     ) -> StdResult<(Vec1<TemplateBody>, Vec<Attachment>), Self::Error >;
 }
 
@@ -35,6 +35,9 @@ pub trait TemplateEngine<C: Context> {
 pub struct TemplateBody {
     /// a body created by a template
     pub body_resource: Resource,
+
+    //TODO isn't this signature to close to the usecase, I mean any other
+    // place just needs  impl Iterator<Item=EmbeddingWithCId> + ExactSizedIterator
     /// embeddings added by the template engine
     ///
     /// It is a mapping of the name under which a embedding had been made available in the

@@ -110,7 +110,7 @@ mod template_engine {
             &self,
             _ctx: &C,
             _id: &Self::TemplateId,
-            data: D
+            data: &D
         ) -> StdResult<(Vec1<TemplateBody>, Vec<Attachment>), Self::Error> {
             // Note: we can use `_ctx` to if we really need to, e.g. to generate ContentID's,
             // through notice, that we can always use Embedding without a content ID

@@ -189,7 +189,7 @@ impl Serialize for Attachment {
     fn serialize<S>(&self, serializer: S) -> StdResult<S::Ok, S::Error> where S: Serializer {
         if !EXTRACTION_DUMP.is_set() {
             return Err( serde::ser::Error::custom(
-                "can only serialize an Attachment in when wrapped with serialize_and_extract" ) );
+                "can only serialize an Attachment in data when wrapped with with_resource_sidechanel" ) );
         }
         EXTRACTION_DUMP.with( |dump: &RefCell<ExtractionDump>| {
             let mut dump = dump.borrow_mut();
