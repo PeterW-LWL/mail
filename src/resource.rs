@@ -164,23 +164,23 @@ impl Serialize for Embedding {
 
 impl Serialize for EmbeddingWithCId {
     fn serialize<S>(&self, serializer: S) -> StdResult<S::Ok, S::Error> where S: Serializer {
-        if !EXTRACTION_DUMP.is_set() {
-            return Err( serde::ser::Error::custom(
-                "can only serialize an Attachment in when wrapped with serialize_and_extract" ) );
-        }
-        EXTRACTION_DUMP.with( |dump: &RefCell<ExtractionDump>| {
-            let mut dump = dump.borrow_mut();
+        if EXTRACTION_DUMP.is_set() {
+            EXTRACTION_DUMP.with( |dump: &RefCell<ExtractionDump>| {
+                let mut dump = dump.borrow_mut();
 
-            let ser_res = serializer.serialize_str( self.content_id.as_str() );
-            if ser_res.is_ok() {
-                // Resource is (now) meant to be shared, and cloning is sheap (Arc inc)
-                let resource = self.resource().clone();
-                dump.embeddings.push( EmbeddingWithCId {
-                    resource, content_id: self.content_id.clone()
-                } );
-            }
-            ser_res
-        } )
+                let ser_res = serializer.serialize_str( self.content_id.as_str() );
+                if ser_res.is_ok() {
+                    // Resource is (now) meant to be shared, and cloning is sheap (Arc inc)
+                    let resource = self.resource().clone();
+                    dump.embeddings.push( EmbeddingWithCId {
+                        resource, content_id: self.content_id.clone()
+                    } );
+                }
+                ser_res
+            } )
+        } else {
+            serializer.serialize_str(self.content_id.as_str())
+        }
     }
 }
 

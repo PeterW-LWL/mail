@@ -56,6 +56,12 @@ pub use self::template::{
 
 pub mod default_impl;
 
+#[cfg(feature="render-template-engine")]
+pub mod render_template_engine;
+
+
+//################# preludes ###########################
+
 pub mod resource_prelude {
     pub use mail::file_buffer::FileBuffer;
     pub use core::utils::FileMeta;
