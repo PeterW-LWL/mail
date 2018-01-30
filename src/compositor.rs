@@ -18,13 +18,12 @@ use mail::{Mail, Builder};
 use utils::SerializeOnly;
 use context::{Context, MailSendContext};
 use resource::{
-    EmbeddingWithCID, Attachment,
-    BodyWithEmbeddings,
+    EmbeddingWithCId, Attachment,
     with_resource_sidechanel
 };
 use builder_extension::BuilderExt;
 use template::{
-    Template, TemplateEngine
+    TemplateBody, TemplateEngine
 };
 
 pub trait NameComposer<D> {
@@ -87,11 +86,11 @@ impl<T, C, CP, D> Compositor<T, C, CP, D>
 
         let (bodies, embeddings, attachments) = self.use_template_engine( template_id, data )?;
 
-        self.build_mail( bodies, embeddings, attachments, core_headers )
+        self.build_mail( bodies, embeddings.into_iter(), attachments, core_headers )
     }
 
     pub fn use_template_engine( &self, template_id: &T::TemplateId, data: D )
-                                -> Result<( Vec<BodyWithEmbeddings>, Vec<EmbeddingWithCID>, Vec<Attachment> )>
+                                -> Result<(Vec1<TemplateBody>, Vec<EmbeddingWithCId>, Vec<Attachment> )>
     {
         let ( (bodies, mut attachments), embeddings, attachments2 ) =
             with_resource_sidechanel( Box::new(self.context.clone()), || -> Result<_> {
@@ -102,11 +101,9 @@ impl<T, C, CP, D> Compositor<T, C, CP, D>
                 // type erasure and then create the template in some other way
                 // but this would break the whole Embedding/Attachment extraction )
                 let sdata = SerializeOnly::new( data );
-                self.preprocess_templates(
-                    self.template_engine
-                        .templates( &self.context, template_id, sdata)
-                        .chain_err( || "failure in template engine" )?
-                        .into() )
+                self.template_engine
+                    .templates( &self.context, template_id, sdata)
+                    .chain_err( || "failure in template engine" )
             } )?;
 
         attachments.extend( attachments2 );
@@ -160,37 +157,16 @@ impl<T, C, CP, D> Compositor<T, C, CP, D>
         Ok( ( subject, from, to ) )
     }
 
-
-
-
-    /// maps all alternate bodies (templates) to
-    /// 1. a single list of attachments as they are not body specific
-    /// 2. a list of Resource+Embedding pair representing the different (sub-) bodies
-    pub fn preprocess_templates( &self, templates: Vec<Template> )
-                                 -> Result<(Vec<BodyWithEmbeddings>, Vec<Attachment>)>
-    {
-        let mut bodies = Vec::new();
-        let mut attachments = Vec::new();
-        for template in templates {
-            let embeddings = template.embeddings.into_iter()
-                .map(|embedding| embedding.with_cid_assured(&self.context))
-                .collect::<Result<Vec<_>>>()?;
-
-            bodies.push( (template.body, embeddings) );
-            attachments.extend( template.attachments );
-        }
-        Ok( (bodies, attachments) )
-    }
-
-
     /// uses the results of preprocessing data and templates, as well as a list of
     /// mail headers like `From`,`To`, etc. to create a new mail
-    pub fn build_mail( &self,
-                       bodies: Vec<BodyWithEmbeddings>,
-                       embeddings: Vec<EmbeddingWithCID>,
-                       attachments: Vec<Attachment>,
-                       core_headers: HeaderMap
-    ) -> Result<Mail> {
+    pub fn build_mail<EMB>(&self,
+                      bodies: Vec1<TemplateBody>,
+                      embeddings: EMB,
+                      attachments: Vec<Attachment>,
+                      core_headers: HeaderMap
+    ) -> Result<Mail>
+        where EMB: Iterator<Item=EmbeddingWithCId> + ExactSizeIterator
+    {
         let mail = match attachments.len() {
             0 => Builder::create_alternate_bodies_with_embeddings(
                 bodies, embeddings, Some(core_headers) )?,

@@ -45,14 +45,13 @@ pub use self::context::{
 
 mod resource;
 pub use self::resource::{
-    Embedding, EmbeddingWithCID,
+    Embedding, EmbeddingWithCId,
     Attachment,
-    BodyWithEmbeddings
 };
 
 mod template;
 pub use self::template::{
-    Template, TemplateEngine
+    TemplateBody, TemplateEngine
 };
 
 pub mod default_impl;
@@ -61,7 +60,7 @@ pub mod resource_prelude {
     pub use mail::file_buffer::FileBuffer;
     pub use core::utils::FileMeta;
     pub use mail::{ Resource, ResourceSpec };
-    pub use ::{ Embedding, Attachment, EmbeddingWithCID };
+    pub use ::{Embedding, Attachment, EmbeddingWithCId};
 }
 
 pub mod composition_prelude {
@@ -94,11 +93,11 @@ pub mod template_engine_prelude {
 
     pub use vec1::Vec1;
     pub use mail::mail::{
-        Resource
+        Resource, ResourceSpec
     };
     pub use ::{
-        Template, TemplateEngine,
+        TemplateBody, TemplateEngine,
         Context,
-        Attachment, Embedding
+        Attachment, EmbeddingWithCId
     };
  }

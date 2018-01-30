@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::result::{ Result as StdResult };
 use std::error::{ Error as StdError };
 
@@ -6,7 +7,7 @@ use serde::Serialize;
 use vec1::Vec1;
 use mail::Resource;
 
-use resource::{Embedding, Attachment};
+use resource::{EmbeddingWithCId, Attachment};
 use context::Context;
 
 ///
@@ -24,13 +25,22 @@ pub trait TemplateEngine<C: Context> {
     type TemplateId: ?Sized;
     type Error: StdError + Send + 'static;
 
-    fn templates<D: Serialize>( &self,  ctx: &C, id: &Self::TemplateId, data: D )
-                                -> StdResult< Vec1<Template>, Self::Error >;
+    fn templates<D: Serialize>(
+        &self,  ctx: &C, id: &Self::TemplateId, data: D
+    ) -> StdResult<(Vec1<TemplateBody>, Vec<Attachment>), Self::Error >;
 }
 
+//TODO move this to BuilderExt and just use it here (oh and rename it)
+/// A mail body created by a template engine
+pub struct TemplateBody {
+    /// a body created by a template
+    pub body_resource: Resource,
+    /// embeddings added by the template engine
+    ///
+    /// It is a mapping of the name under which a embedding had been made available in the
+    /// template engine to the embedding (which has to contain a CId, as it already
+    /// was used in the template engine and CIds are used to link to the content which should
+    /// be embedded)
+    pub embeddings: HashMap<String, EmbeddingWithCId>,
 
-pub struct Template {
-    pub body: Resource,
-    pub embeddings: Vec<Embedding>,
-    pub attachments: Vec<Attachment>
 }

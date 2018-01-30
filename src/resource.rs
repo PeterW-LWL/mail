@@ -9,8 +9,8 @@ use mail::Resource;
 
 use context::ContentIdGen;
 
-pub type BodyWithEmbeddings = (Resource, Vec<EmbeddingWithCID>);
 
+//TODO consider to rename it to "in-data-embedding"
 #[derive(Debug)]
 pub struct Embedding {
     resource: Resource,
@@ -18,7 +18,7 @@ pub struct Embedding {
 }
 
 #[derive(Debug)]
-pub struct EmbeddingWithCID {
+pub struct EmbeddingWithCId {
     resource: Resource,
     content_id: ContentID
 }
@@ -70,7 +70,7 @@ impl Embedding {
     pub fn with_cid_assured<CIDGen: ContentIdGen + ?Sized>(
         self,
         cid_gen: &CIDGen
-    ) -> Result<EmbeddingWithCID> {
+    ) -> Result<EmbeddingWithCId> {
         let Embedding { resource, content_id } = self;
         let content_id =
             if let Some( cid ) = content_id.into_inner() {
@@ -78,7 +78,7 @@ impl Embedding {
             } else {
                 cid_gen.new_content_id()?
             };
-        Ok( EmbeddingWithCID { resource, content_id } )
+        Ok( EmbeddingWithCId { resource, content_id } )
     }
 
     fn assure_content_id<CIDGen: ContentIdGen + ?Sized>(
@@ -98,9 +98,9 @@ impl Embedding {
     }
 }
 
-impl EmbeddingWithCID {
+impl EmbeddingWithCId {
     pub fn new( resource: Resource, content_id: ContentID ) -> Self {
-        EmbeddingWithCID { resource, content_id }
+        EmbeddingWithCId { resource, content_id }
     }
 
     pub fn resource(&self) -> &Resource {
@@ -150,7 +150,7 @@ impl Serialize for Embedding {
                     if ser_res.is_ok() {
                         // Resource is (now) meant to be shared, and cloning is sheap (Arc inc)
                         let resource = self.resource().clone();
-                        dump.embeddings.push( EmbeddingWithCID { resource, content_id } )
+                        dump.embeddings.push( EmbeddingWithCId { resource, content_id } )
                     }
                     ser_res
                 },
@@ -162,7 +162,7 @@ impl Serialize for Embedding {
     }
 }
 
-impl Serialize for EmbeddingWithCID {
+impl Serialize for EmbeddingWithCId {
     fn serialize<S>(&self, serializer: S) -> StdResult<S::Ok, S::Error> where S: Serializer {
         if !EXTRACTION_DUMP.is_set() {
             return Err( serde::ser::Error::custom(
@@ -175,7 +175,7 @@ impl Serialize for EmbeddingWithCID {
             if ser_res.is_ok() {
                 // Resource is (now) meant to be shared, and cloning is sheap (Arc inc)
                 let resource = self.resource().clone();
-                dump.embeddings.push( EmbeddingWithCID {
+                dump.embeddings.push( EmbeddingWithCId {
                     resource, content_id: self.content_id.clone()
                 } );
             }
@@ -227,7 +227,7 @@ impl From<Resource> for Attachment {
     }
 }
 
-impl Into<(ContentID, Resource)> for EmbeddingWithCID {
+impl Into<(ContentID, Resource)> for EmbeddingWithCId {
     fn into( self ) -> (ContentID, Resource) {
         (self.content_id, self.resource)
     }
@@ -235,7 +235,7 @@ impl Into<(ContentID, Resource)> for EmbeddingWithCID {
 
 
 struct ExtractionDump {
-    embeddings: Vec<EmbeddingWithCID>,
+    embeddings: Vec<EmbeddingWithCId>,
     attachments: Vec<Attachment>,
     //BLOCKED(unsized_thread_locals): use ContentIdGen instead in another thread_local when possible
     cid_gen: Box<ContentIdGen>
@@ -267,7 +267,7 @@ scoped_thread_local!(static EXTRACTION_DUMP: RefCell<ExtractionDump> );
 pub fn with_resource_sidechanel<FN, R, E>(
     cid_gen: Box<ContentIdGen>,
     func: FN
-) -> StdResult<( R, Vec<EmbeddingWithCID>, Vec<Attachment> ), E>
+) -> StdResult<(R, Vec<EmbeddingWithCId>, Vec<Attachment> ), E>
     where FN: FnOnce() -> StdResult<R, E>
 {
     let dump: RefCell<ExtractionDump> = RefCell::new( ExtractionDump {
