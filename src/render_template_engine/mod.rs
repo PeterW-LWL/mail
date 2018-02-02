@@ -1,6 +1,5 @@
 use std::path::{Path, PathBuf};
 use std::collections::HashMap;
-use std::borrow::Cow;
 use std::mem::replace;
 
 use serde::{Serialize, Serializer};
@@ -10,9 +9,13 @@ use mail::file_buffer::FileBuffer;
 use mail::MediaType;
 
 use self::error::{SpecError, Error, Result};
+use self::utils::{new_string_path, string_path_set, check_string_path};
 
-
-mod error;
+pub mod error;
+mod utils;
+mod settings;
+pub use self::settings::*;
+mod from_dir;
 
 #[derive(Debug)]
 pub struct RenderTemplateEngine<R: RenderEngine> {
@@ -63,7 +66,7 @@ impl<R, C> TemplateEngine<C> for RenderTemplateEngine<R>
             let rendered = {
                 // make CIds available to render engine
                 let data = DataWrapper { data, cids: &embeddings };
-                let path = template.path(spec);
+                let path = template.str_path();
                 self.render_engine.render(&*path, data)
                     .map_err(|re| Error::RenderError(re))?
             };
@@ -91,45 +94,53 @@ impl<R, C> TemplateEngine<C> for RenderTemplateEngine<R>
 pub trait RenderEngine {
     type Error: StdError + Send + 'static;
 
-    //any chaching is doen inside transparently
+    //any caching is done inside transparently
     fn render<D: Serialize>(&self, id: &str, data: D) -> StdResult<String, Self::Error>;
 
 }
 
-/// POD
+
 #[derive(Debug)]
 pub struct TemplateSpec {
-    /// the `base_path` to which `SubTemplateSpec` paths can be relative to
-    ///
-    /// Note that it is used as part of a render_id for RenderEngine and therefore
-    /// has to be a valid utf-8 string, instead of Path.
-    base_path: String,
+    /// the `base_path` which was used to construct the template from,
+    /// e.g. with `TemplateSpec::from_dir` and which is used for reloading
+    base_path: Option<PathBuf>,
     templates: Vec1<SubTemplateSpec>
 }
 
 impl TemplateSpec {
-//    pub fn from_dir(path: Path) -> TemplateSpec {
-//        //create template spec defaulting to:
-//        // 1. order is html, xhtml, txt (or the other name around?)
-//        // 2. expect a folder for each sub_template (html,txt,etc.)
-//        // 3. in that folder expect a file "mail.<sub_template>" e.g. mail.html
-//        // 4. all other resources in the folder are expected to be embeddings with
-//        // 4.1. media_type = auto i.e. sniff it (sane sniffer?)
-//        // 4.2. name = strip_suffix(file_name(path_to_file))
-//        // 5. charset is always utf-8
-//        // 6. no attachments
-//    }
 
-    pub fn new<P>(base_path: P, templates: Vec1<SubTemplateSpec>) -> StdResult<Self, SpecError>
+    ///
+    /// ```no_rust
+    /// templates/
+    ///  templateA/
+    ///   html/
+    ///     mail.html
+    ///     emb_logo.png
+    ///   text/
+    ///     mail.text
+    /// ```
+    ///
+    /// Note:  the file name "this.is.a" is interprete as name "this" with suffix/type ".is.a"
+    ///        so it's cid gan be accessed with "cids.this"
+    #[inline]
+    pub fn from_dir<P>(settings: &Settings, base_path: P) -> StdResult<TemplateSpec, SpecError>
         where P: AsRef<Path>
     {
-        let mut tmp = String::new();
-        // reuse as validator, as empty string does not allocate, so this is fine
-        string_path_set(&mut tmp, base_path.as_ref())?;
-        Ok(TemplateSpec {
-            base_path: tmp,
-            templates,
-        })
+        from_dir::from_dir(settings, base_path.as_ref())
+    }
+
+    pub fn new(templates: Vec1<SubTemplateSpec>) -> Self {
+        TemplateSpec { base_path: None, templates }
+    }
+
+    pub fn new_with_base_path<P>(templates: Vec1<SubTemplateSpec>, base_path: P)
+        -> StdResult<Self, SpecError>
+        where P: AsRef<Path>
+    {
+        let path = base_path.as_ref().to_owned();
+        check_string_path(&*path)?;
+        Ok(TemplateSpec { base_path: Some(path), templates })
     }
 
     pub fn templates(&self) -> &Vec1<SubTemplateSpec> {
@@ -140,18 +151,16 @@ impl TemplateSpec {
         &mut self.templates
     }
 
-    pub fn str_base_path(&self) -> &str {
-        &self.base_path
+    pub fn base_path(&self) -> Option<&Path> {
+        self.base_path.as_ref().map(|r| &**r)
     }
 
-    pub fn base_path(&self) -> &Path {
-        Path::new(&self.base_path)
-    }
-
-    pub fn set_base_path<P>(&mut self, new_path: P) -> StdResult<PathBuf, SpecError>
+    pub fn set_base_path<P>(&mut self, new_path: P) -> StdResult<Option<PathBuf>, SpecError>
         where P: AsRef<Path>
     {
-        string_path_set(&mut self.base_path, new_path.as_ref())
+        let path = new_path.as_ref();
+        check_string_path(path)?;
+        Ok(replace(&mut self.base_path, Some(path.to_owned())))
     }
 
 }
@@ -159,13 +168,8 @@ impl TemplateSpec {
 #[derive(Debug)]
 pub struct SubTemplateSpec {
     media_type: MediaType,
-    /// The path to the template file
-    ///
-    /// It can either be a path relative to the `TemplateSpec::base_path()` or
-    /// an absolute path.
-    ///
-    /// Note that it is a string, as it is also used as a Id for the template engine,
-    /// and not all engine support Path based Id's, so the
+    /// The path to the template file if it is a relative path it is
+    /// used relative to the working directory
     path: String,
     // (Name, ResourceSpec) | name is used by the template engine e.g. log, and differs to
     // resource spec use_name which would
@@ -176,6 +180,9 @@ pub struct SubTemplateSpec {
 
 impl SubTemplateSpec {
 
+    //FIXME to many arguments alternatives: builder,
+    // default values (embedding, attachment)+then setter,
+    // default values + then with_... methods
     pub fn new<P>(path: P,
                   media_type: MediaType,
                   embeddings: HashMap<String, ResourceSpec>,
@@ -183,23 +190,16 @@ impl SubTemplateSpec {
     ) -> StdResult<Self, SpecError>
         where P: AsRef<Path>
     {
-        let mut tmp = String::new();
-        //ok as empty string does not allocate
-        string_path_set(&mut tmp, path.as_ref())?;
-        Ok(SubTemplateSpec {
-            path: tmp,
-            media_type, embeddings, attachments
-        })
+        let path = new_string_path(path.as_ref())?;
+        Ok(SubTemplateSpec { path, media_type, embeddings, attachments })
     }
 
-    pub fn path(&self, base: &TemplateSpec) -> Cow<str> {
-        if Path::new(&*self.path).is_absolute() {
-            Cow::Borrowed(&*self.path)
-        } else {
-            let full_path: PathBuf = Path::new(base.str_base_path()).join(&self.path);
-            //UNWRAP_SAFE: we create the Path by joinging to strings
-            Cow::Owned(full_path.into_os_string().into_string().unwrap())
-        }
+    pub fn path(&self) -> &Path {
+        Path::new(&self.path)
+    }
+
+    pub fn str_path(&self) -> &str {
+        &self.path
     }
 
     pub fn set_path<P>(&mut self, new_path: P) -> StdResult<PathBuf, SpecError>
@@ -257,11 +257,3 @@ fn cid_mapped_serialize<'a, S>(
     }))
 }
 
-pub fn string_path_set(field: &mut String, new_path: &Path) -> StdResult<PathBuf, SpecError> {
-    if let Some(path) = new_path.to_str() {
-        let old = replace(field, path.to_owned());
-        Ok(PathBuf::from(old))
-    } else {
-        Err(SpecError::StringPath(new_path.to_owned()))
-    }
-}

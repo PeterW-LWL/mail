@@ -26,6 +26,8 @@ mail-codec-headers = { git="https://github.com/1aim/mail-codec-headers" }
 error-chain = "0.11.0"
 chrono = "0.4.0"
 soft-ascii-string = "0.2.0"
+futures-cpupool = { version = "0.1.5", optional = true }
+tera = { version="0.11.1", optional = true }
 
 [dependencies.mime]
 git="https://github.com/1aim/mime"
@@ -33,16 +35,13 @@ branch="parser_revamp"
 version="0.4.0"
 
 
-[dependencies.futures-cpupool]
-optional = true
-version = "0.1.5"
-
 [dev-dependencies]
 serde_json = "1.0.2"
 
 [features]
 debug_trace_tokens = []
 render-template-engine = []
+tera-bindings = ["tera", "render-template-engine"]
 default = ["default_impl"]
 default_impl = [
     "default_impl_name_composer", "default_impl_component_id",
