@@ -91,12 +91,11 @@ fn embedding_from_dir_entry(path: PathBuf, settings: &Settings)
         .unwrap()
         .to_owned();
 
-    let use_media_type = settings.determine_media_type(&path)?;
+    let media_type = settings.determine_media_type(&path)?;
 
     let resource_spec = ResourceSpec {
-        path,
-        use_name: Some(file_name),
-        use_mime: Some(use_media_type),
+        path, media_type,
+        name: Some(file_name),
     };
 
     Ok((name, resource_spec))

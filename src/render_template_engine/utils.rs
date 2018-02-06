@@ -28,3 +28,12 @@ pub(crate) fn check_string_path(path: &Path) -> Result<(), SpecError> {
         Ok(())
     }
 }
+
+
+pub(crate) fn sniff_media_type(path: &Path) -> Result<MediaType, SpecError> {
+    // 1. determine media type by file ending
+    // 2. determine media type by file
+    // 3. compare (FEAT: validate instead of 2+3, as it only needs to run some tests)
+    unimplemented!()
+
+}

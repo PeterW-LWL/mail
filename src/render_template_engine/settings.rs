@@ -4,8 +4,10 @@ use std::path::Path;
 
 use media_type::CHARSET;
 
-use super::error::SpecError;
 use mail::MediaType;
+
+use super::error::SpecError;
+use super::utils;
 
 
 //Type::find_media_type(Path)
@@ -39,15 +41,8 @@ impl Settings {
     pub fn determine_media_type<P>(&self, path: P) -> Result<MediaType, SpecError>
         where P: AsRef<Path>
     {
-        self._determine_media_type(path.as_ref())
+        utils::sniff_media_type(path.as_ref())
     }
-
-    fn _determine_media_type(&self, path: &Path) -> Result<MediaType, SpecError> {
-        //cautious media type sniffing (form image/, video/, .. but e.g. not text?, maybe not
-        // application?)
-        unimplemented!("TODO pull the mime sniffing code from mail-codec into this place")
-    }
-
 }
 
 pub struct Type {
