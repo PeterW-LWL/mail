@@ -22,6 +22,11 @@ extern crate serde_derive;
 extern crate scoped_tls;
 #[cfg(feature="default_impl_simple_context")]
 extern crate futures_cpupool;
+#[cfg(feature="render-template-engine")]
+extern crate conduit_mime_types;
+#[cfg(feature="render-template-engine")]
+#[macro_use]
+extern crate lazy_static;
 #[cfg(feature="tera-bindings")]
 extern crate tera;
 
