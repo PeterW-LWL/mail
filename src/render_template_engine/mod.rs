@@ -58,7 +58,7 @@ impl<R, C> TemplateEngine<C> for RenderTemplateEngine<R>
     {
         let spec = self.lookup_spec(template_id)?;
         let mut attachments = Vec::new();
-        let templates = spec.templates().try_mapped_ref(|template| {
+        let templates = spec.sub_specs().try_mapped_ref(|template| {
 
             let embeddings = template.embeddings.iter()
                 .map(|(key, resource_spec)| {
@@ -125,7 +125,7 @@ impl TemplateSpec {
     /// Note:  the file name "this.is.a" is interprete as name "this" with suffix/type ".is.a"
     ///        so it's cid gan be accessed with "cids.this"
     #[inline]
-    pub fn from_dir<P>(settings: &Settings, base_path: P) -> StdResult<TemplateSpec, SpecError>
+    pub fn from_dir<P>(base_path: P, settings: &Settings) -> StdResult<TemplateSpec, SpecError>
         where P: AsRef<Path>
     {
         from_dir::from_dir(base_path.as_ref(), settings)
@@ -163,11 +163,11 @@ impl TemplateSpec {
         Ok(TemplateSpec { base_path: Some(path), templates, embeddings })
     }
 
-    pub fn templates(&self) -> &Vec1<SubTemplateSpec> {
+    pub fn sub_specs(&self) -> &Vec1<SubTemplateSpec> {
         &self.templates
     }
 
-    pub fn templates_mut(&mut self) -> &mut Vec1<SubTemplateSpec> {
+    pub fn sub_specs_mut(&mut self) -> &mut Vec1<SubTemplateSpec> {
         &mut self.templates
     }
 

@@ -21,10 +21,44 @@ use super::utils;
 //   needs:
 //      list of aliases file endings
 
+lazy_static! {
+    pub static ref DEFAULT_SETTINGS: Settings = {
+        let html =  Type {
+            base_type: "text".to_owned(),
+            base_subtype: "html".to_owned(),
+            suffixes: vec1![ ".html".to_owned(), ".htm".to_owned() ],
+            charset: Some("utf-8".to_owned()),
+        };
+        let xhtml = Type {
+            base_type: "application".to_owned(),
+            base_subtype: "xhtml+xml".to_owned(),
+            suffixes: vec1![ ".xhtml".to_owned(), ".xml".to_owned() ],
+            charset: Some("utf-8".to_owned()),
+        };
+        let enriched = Type {
+            base_type: "text".to_owned(),
+            base_subtype: "enriched".to_owned(),
+            //TODO
+            suffixes: vec1![ ".txt".to_owned(), ".text".to_owned() ],
+            //TODO
+            charset: Some("utf-8".to_owned()),
+        };
+        let text = Type {
+            base_type: "text".to_owned(),
+            base_subtype: "plain".to_owned(),
+            suffixes: vec1![ ".txt".to_owned(), ".text".to_owned() ],
+            charset: Some("utf-8".to_owned()),
+        };
 
-// name -> (priority, Type)
-// + name reltaive to == increase priorities for all with priority >= this
-// priority_idx_for(name) -> usize
+        let mut se = Settings::new();
+        se.set_type_lookup("text", text, None).unwrap();
+        se.set_type_lookup("enriched", enriched, Some("text")).unwrap();
+        se.set_type_lookup("xhtml", xhtml, Some("enriched")).unwrap();
+        se.set_type_lookup("html", html, Some("xhtml")).unwrap();
+
+        se
+    };
+}
 
 
 //IMPLEMENTATION NOTE: for now this is a simple configurabe think,
@@ -32,7 +66,7 @@ use super::utils;
 // 1. extended to support more stuff
 // 2. made into a trait with multiple impl. where the current impl. is just the default
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Settings {
     type_lookup: HashMap<String, (usize, Type)>
 }
