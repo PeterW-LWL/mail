@@ -106,7 +106,7 @@ mod template_engine {
         type TemplateId = str;
         type Error = serde_json::Error;
 
-        fn templates<D: Serialize>(
+        fn use_templates<D: Serialize>(
             &self,
             _ctx: &C,
             _id: &Self::TemplateId,

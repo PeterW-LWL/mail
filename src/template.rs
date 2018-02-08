@@ -24,7 +24,7 @@ pub trait TemplateEngine<C: Context> {
     type TemplateId: ?Sized;
     type Error: StdError + Send + 'static;
 
-    fn templates<D: Serialize>(
+    fn use_templates<D: Serialize>(
         &self,  ctx: &C, id: &Self::TemplateId, data: &D
     ) -> StdResult<MailParts, Self::Error >;
 }

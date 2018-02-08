@@ -49,7 +49,7 @@ impl<R, C> TemplateEngine<C> for RenderTemplateEngine<R>
     type TemplateId = str;
     type Error = Error<R::Error>;
 
-    fn templates<D: Serialize>(
+    fn use_templates<D: Serialize>(
         &self,
         ctx: &C,
         template_id: &str,
