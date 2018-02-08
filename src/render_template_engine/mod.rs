@@ -17,6 +17,14 @@ mod settings;
 pub use self::settings::*;
 mod from_dir;
 
+pub trait RenderEngine {
+    type Error: StdError + Send + 'static;
+
+    //any caching is done inside transparently
+    fn render<D: Serialize>(&self, id: &str, data: D) -> StdResult<String, Self::Error>;
+
+}
+
 #[derive(Debug)]
 pub struct RenderTemplateEngine<R: RenderEngine> {
     render_engine: R,
@@ -88,15 +96,6 @@ impl<R, C> TemplateEngine<C> for RenderTemplateEngine<R>
         Ok((templates, attachments))
 
     }
-}
-
-
-pub trait RenderEngine {
-    type Error: StdError + Send + 'static;
-
-    //any caching is done inside transparently
-    fn render<D: Serialize>(&self, id: &str, data: D) -> StdResult<String, Self::Error>;
-
 }
 
 
