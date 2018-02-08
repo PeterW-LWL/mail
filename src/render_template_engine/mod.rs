@@ -35,11 +35,87 @@ pub struct RenderTemplateEngine<R: RenderEngine> {
 impl<R> RenderTemplateEngine<R>
     where R: RenderEngine
 {
+    pub fn new(render_engine: R) -> Self {
+        RenderTemplateEngine {
+            render_engine,
+            id2spec: Default::default(),
+            fix_newlines: !R::PRODUCES_VALID_NEWLINES,
+        }
+    }
+
+    pub fn set_fix_newlines(&mut self, should_fix_newlines: bool) {
+        self.fix_newlines = should_fix_newlines
+    }
+
+    pub fn does_fix_newlines(&self) -> bool {
+        self.fix_newlines
+    }
+
+    pub fn add_spec(&mut self, id: String, spec: TemplateSpec) -> Option<TemplateSpec> {
+        self.id2spec.insert(id, spec)
+    }
+
+    pub fn remove_spec(&mut self, id: &str) -> Option<TemplateSpec> {
+        self.id2spec.remove(id)
+    }
+
+    pub fn specs(&self) -> &HashMap<String, TemplateSpec> {
+        &self.id2spec
+    }
+
+//    pub fn specs_mut(&mut self) -> &mut HashMap<String, TemplateSpec> {
+//        &mut self.specs()
+//    }
 
     pub fn lookup_spec(&self, template_id: &str) -> Result<&TemplateSpec, R::Error> {
         self.id2spec
             .get(template_id)
             .ok_or_else(|| Error::UnknownTemplateId(template_id.to_owned()))
+    }
+
+    pub fn load_specs_from_dir<P>(
+        &mut self,
+        dir_path: P,
+        settings: &LoadSpecSettings
+    ) -> StdResult<(), SpecError>
+        where P: AsRef<Path>
+    {
+        self._load_specs_from_dir(dir_path.as_ref(), settings, false)
+    }
+
+    pub fn load_specs_from_dir_allow_override<P>(
+        &mut self,
+        dir_path: P,
+        settings: &LoadSpecSettings
+    ) -> StdResult<(), SpecError>
+        where P: AsRef<Path>
+    {
+        self._load_specs_from_dir(dir_path.as_ref(), settings, true)
+    }
+
+    fn _load_specs_from_dir(
+        &mut self,
+        dir_path: &Path,
+        settings: &LoadSpecSettings,
+        allow_override: bool
+    ) -> StdResult<(), SpecError>
+    {
+        for entry in dir_path.read_dir()? {
+            let entry = entry?;
+            if entry.metadata()?.is_dir() {
+                let id = entry.file_name()
+                    .into_string()
+                    .map_err(|file_name| SpecError::NonStringPath(file_name.into()))?;
+                let spec = TemplateSpec::from_dir(entry.path(), settings)?;
+                let old = self.add_spec(id, spec);
+                if old.is_some() && !allow_override {
+                    // we already know that the file name can be converted into a string
+                    let file_name = entry.file_name().into_string().unwrap();
+                    return Err(SpecError::AccidentalSpecOverride(file_name));
+                }
+            }
+        }
+        Ok(())
     }
 
 }
