@@ -47,12 +47,13 @@ pub(crate) fn sniff_media_type(path: &Path) -> Result<MediaType, SpecError> {
     //this does not work for
     // 1. multi part extensions like .tar.gz
     // 2. types not supported by conduit-media-types (which, btw. include .tar.gz /.tgz)
-    let extension = path.extension().and_then(|extension| {
-        extension.to_str()
-    }).ok_or_else(|| SpecError::NoValidFileStem(path.to_owned()))?;
+    let extension = path.extension()
+        .and_then(|extension| extension.to_str())
+        .ok_or_else(|| SpecError::NoValidFileStem(path.to_owned()))?;
 
     // 1. determine media type by file ending
-    let by_extension_str_media_type = TYPES_BY_SUFFIX.get_mime_type(extension)
+    let by_extension_str_media_type = TYPES_BY_SUFFIX
+        .get_mime_type(extension)
         .ok_or_else(|| SpecError::NoMediaTypeFor(extension.to_owned()))?;
 
     // 2. determine media type by file

@@ -127,7 +127,7 @@ impl TemplateSpec {
     pub fn from_dir<P>(settings: &Settings, base_path: P) -> StdResult<TemplateSpec, SpecError>
         where P: AsRef<Path>
     {
-        from_dir::from_dir(settings, base_path.as_ref())
+        from_dir::from_dir(base_path.as_ref(), settings)
     }
 
     pub fn new(templates: Vec1<SubTemplateSpec>) -> Self {

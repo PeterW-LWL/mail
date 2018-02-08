@@ -10,31 +10,44 @@ use super::utils::new_string_path;
 use super::{TemplateSpec, SubTemplateSpec};
 use super::settings::{Settings, Type};
 
-pub(crate) fn from_dir(settings: &Settings, base_path: &Path) -> Result<TemplateSpec, SpecError> {
-    let mut sub_specs = Vec::new();
+//TODO missing global template level embeddings
+//TODO missing caching (of Resources)
+//TODO missing sub-template ordering
+
+
+pub(crate) fn from_dir(base_path: &Path, settings: &Settings) -> Result<TemplateSpec, SpecError> {
+    let mut sub_template_dirs = Vec::new();
     for folder in base_path.read_dir()? {
         let entry = folder?;
         if entry.file_type()?.is_dir() {
-            let sub_template = sub_template_from_dir(settings, &*entry.path())?;
-            sub_specs.push(sub_template);
+            let type_name = entry.file_name()
+                .into_string().map_err(|_| SpecError::NonStringPath(entry.path()))?;
+            let (prio, type_) = settings.get_type_with_priority(&*type_name)
+                .ok_or_else(|| SpecError::MissingTypeInfo(type_name.clone()))?;
+            sub_template_dirs.push((prio, entry.path(), type_));
+        } else {
+            //todo handle template level embeddings
         }
     }
+
+    sub_template_dirs.sort_by_key(|data| data.0);
+
+    let mut sub_specs = Vec::with_capacity(sub_template_dirs.len());
+    for (_, dir_path, type_) in sub_template_dirs {
+        sub_specs.push(sub_template_from_dir(&*dir_path, type_, settings)?);
+    }
+
     let sub_specs = Vec1::from_vec(sub_specs)
         .map_err(|_| SpecError::NoSubTemplatesFound(base_path.to_owned()))?;
     TemplateSpec::new_with_base_path(sub_specs, base_path.to_owned())
 }
 
 
-fn sub_template_from_dir(settings: &Settings, dir: &Path)
+//NOTE: if this is provided as a pub utility provide a wrapper function instead which
+// only accpets dir_path + settings and gets the rest from it
+fn sub_template_from_dir(dir: &Path, type_: &Type, settings: &Settings)
     -> Result<SubTemplateSpec, SpecError>
 {
-    //UNWRAP_SAFE: returns None if dir ends in "..", it's a read_dir entries dir,
-    // so it can not end in ".."
-    let file_name = dir.file_name().unwrap();
-    let type_name = new_string_path(file_name)?;
-    let type_ = settings.get_type(&*type_name)
-        .ok_or_else(|| SpecError::MissingTypeInfo(type_name.to_owned()))?;
-
     let template_file = find_template_file(dir, type_)?;
     let media_type = type_.to_media_type_for(&*template_file)?;
     let embeddings = find_embeddings(dir, &*template_file, settings)?;
