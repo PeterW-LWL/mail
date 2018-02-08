@@ -9,7 +9,7 @@ use mail::file_buffer::FileBuffer;
 use mail::MediaType;
 
 use self::error::{SpecError, Error, Result};
-use self::utils::{new_string_path, string_path_set, check_string_path};
+use self::utils::{new_string_path, string_path_set, check_string_path, fix_newlines};
 
 pub mod error;
 mod utils;
@@ -18,8 +18,8 @@ pub use self::settings::*;
 mod from_dir;
 
 pub trait RenderEngine {
+    const PRODUCES_VALID_NEWLINES: bool;
     type Error: StdError + Send + 'static;
-
     //any caching is done inside transparently
     fn render<D: Serialize>(&self, id: &str, data: D) -> StdResult<String, Self::Error>;
 
@@ -27,6 +27,7 @@ pub trait RenderEngine {
 
 #[derive(Debug)]
 pub struct RenderTemplateEngine<R: RenderEngine> {
+    fix_newlines: bool,
     render_engine: R,
     id2spec: HashMap<String, TemplateSpec>,
 }
@@ -73,8 +74,6 @@ impl<R, C> TemplateEngine<C> for RenderTemplateEngine<R>
                     create_embedding(key.to_owned(),resource_spec.clone(), ctx))
                 .collect::<Result<HashMap<_,_>,_>>()?;
 
-
-            //TODO fix newlines in rendered
             let rendered = {
                 // make CIds available to render engine
                 let data = DataWrapper { data, cids: (&embeddings, &shared_embeddings) };
@@ -82,6 +81,13 @@ impl<R, C> TemplateEngine<C> for RenderTemplateEngine<R>
                 self.render_engine.render(&*path, data)
                     .map_err(|re| Error::RenderError(re))?
             };
+
+            let rendered =
+                if self.fix_newlines {
+                    fix_newlines(rendered)
+                } else {
+                    rendered
+                };
 
             let buffer = FileBuffer::new(template.media_type().clone(), rendered.into());
             let resource = Resource::from_buffer(buffer);

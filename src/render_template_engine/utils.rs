@@ -110,50 +110,139 @@ pub(crate) fn sniff_with_file_cmd(path: &Path) -> Result<MediaType, SpecError> {
 }
 
 
+pub(crate) fn fix_newlines(text: String) -> String {
+    let mut hit_cr = false;
+    let offset = text.bytes().position(|bch| {
+        match bch {
+            b'\r' => {
+                let invalid = hit_cr == true;
+                hit_cr = true;
+                invalid
+            },
+            b'\n' => {
+                let invalid = hit_cr == false;
+                hit_cr = false;
+                invalid
+            },
+            _ => {
+                hit_cr == true
+            }
+        }
+    });
+
+
+    if let Some(offset) = offset {
+        _fix_newlines_from(&*text, offset)
+    } else if hit_cr {
+        let mut out = text;
+        out.push('\n');
+        out
+    } else {
+        text
+    }
+}
+
+// note this expect offset to be a bad char i.e. if text[offset] is \n
+// it assumes text[offset-1] was not \r and if it is any other char
+// it assumes text[offset-1] has been \r.
+// IT PANICS if there is no char at offser i.e. if text[offset..].chars().next() == None
+fn _fix_newlines_from(text: &str, offset: usize) -> String {
+    let mut buff = String::with_capacity(text.len() + 1);
+    let (ok, tail) = text.split_at(offset);
+    buff.push_str(ok);
+
+    let mut chars = tail.chars();
+    let mut hit_cr = false;
+    // we know the first char is wrong
+    match chars.next() {
+        Some('\n') => {
+            // \n is wrong if there was no preceeding \r
+            buff.push('\r');
+            buff.push('\n');
+        },
+        Some(not_nl) => {
+            // not_nl incl \r is only wrong (without lookahead) if preceded by an \r
+            buff.push('\n');
+            buff.push(not_nl);
+            hit_cr = not_nl == '\r'
+        },
+        None => {
+            //this function is internal in-module use only
+            unreachable!(
+                "[BUG] this function is meant to be called with offset pointing to a character")
+        }
+    }
+
+    for ch in chars {
+        if hit_cr {
+            buff.push('\n');
+            if ch != '\n' {
+                buff.push(ch);
+                hit_cr = ch == '\r'
+            }
+        } else {
+            if ch == '\n' {
+                buff.push('\r')
+            } else {
+                hit_cr = ch == '\r'
+            }
+            buff.push(ch)
+        }
+    }
+
+    if hit_cr {
+        buff.push('\n')
+    }
+
+    buff
+}
+
 
 #[cfg(test)]
 mod test {
-    use std::path::Path;
-    use super::super::error::SpecError;
-    use super::sniff_media_type;
 
+    mod sniff_media_type {
+        use std::path::Path;
+        use super::super::super::error::SpecError;
+        use super::super::sniff_media_type;
 
-    #[test]
-    fn sniff_pdf() {
-        let mt = sniff_media_type(Path::new("./test_resources/simple.pdf")).unwrap();
-        assert_eq!(mt.as_str_repr(), "application/pdf; charset=binary")
-    }
+        #[test]
+        fn sniff_pdf() {
+            let mt = sniff_media_type(Path::new("./test_resources/simple.pdf")).unwrap();
+            assert_eq!(mt.as_str_repr(), "application/pdf; charset=binary")
+        }
 
-    #[test]
-    fn sniff_image() {
-        let mt = sniff_media_type(Path::new("./test_resources/png_image.png")).unwrap();
-        assert_eq!(mt.as_str_repr(), "image/png; charset=binary")
-    }
+        #[test]
+        fn sniff_image() {
+            let mt = sniff_media_type(Path::new("./test_resources/png_image.png")).unwrap();
+            assert_eq!(mt.as_str_repr(), "image/png; charset=binary")
+        }
 
-    #[test]
-    fn sniff_ascii() {
-        let mt = sniff_media_type(Path::new("./test_resources/ascii_text.txt")).unwrap();
-        assert_eq!(mt.as_str_repr(), "text/plain; charset=us-ascii")
-    }
+        #[test]
+        fn sniff_ascii() {
+            let mt = sniff_media_type(Path::new("./test_resources/ascii_text.txt")).unwrap();
+            assert_eq!(mt.as_str_repr(), "text/plain; charset=us-ascii")
+        }
 
-    #[test]
-    fn sniff_utf8() {
-        let mt = sniff_media_type(Path::new("./test_resources/utf8_text.txt")).unwrap();
-        assert_eq!(mt.as_str_repr(), "text/plain; charset=utf-8")
-    }
+        #[test]
+        fn sniff_utf8() {
+            let mt = sniff_media_type(Path::new("./test_resources/utf8_text.txt")).unwrap();
+            assert_eq!(mt.as_str_repr(), "text/plain; charset=utf-8")
+        }
 
-    #[test]
-    fn sniff_conflicting_image() {
-        let _path = Path::new("./test_resources/jpg_image.png");
-        let err = sniff_media_type(_path).unwrap_err();
-        if let SpecError::FileStemAndContentDifferInMediaType { path, by_extension, by_content }
-            = err
-        {
-            assert_eq!(path, _path);
-            assert_eq!(by_extension, "image/png");
-            assert_eq!(by_content, "image/jpeg");
-        } else {
-            panic!("unexpected error: {}", err);
+        #[test]
+        fn sniff_conflicting_image() {
+            let _path = Path::new("./test_resources/jpg_image.png");
+            let err = sniff_media_type(_path).unwrap_err();
+            if let SpecError::FileStemAndContentDifferInMediaType { path, by_extension, by_content }
+                = err
+            {
+                assert_eq!(path, _path);
+                assert_eq!(by_extension, "image/png");
+                assert_eq!(by_content, "image/jpeg");
+            } else {
+                panic!("unexpected error: {}", err);
+            }
         }
     }
 }
