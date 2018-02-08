@@ -176,9 +176,9 @@ fn _fix_newlines_from(text: &str, offset: usize) -> String {
     for ch in chars {
         if hit_cr {
             buff.push('\n');
+            hit_cr = ch == '\r';
             if ch != '\n' {
                 buff.push(ch);
-                hit_cr = ch == '\r'
             }
         } else {
             if ch == '\n' {
@@ -200,7 +200,28 @@ fn _fix_newlines_from(text: &str, offset: usize) -> String {
 
 #[cfg(test)]
 mod test {
+    mod fix_newlines {
+        use super::super::fix_newlines;
 
+        #[test]
+        fn replace_orphan_cr_nl() {
+            assert_eq!(fix_newlines("abc\rdef\nghi".to_owned()), "abc\r\ndef\r\nghi");
+            assert_eq!(fix_newlines("\rabc\r".to_owned()), "\r\nabc\r\n");
+            assert_eq!(fix_newlines("\r".to_owned()), "\r\n");
+            assert_eq!(fix_newlines("\nabc\n".to_owned()), "\r\nabc\r\n");
+            assert_eq!(fix_newlines("\n".to_owned()), "\r\n");
+            assert_eq!(fix_newlines("abc\nd".to_owned()), "abc\r\nd");
+        }
+
+        #[test]
+        fn handle_multiple_orphan_cr_nl_in_row() {
+            assert_eq!(fix_newlines("\r\r".to_owned()), "\r\n\r\n");
+            assert_eq!(fix_newlines("\n\n".to_owned()), "\r\n\r\n");
+            assert_eq!(fix_newlines("\r\r\n\n".to_owned()), "\r\n\r\n\r\n");
+            assert_eq!(fix_newlines("\r\r\n\r".to_owned()), "\r\n\r\n\r\n");
+        }
+
+    }
     mod sniff_media_type {
         use std::path::Path;
         use super::super::super::error::SpecError;
