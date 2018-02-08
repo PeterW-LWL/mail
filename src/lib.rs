@@ -59,7 +59,7 @@ pub use self::resource::{
 
 mod template;
 pub use self::template::{
-    TemplateBody, TemplateEngine
+    MailParts, BodyPart, TemplateEngine
 };
 
 pub mod default_impl;
@@ -112,7 +112,7 @@ pub mod template_engine_prelude {
         Resource, ResourceSpec
     };
     pub use ::{
-        TemplateBody, TemplateEngine,
+        MailParts, BodyPart, TemplateEngine,
         Context,
         Attachment, EmbeddingWithCId
     };

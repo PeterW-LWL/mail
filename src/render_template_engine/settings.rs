@@ -38,9 +38,7 @@ lazy_static! {
         let enriched = Type {
             base_type: "text".to_owned(),
             base_subtype: "enriched".to_owned(),
-            //TODO
             suffixes: vec1![ ".txt".to_owned(), ".text".to_owned() ],
-            //TODO
             charset: Some("utf-8".to_owned()),
         };
         let text = Type {

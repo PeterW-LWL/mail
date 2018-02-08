@@ -9,7 +9,7 @@ use headers::components::Disposition;
 use mail::MediaType;
 use mail::{Resource, Mail, Builder};
 
-use template::TemplateBody;
+use template::BodyPart;
 use resource::{EmbeddingWithCId,  Attachment};
 
 
@@ -18,14 +18,14 @@ use resource::{EmbeddingWithCId,  Attachment};
 pub trait BuilderExt {
 
     fn create_alternate_bodies<HM>(
-        bodies: Vec1<TemplateBody>,
+        bodies: Vec1<BodyPart>,
         header: HM
     ) -> Result<Mail>
         where HM: Into<Option<HeaderMap>>;
 
 
     fn create_mail_body<HM>(
-        body: TemplateBody,
+        body: BodyPart,
         headers: HM
     ) -> Result<Mail>
         where HM: Into<Option<HeaderMap>>;
@@ -52,7 +52,7 @@ pub trait BuilderExt {
               EMB: Iterator<Item=EmbeddingWithCId> + ExactSizeIterator;
 
     fn create_alternate_bodies_with_embeddings<HM, EMB>(
-        bodies: Vec1<TemplateBody>,
+        bodies: Vec1<BodyPart>,
         embeddings: EMB,
         header: HM
     ) -> Result<Mail>
@@ -65,7 +65,7 @@ pub trait BuilderExt {
 impl BuilderExt for Builder {
 
     fn create_alternate_bodies<HM>(
-        bodies: Vec1<TemplateBody>,
+        bodies: Vec1<BodyPart>,
         headers: HM
     ) -> Result<Mail>
         where HM: Into<Option<HeaderMap>>
@@ -92,7 +92,7 @@ impl BuilderExt for Builder {
     }
 
     fn create_alternate_bodies_with_embeddings<HM, EMB>(
-        bodies: Vec1<TemplateBody>,
+        bodies: Vec1<BodyPart>,
         embeddings: EMB,
         headers: HM
     ) -> Result<Mail>
@@ -114,16 +114,16 @@ impl BuilderExt for Builder {
     }
 
     fn create_mail_body<HM>(
-        body: TemplateBody,
+        body: BodyPart,
         headers: HM
     ) -> Result<Mail>
         where HM: Into<Option<HeaderMap>>
     {
-        let TemplateBody { body_resource, embeddings } = body;
+        let BodyPart { body_resource, embeddings } = body;
         if embeddings.len() > 0 {
             Self::create_body_with_embeddings(
                 Self::create_body_from_resource( body_resource, None )?,
-                embeddings.into_iter().map(|(_,v)|v),
+                embeddings.into_iter(),
                 headers
             )
         } else {

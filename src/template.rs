@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::result::{ Result as StdResult };
 use std::error::{ Error as StdError };
 
@@ -27,23 +26,28 @@ pub trait TemplateEngine<C: Context> {
 
     fn templates<D: Serialize>(
         &self,  ctx: &C, id: &Self::TemplateId, data: &D
-    ) -> StdResult<(Vec1<TemplateBody>, Vec<Attachment>), Self::Error >;
+    ) -> StdResult<MailParts, Self::Error >;
+}
+
+pub struct MailParts {
+    pub alternative_bodies: Vec1<BodyPart>,
+    /// embeddings shared between alternative_bodies
+    pub shared_embeddings: Vec<EmbeddingWithCId>,
+    pub attachments: Vec<Attachment>
 }
 
 //TODO move this to BuilderExt and just use it here (oh and rename it)
 /// A mail body created by a template engine
-pub struct TemplateBody {
+pub struct BodyPart {
     /// a body created by a template
     pub body_resource: Resource,
 
-    //TODO isn't this signature to close to the usecase, I mean any other
-    // place just needs  impl Iterator<Item=EmbeddingWithCId> + ExactSizedIterator
     /// embeddings added by the template engine
     ///
     /// It is a mapping of the name under which a embedding had been made available in the
     /// template engine to the embedding (which has to contain a CId, as it already
     /// was used in the template engine and CIds are used to link to the content which should
     /// be embedded)
-    pub embeddings: HashMap<String, EmbeddingWithCId>,
+    pub embeddings: Vec<EmbeddingWithCId>,
 
 }

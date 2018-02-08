@@ -111,7 +111,7 @@ mod template_engine {
             _ctx: &C,
             _id: &Self::TemplateId,
             data: &D
-        ) -> StdResult<(Vec1<TemplateBody>, Vec<Attachment>), Self::Error> {
+        ) -> StdResult<MailParts, Self::Error> {
             // Note: we can use `_ctx` to if we really need to, e.g. to generate ContentID's,
             // through notice, that we can always use Embedding without a content ID
             // and the compositor will handle that part for us.
@@ -131,12 +131,15 @@ mod template_engine {
                 " an Attachment and as such there is no reason represent it in\r\n",
                 " the data, use an embedding if you want to refere to it/inline it\r\n"
             ), stringified);
-            let templates = Vec1::new(TemplateBody {
+            let bodies = Vec1::new(BodyPart {
                 body_resource: Resource::from_text(text),
                 embeddings: Default::default(),
             });
-            let attachments = Vec::new();
-            Ok((templates, attachments))
+            Ok(MailParts {
+                alternative_bodies: bodies,
+                shared_embeddings: Vec::new(),
+                attachments: Vec::new()
+            })
         }
     }
 }

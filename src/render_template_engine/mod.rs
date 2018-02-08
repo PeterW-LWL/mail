@@ -54,26 +54,30 @@ impl<R, C> TemplateEngine<C> for RenderTemplateEngine<R>
         ctx: &C,
         template_id: &str,
         data: &D
-    ) -> StdResult<(Vec1<TemplateBody>, Vec<Attachment>), Self::Error >
+    ) -> StdResult<MailParts, Self::Error >
     {
         let spec = self.lookup_spec(template_id)?;
+
+        //OPTIMIZE there should be a more efficient way
+        // maybe use Rc<str> as keys? and Rc<ResourceSpec> for embeddings?
+        let shared_embeddings = spec.embeddings().iter()
+            .map(|(key, resource_spec)|
+                create_embedding(key.to_owned(),resource_spec.clone(), ctx))
+            .collect::<Result<HashMap<_,_>,_>>()?;
+
         let mut attachments = Vec::new();
-        let templates = spec.sub_specs().try_mapped_ref(|template| {
+        let bodies = spec.sub_specs().try_mapped_ref(|template| {
 
             let embeddings = template.embeddings.iter()
-                .map(|(key, resource_spec)| {
-                    let resource = Resource::from_spec(resource_spec.clone());
-                    let cid = ctx.new_content_id().map_err(|err| Error::CIdGenFailed(err))?;
-                    let embedding = EmbeddingWithCId::new(resource, cid);
-                    Ok((key.to_owned(), embedding))
-                })
+                .map(|(key, resource_spec)|
+                    create_embedding(key.to_owned(),resource_spec.clone(), ctx))
                 .collect::<Result<HashMap<_,_>,_>>()?;
 
 
             //TODO fix newlines in rendered
             let rendered = {
                 // make CIds available to render engine
-                let data = DataWrapper { data, cids: &embeddings };
+                let data = DataWrapper { data, cids: (&embeddings, &shared_embeddings) };
                 let path = template.str_path();
                 self.render_engine.render(&*path, data)
                     .map_err(|re| Error::RenderError(re))?
@@ -88,14 +92,27 @@ impl<R, C> TemplateEngine<C> for RenderTemplateEngine<R>
                     Attachment::new(resource)
                 }));
 
-            Ok(TemplateBody {
+            Ok(BodyPart {
                 body_resource: resource,
-                embeddings
+                embeddings: embeddings.into_iter().map(|(_,v)| v).collect()
             })
         })?;
-        Ok((templates, attachments))
 
+        Ok(MailParts {
+            alternative_bodies: bodies,
+            shared_embeddings: shared_embeddings.into_iter().map(|(_, v)| v).collect(),
+            attachments,
+        })
     }
+}
+
+fn create_embedding<R, C>(key: String, resource_spec: ResourceSpec, ctx: &C)
+    -> Result<(String, EmbeddingWithCId), R>
+    where C: Context, R: StdError
+{
+    let resource = Resource::from_spec(resource_spec.clone());
+    let cid = ctx.new_content_id().map_err(|err| Error::CIdGenFailed(err))?;
+    Ok((key, EmbeddingWithCId::new(resource, cid)))
 }
 
 
@@ -269,19 +286,19 @@ impl SubTemplateSpec {
 struct DataWrapper<'a, D: Serialize + 'a> {
     /// make cid's of embeddings available
     #[serde(serialize_with = "cid_mapped_serialize")]
-    pub cids: &'a HashMap<String, EmbeddingWithCId>,
+    pub cids: (&'a HashMap<String, EmbeddingWithCId>, &'a HashMap<String, EmbeddingWithCId>),
     /// make data available
     pub data: &'a D
 }
 
 /// serialize name->embedding_cid map as name->cid map
 fn cid_mapped_serialize<'a, S>(
-    cids: &&'a HashMap<String, EmbeddingWithCId>,
+    cids: &(&'a HashMap<String, EmbeddingWithCId>, &'a HashMap<String, EmbeddingWithCId>),
     serializer: S
 ) -> StdResult<S::Ok, S::Error>
     where S: Serializer
 {
-    serializer.collect_map(cids.iter().map(|(k, v)| {
+    serializer.collect_map(cids.0.iter().chain(cids.1.iter()).map(|(k, v)| {
         (k, v.content_id().as_str())
     }))
 }

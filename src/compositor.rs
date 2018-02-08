@@ -23,7 +23,7 @@ use resource::{
 };
 use builder_extension::BuilderExt;
 use template::{
-    TemplateBody, TemplateEngine
+    BodyPart, TemplateEngine, MailParts
 };
 
 pub trait NameComposer<D> {
@@ -84,15 +84,17 @@ impl<T, C, CP, D> Compositor<T, C, CP, D>
             Subject: subject
         }?;
 
-        let (bodies, embeddings, attachments) = self.use_template_engine( template_id, data )?;
+        let MailParts { alternative_bodies, shared_embeddings, attachments }
+            = self.use_template_engine( template_id, data )?;
 
-        self.build_mail( bodies, embeddings.into_iter(), attachments, core_headers )
+        self.build_mail( alternative_bodies, shared_embeddings.into_iter(), attachments,
+                         core_headers )
     }
 
     pub fn use_template_engine( &self, template_id: &T::TemplateId, data: D )
-                                -> Result<(Vec1<TemplateBody>, Vec<EmbeddingWithCId>, Vec<Attachment> )>
+                                -> Result<MailParts>
     {
-        let ( (bodies, mut attachments), embeddings, attachments2 ) =
+        let ( mut mail_parts, embeddings, attachments ) =
             with_resource_sidechanel( Box::new(self.context.clone()), || -> Result<_> {
                 // we just want to make sure that the template engine does
                 // really serialize the data, so we make it so that it can
@@ -106,9 +108,9 @@ impl<T, C, CP, D> Compositor<T, C, CP, D>
                     .chain_err( || "failure in template engine" )
             } )?;
 
-        attachments.extend( attachments2 );
-
-        Ok( ( bodies, embeddings, attachments) )
+        mail_parts.attachments.extend(attachments);
+        mail_parts.shared_embeddings.extend(embeddings);
+        Ok(mail_parts)
     }
 
     /// creates a MailboxList with default display_names from a non empty sequence of Mailboxes
@@ -160,10 +162,10 @@ impl<T, C, CP, D> Compositor<T, C, CP, D>
     /// uses the results of preprocessing data and templates, as well as a list of
     /// mail headers like `From`,`To`, etc. to create a new mail
     pub fn build_mail<EMB>(&self,
-                      bodies: Vec1<TemplateBody>,
-                      embeddings: EMB,
-                      attachments: Vec<Attachment>,
-                      core_headers: HeaderMap
+                           bodies: Vec1<BodyPart>,
+                           embeddings: EMB,
+                           attachments: Vec<Attachment>,
+                           core_headers: HeaderMap
     ) -> Result<Mail>
         where EMB: Iterator<Item=EmbeddingWithCId> + ExactSizeIterator
     {
