@@ -22,7 +22,7 @@ use super::utils;
 //      list of aliases file endings
 
 lazy_static! {
-    pub static ref DEFAULT_SETTINGS: Settings = {
+    pub static ref DEFAULT_SETTINGS: LoadSpecSettings = {
         let html =  Type {
             base_type: "text".to_owned(),
             base_subtype: "html".to_owned(),
@@ -48,7 +48,7 @@ lazy_static! {
             charset: Some("utf-8".to_owned()),
         };
 
-        let mut se = Settings::new();
+        let mut se = LoadSpecSettings::new();
         se.set_type_lookup("text", text, None).unwrap();
         se.set_type_lookup("enriched", enriched, Some("text")).unwrap();
         se.set_type_lookup("xhtml", xhtml, Some("enriched")).unwrap();
@@ -65,15 +65,17 @@ lazy_static! {
 // 2. made into a trait with multiple impl. where the current impl. is just the default
 
 #[derive(Debug, Clone)]
-pub struct Settings {
-    type_lookup: HashMap<String, (usize, Type)>
+pub struct LoadSpecSettings {
+    type_lookup: HashMap<String, (usize, Type)>,
 }
 
-impl Settings {
+impl LoadSpecSettings {
 
     pub fn new() -> Self {
-        Settings { type_lookup: HashMap::new() }
+        LoadSpecSettings { type_lookup: HashMap::new() }
     }
+
+
 
     pub fn get_type(&self, name: &str) -> Option<&Type> {
         self.type_lookup.get(name)
@@ -221,10 +223,10 @@ impl Type {
 
 #[cfg(test)]
 mod test {
-    use super::{Settings, Type};
+    use super::{LoadSpecSettings, Type};
 
-    fn dumy_settings() -> Settings {
-        let mut se = Settings::new();
+    fn dumy_settings() -> LoadSpecSettings {
+        let mut se = LoadSpecSettings::new();
         let text = dumy_type("text", "txt");
         se.set_type_lookup("text", text.clone(), None).unwrap();
         let xhtml = dumy_type("xhtml+xml", "xhtml");
@@ -245,7 +247,7 @@ mod test {
 
     #[test]
     fn add_types_and_aliases() {
-        let mut se = Settings::new();
+        let mut se = LoadSpecSettings::new();
         let text = dumy_type("text", "txt");
         se.set_type_lookup("text", text.clone(), None).unwrap();
         let html = dumy_type("html", "html");

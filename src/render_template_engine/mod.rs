@@ -142,7 +142,7 @@ impl TemplateSpec {
     /// Note:  the file name "this.is.a" is interprete as name "this" with suffix/type ".is.a"
     ///        so it's cid gan be accessed with "cids.this"
     #[inline]
-    pub fn from_dir<P>(base_path: P, settings: &Settings) -> StdResult<TemplateSpec, SpecError>
+    pub fn from_dir<P>(base_path: P, settings: &LoadSpecSettings) -> StdResult<TemplateSpec, SpecError>
         where P: AsRef<Path>
     {
         from_dir::from_dir(base_path.as_ref(), settings)

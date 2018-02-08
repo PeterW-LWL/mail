@@ -8,13 +8,13 @@ use mail::ResourceSpec;
 use super::error::SpecError;
 use super::utils::new_string_path;
 use super::{TemplateSpec, SubTemplateSpec};
-use super::settings::{Settings, Type};
+use super::settings::{LoadSpecSettings, Type};
 
 //TODO missing global template level embeddings
 //TODO missing caching (of Resources)
 
 
-pub(crate) fn from_dir(base_path: &Path, settings: &Settings) -> Result<TemplateSpec, SpecError> {
+pub(crate) fn from_dir(base_path: &Path, settings: &LoadSpecSettings) -> Result<TemplateSpec, SpecError> {
     let mut glob_embeddings = HashMap::new();
     let mut sub_template_dirs = Vec::new();
     for folder in base_path.read_dir()? {
@@ -47,7 +47,7 @@ pub(crate) fn from_dir(base_path: &Path, settings: &Settings) -> Result<Template
 
 //NOTE: if this is provided as a pub utility provide a wrapper function instead which
 // only accepts dir_path + settings and gets the rest from it
-fn sub_template_from_dir(dir: &Path, type_: &Type, settings: &Settings)
+fn sub_template_from_dir(dir: &Path, type_: &Type, settings: &LoadSpecSettings)
     -> Result<SubTemplateSpec, SpecError>
 {
     let template_file = find_template_file(dir, type_)?;
@@ -67,7 +67,7 @@ fn find_template_file(dir: &Path, type_: &Type) -> Result<PathBuf, SpecError> {
 }
 
 
-fn find_embeddings(target_path: &Path, template_file: &Path, settings: &Settings)
+fn find_embeddings(target_path: &Path, template_file: &Path, settings: &LoadSpecSettings)
     -> Result<HashMap<String, ResourceSpec>, SpecError>
 {
     use std::collections::hash_map::Entry::*;
@@ -87,7 +87,7 @@ fn find_embeddings(target_path: &Path, template_file: &Path, settings: &Settings
     Ok(embeddings)
 }
 
-fn embedding_from_path(path: PathBuf, settings: &Settings)
+fn embedding_from_path(path: PathBuf, settings: &LoadSpecSettings)
                        -> Result<(String, ResourceSpec), SpecError>
 {
     if !path.is_file() {
