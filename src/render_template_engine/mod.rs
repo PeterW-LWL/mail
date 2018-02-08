@@ -105,7 +105,9 @@ pub struct TemplateSpec {
     /// the `base_path` which was used to construct the template from,
     /// e.g. with `TemplateSpec::from_dir` and which is used for reloading
     base_path: Option<PathBuf>,
-    templates: Vec1<SubTemplateSpec>
+    templates: Vec1<SubTemplateSpec>,
+    /// template level embeddings, i.e. embeddings shared between alternative bodies
+    embeddings: HashMap<String, ResourceSpec>
 }
 
 impl TemplateSpec {
@@ -131,16 +133,35 @@ impl TemplateSpec {
     }
 
     pub fn new(templates: Vec1<SubTemplateSpec>) -> Self {
-        TemplateSpec { base_path: None, templates }
+        Self::new_with_embeddings(templates, Default::default())
+    }
+
+    pub fn new_with_embeddings(
+        templates: Vec1<SubTemplateSpec>,
+        embeddings: HashMap<String, ResourceSpec>
+    ) -> Self {
+        TemplateSpec { base_path: None, templates, embeddings }
     }
 
     pub fn new_with_base_path<P>(templates: Vec1<SubTemplateSpec>, base_path: P)
         -> StdResult<Self, SpecError>
         where P: AsRef<Path>
     {
+        Self::new_with_embeddings_and_base_path(
+            templates, Default::default(), base_path.as_ref()
+        )
+    }
+
+    pub fn new_with_embeddings_and_base_path<P>(
+        templates: Vec1<SubTemplateSpec>,
+        embeddings: HashMap<String, ResourceSpec>,
+        base_path: P
+    ) -> StdResult<Self, SpecError>
+        where P: AsRef<Path>
+    {
         let path = base_path.as_ref().to_owned();
         check_string_path(&*path)?;
-        Ok(TemplateSpec { base_path: Some(path), templates })
+        Ok(TemplateSpec { base_path: Some(path), templates, embeddings })
     }
 
     pub fn templates(&self) -> &Vec1<SubTemplateSpec> {
@@ -150,6 +171,15 @@ impl TemplateSpec {
     pub fn templates_mut(&mut self) -> &mut Vec1<SubTemplateSpec> {
         &mut self.templates
     }
+
+    pub fn embeddings(&self) -> &HashMap<String, ResourceSpec> {
+        &self.embeddings
+    }
+
+    pub fn embeddings_mut(&mut self) -> &mut HashMap<String, ResourceSpec> {
+        &mut self.embeddings
+    }
+
 
     pub fn base_path(&self) -> Option<&Path> {
         self.base_path.as_ref().map(|r| &**r)

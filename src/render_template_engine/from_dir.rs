@@ -12,10 +12,10 @@ use super::settings::{Settings, Type};
 
 //TODO missing global template level embeddings
 //TODO missing caching (of Resources)
-//TODO missing sub-template ordering
 
 
 pub(crate) fn from_dir(base_path: &Path, settings: &Settings) -> Result<TemplateSpec, SpecError> {
+    let mut glob_embeddings = HashMap::new();
     let mut sub_template_dirs = Vec::new();
     for folder in base_path.read_dir()? {
         let entry = folder?;
@@ -26,7 +26,8 @@ pub(crate) fn from_dir(base_path: &Path, settings: &Settings) -> Result<Template
                 .ok_or_else(|| SpecError::MissingTypeInfo(type_name.clone()))?;
             sub_template_dirs.push((prio, entry.path(), type_));
         } else {
-            //todo handle template level embeddings
+            let (name, resource_spec) = embedding_from_path(entry.path(), settings)?;
+            glob_embeddings.insert(name, resource_spec);
         }
     }
 
@@ -39,12 +40,13 @@ pub(crate) fn from_dir(base_path: &Path, settings: &Settings) -> Result<Template
 
     let sub_specs = Vec1::from_vec(sub_specs)
         .map_err(|_| SpecError::NoSubTemplatesFound(base_path.to_owned()))?;
-    TemplateSpec::new_with_base_path(sub_specs, base_path.to_owned())
+    TemplateSpec::new_with_embeddings_and_base_path(
+        sub_specs, glob_embeddings, base_path.to_owned())
 }
 
 
 //NOTE: if this is provided as a pub utility provide a wrapper function instead which
-// only accpets dir_path + settings and gets the rest from it
+// only accepts dir_path + settings and gets the rest from it
 fn sub_template_from_dir(dir: &Path, type_: &Type, settings: &Settings)
     -> Result<SubTemplateSpec, SpecError>
 {
@@ -75,7 +77,7 @@ fn find_embeddings(target_path: &Path, template_file: &Path, settings: &Settings
         let entry = entry?;
         let path = entry.path();
         if path != template_file {
-            let (key, value) = embedding_from_dir_entry(path, settings)?;
+            let (key, value) = embedding_from_path(path, settings)?;
             match embeddings.entry(key) {
                 Occupied(oe) => return Err(SpecError::DuplicateEmbeddingName(oe.key().clone())),
                 Vacant(ve) => {ve.insert(value);}
@@ -85,8 +87,8 @@ fn find_embeddings(target_path: &Path, template_file: &Path, settings: &Settings
     Ok(embeddings)
 }
 
-fn embedding_from_dir_entry(path: PathBuf, settings: &Settings)
-    -> Result<(String, ResourceSpec), SpecError>
+fn embedding_from_path(path: PathBuf, settings: &Settings)
+                       -> Result<(String, ResourceSpec), SpecError>
 {
     if !path.is_file() {
         return Err(SpecError::NotAFile(path.to_owned()));
