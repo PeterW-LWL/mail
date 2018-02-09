@@ -25,7 +25,7 @@ fn use_tera_template_a() {
     let mut rte = RenderTemplateEngine::new(tera);
     rte.load_specs_from_dir("./test_resources/templates", &*DEFAULT_SETTINGS).unwrap();
 
-    let context = self::tmp_context::SimpleContext::new( "company_a".into() );
+    let context = self::tmp_context::SimpleContext::new( "company_a.not_a_domain".into() );
     let composer = Compositor::new( rte, context.clone(), NoNameComposer );
 
     let data = Name { name: "abcdefg" };
