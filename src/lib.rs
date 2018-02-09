@@ -28,7 +28,7 @@ extern crate conduit_mime_types;
 #[macro_use]
 extern crate lazy_static;
 #[cfg(feature="tera-bindings")]
-extern crate tera;
+extern crate tera as tera_crate;
 
 
 mod builder_extension;
