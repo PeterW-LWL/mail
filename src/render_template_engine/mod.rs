@@ -21,7 +21,7 @@ pub trait RenderEngine {
     const PRODUCES_VALID_NEWLINES: bool;
     type Error: StdError + Send + 'static;
     //any caching is done inside transparently
-    fn render<D: Serialize>(&self, id: &str, data: D) -> StdResult<String, Self::Error>;
+    fn render<D: Serialize>(&self, id: &str, data: &D) -> StdResult<String, Self::Error>;
 
 }
 
@@ -154,7 +154,7 @@ impl<R, C> TemplateEngine<C> for RenderTemplateEngine<R>
                 // make CIds available to render engine
                 let data = DataWrapper { data, cids: (&embeddings, &shared_embeddings) };
                 let path = template.str_path();
-                self.render_engine.render(&*path, data)
+                self.render_engine.render(&*path, &data)
                     .map_err(|re| Error::RenderError(re))?
             };
 
