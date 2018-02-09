@@ -109,7 +109,17 @@ pub(crate) fn sniff_with_file_cmd(path: &Path) -> Result<MediaType, SpecError> {
         })
 }
 
-
+/// replace any orphan \r,\n chars with \r\n if needed
+///
+/// If the there is no need to replace anything the input String will be returned,
+/// if it's just a tailin \r the input string will be extended by \n and returned,
+/// else a new string is created containing the input text but with all orphan CR/NL's
+/// replaced with \r\n.
+///
+/// Note: this function was intentionally designed to not consume a &str and return a Cow<str>,
+/// if it is ever made public the interface should be changed to that and the place where it is
+/// used should be changed to match on a Cow returning the input if it is Cow::Borrowed or returning
+/// the new value and droping the input if it is Cow::Owned
 pub(crate) fn fix_newlines(text: String) -> String {
     let mut hit_cr = false;
     let offset = text.bytes().position(|bch| {
