@@ -85,7 +85,7 @@ impl LoadSpecSettings {
     /// returns the type and its priority idx for a given name if there is a type registered for it
     ///
     /// Note that the priority idx can change if type lookups are inserted/removed.
-    /// See [`get_priority_idx`](struct Settings.get_priority_idx) for a more indepth explanation
+    /// See `get_priority_idx` for a more indepth explanation
     /// of how to interprete the priority idx.
     pub fn get_type_with_priority(&self, name: &str) -> Option<(usize, &Type)> {
         self.type_lookup.get(name)

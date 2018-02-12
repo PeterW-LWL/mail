@@ -83,7 +83,6 @@ pub mod composition_prelude {
     pub type Encoder = ::core::codec::Encoder<::mail::Resource>;
     pub use core::*;
     pub use core::error::*;
-    pub use core::grammar::MailType;
     pub use headers::components::{
         Mailbox,
         Email,

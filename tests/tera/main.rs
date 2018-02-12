@@ -4,7 +4,14 @@ extern crate futures;
 #[macro_use]
 extern crate serde_derive;
 extern crate futures_cpupool;
+extern crate regex;
 
+use std::result::{Result as StdResult};
+use std::io::{Read, BufRead, BufReader};
+use std::path::Path;
+use std::fs::File;
+
+use regex::Regex;
 use futures::Future;
 
 use compose::composition_prelude::Result;
@@ -42,12 +49,18 @@ fn use_tera_template_a() {
     let encodable_mail = mail.into_encodeable_mail( &context ).wait().unwrap();
     encodable_mail.encode( &mut encoder ).unwrap();
 
-
-    println!( "{}", encoder.into_string_lossy().unwrap() );
-
-
-
+    //TODO use into_string().unwrap() and make into_string_lossy() nonfailable
+    let stringified = encoder.into_string_lossy().unwrap();
+    let mut line_iter = stringified.lines();
+    let fd = File::open("./test_resources/template_a.out.regex").unwrap();
+    for template_line in BufReader::new(fd).lines().map(StdResult::unwrap) {
+        let line_regex = Regex::new(&*template_line).unwrap();
+        let res_line = line_iter.next().unwrap();
+        assert!(line_regex.is_match(res_line), "regex: {:?}, line: {:?}", line_regex, res_line);
+    }
+    assert_eq!(line_iter.next(), None);
 }
+
 
 //this will just be a temporary solution until default_impl::SimpleContext is improved
 mod tmp_context {

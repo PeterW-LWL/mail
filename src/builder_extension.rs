@@ -73,7 +73,7 @@ impl BuilderExt for Builder {
         let bodies = bodies;
 
         match bodies.len() {
-            0 => bail!( ErrorKind::NeedPlainAndOrHtmlMailBody ),
+            0 => bail!( ErrorKind::NeedAtLastOneBodyInMultipartMail ),
             1 => return Self::create_mail_body(bodies.into_vec().pop().unwrap(), headers ),
             _n => {}
         }
