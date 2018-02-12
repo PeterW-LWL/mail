@@ -10,6 +10,7 @@ use std::result::{Result as StdResult};
 use std::io::{Read, BufRead, BufReader};
 use std::path::Path;
 use std::fs::File;
+use std::collections::HashMap;
 
 use regex::Regex;
 use futures::Future;
@@ -27,6 +28,7 @@ struct Name {
 
 #[test]
 fn use_tera_template_a() {
+    use std::collections::hash_map::Entry::*;
     let tera = TeraRenderEngine::new("./test_resources/tera_base/**/*").unwrap();
     let mut rte = RenderTemplateEngine::new(tera);
     rte.load_specs_from_dir("./test_resources/templates", &*DEFAULT_SETTINGS).unwrap();
@@ -50,12 +52,25 @@ fn use_tera_template_a() {
 
     //TODO use into_string().unwrap() and make into_string_lossy() nonfailable
     let stringified = encoder.into_string_lossy().unwrap();
+
     let mut line_iter = stringified.lines();
+    let mut capture_map = HashMap::new();
+
     let fd = File::open("./test_resources/template_a.out.regex").unwrap();
-    for template_line in BufReader::new(fd).lines().map(StdResult::unwrap) {
-        let line_regex = Regex::new(&*template_line).unwrap();
+    let fd_line_iter = BufReader::new(fd).lines().map(StdResult::unwrap).enumerate();
+    for (line_nr, mut template_line) in fd_line_iter {
+        template_line.insert(0, '^');
+        template_line.push('$');
+        let mut line_regex = Regex::new(&*template_line).unwrap();
         let res_line = line_iter.next().unwrap();
-        assert!(line_regex.is_match(res_line), "regex: {:?}, line: {:?}", line_regex, res_line);
+        let captures = line_regex.captures(res_line).unwrap_or_else(|| {
+            panic!("[{}] no match, regex: {:?}, line: {:?}", line_nr, line_regex, res_line);
+        });
+        for name in line_regex.capture_names().filter_map(|e|e){
+            let value = captures.name(name).unwrap().as_str();
+            let value2 = capture_map.entry(name.to_owned()).or_insert(value);
+            assert_eq!(value, *value2)
+        }
     }
     assert_eq!(line_iter.next(), None);
 }
