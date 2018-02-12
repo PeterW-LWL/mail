@@ -138,7 +138,7 @@ impl<R, C> TemplateEngine<C> for RenderTemplateEngine<R>
         let spec = self.lookup_spec(template_id)?;
 
         //OPTIMIZE there should be a more efficient way
-        // maybe use Rc<str> as keys? and Rc<ResourceSpec> for embeddings?
+        // maybe use Rc<str> as keys? and Rc<Resource> for embeddings?
         let shared_embeddings = spec.embeddings().iter()
             .map(|(key, resource_spec)|
                 create_embedding(key.to_owned(),resource_spec.clone(), ctx))
@@ -171,10 +171,7 @@ impl<R, C> TemplateEngine<C> for RenderTemplateEngine<R>
             let resource = Resource::from_buffer(buffer);
 
             attachments.extend(template.attachments().iter()
-                .map(|resouce_spec| {
-                    let resource = Resource::from_spec(resouce_spec.clone());
-                    Attachment::new(resource)
-                }));
+                .map(|resource| Attachment::new(resource.clone())));
 
             Ok(BodyPart {
                 body_resource: resource,
@@ -190,11 +187,10 @@ impl<R, C> TemplateEngine<C> for RenderTemplateEngine<R>
     }
 }
 
-fn create_embedding<R, C>(key: String, resource_spec: ResourceSpec, ctx: &C)
+fn create_embedding<R, C>(key: String, resource: Resource, ctx: &C)
     -> Result<(String, EmbeddingWithCId), R>
     where C: Context, R: StdError
 {
-    let resource = Resource::from_spec(resource_spec.clone());
     let cid = ctx.new_content_id().map_err(|err| Error::CIdGenFailed(err))?;
     Ok((key, EmbeddingWithCId::new(resource, cid)))
 }
@@ -207,7 +203,7 @@ pub struct TemplateSpec {
     base_path: Option<PathBuf>,
     templates: Vec1<SubTemplateSpec>,
     /// template level embeddings, i.e. embeddings shared between alternative bodies
-    embeddings: HashMap<String, ResourceSpec>
+    embeddings: HashMap<String, Resource>
 }
 
 impl TemplateSpec {
@@ -238,7 +234,7 @@ impl TemplateSpec {
 
     pub fn new_with_embeddings(
         templates: Vec1<SubTemplateSpec>,
-        embeddings: HashMap<String, ResourceSpec>
+        embeddings: HashMap<String, Resource>
     ) -> Self {
         TemplateSpec { base_path: None, templates, embeddings }
     }
@@ -254,7 +250,7 @@ impl TemplateSpec {
 
     pub fn new_with_embeddings_and_base_path<P>(
         templates: Vec1<SubTemplateSpec>,
-        embeddings: HashMap<String, ResourceSpec>,
+        embeddings: HashMap<String, Resource>,
         base_path: P
     ) -> StdResult<Self, SpecError>
         where P: AsRef<Path>
@@ -272,11 +268,11 @@ impl TemplateSpec {
         &mut self.templates
     }
 
-    pub fn embeddings(&self) -> &HashMap<String, ResourceSpec> {
+    pub fn embeddings(&self) -> &HashMap<String, Resource> {
         &self.embeddings
     }
 
-    pub fn embeddings_mut(&mut self) -> &mut HashMap<String, ResourceSpec> {
+    pub fn embeddings_mut(&mut self) -> &mut HashMap<String, Resource> {
         &mut self.embeddings
     }
 
@@ -301,11 +297,11 @@ pub struct SubTemplateSpec {
     /// The path to the template file if it is a relative path it is
     /// used relative to the working directory
     path: String,
-    // (Name, ResourceSpec) | name is used by the template engine e.g. log, and differs to
+    // (Name, Resource) | name is used by the template engine e.g. log, and differs to
     // resource spec use_name which would
     //  e.g. be logo.png but referring to the file long_logo_name.png
-    embeddings: HashMap<String, ResourceSpec>,//todo use ordered map
-    attachments: Vec<ResourceSpec>
+    embeddings: HashMap<String, Resource>,//todo use ordered map
+    attachments: Vec<Resource>
 }
 
 impl SubTemplateSpec {
@@ -315,8 +311,8 @@ impl SubTemplateSpec {
     // default values + then with_... methods
     pub fn new<P>(path: P,
                   media_type: MediaType,
-                  embeddings: HashMap<String, ResourceSpec>,
-                  attachments: Vec<ResourceSpec>
+                  embeddings: HashMap<String, Resource>,
+                  attachments: Vec<Resource>
     ) -> StdResult<Self, SpecError>
         where P: AsRef<Path>
     {
@@ -347,19 +343,19 @@ impl SubTemplateSpec {
         replace(&mut self.media_type, media_type)
     }
 
-    pub fn embeddings(&self) -> &HashMap<String, ResourceSpec> {
+    pub fn embeddings(&self) -> &HashMap<String, Resource> {
         &self.embeddings
     }
 
-    pub fn embedding_mut(&mut self) -> &mut HashMap<String, ResourceSpec> {
+    pub fn embedding_mut(&mut self) -> &mut HashMap<String, Resource> {
         &mut self.embeddings
     }
 
-    pub fn attachments(&self) -> &Vec<ResourceSpec> {
+    pub fn attachments(&self) -> &Vec<Resource> {
         &self.attachments
     }
 
-    pub fn attachments_mut(&mut self) -> &mut Vec<ResourceSpec> {
+    pub fn attachments_mut(&mut self) -> &mut Vec<Resource> {
         &mut self.attachments
     }
 

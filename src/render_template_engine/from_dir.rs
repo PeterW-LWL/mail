@@ -3,7 +3,7 @@ use std::collections::HashMap;
 
 use vec1::Vec1;
 
-use mail::ResourceSpec;
+use mail::{Resource, ResourceSpec};
 
 use super::error::SpecError;
 use super::utils::new_string_path;
@@ -68,7 +68,7 @@ fn find_template_file(dir: &Path, type_: &Type) -> Result<PathBuf, SpecError> {
 
 
 fn find_embeddings(target_path: &Path, template_file: &Path, settings: &LoadSpecSettings)
-    -> Result<HashMap<String, ResourceSpec>, SpecError>
+    -> Result<HashMap<String, Resource>, SpecError>
 {
     use std::collections::hash_map::Entry::*;
 
@@ -88,7 +88,7 @@ fn find_embeddings(target_path: &Path, template_file: &Path, settings: &LoadSpec
 }
 
 fn embedding_from_path(path: PathBuf, settings: &LoadSpecSettings)
-                       -> Result<(String, ResourceSpec), SpecError>
+                       -> Result<(String, Resource), SpecError>
 {
     if !path.is_file() {
         return Err(SpecError::NotAFile(path.to_owned()));
@@ -112,6 +112,7 @@ fn embedding_from_path(path: PathBuf, settings: &LoadSpecSettings)
         path, media_type,
         name: Some(file_name),
     };
+    let resource = Resource::from_spec(resource_spec);
 
-    Ok((name, resource_spec))
+    Ok((name, resource))
 }
