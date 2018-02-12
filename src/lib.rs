@@ -22,6 +22,14 @@ extern crate serde_derive;
 extern crate scoped_tls;
 #[cfg(feature="default_impl_simple_context")]
 extern crate futures_cpupool;
+#[cfg(feature="render-template-engine")]
+extern crate conduit_mime_types;
+#[cfg(feature="render-template-engine")]
+#[macro_use]
+extern crate lazy_static;
+#[cfg(feature="tera-bindings")]
+extern crate tera as tera_crate;
+
 
 mod builder_extension;
 pub use self::builder_extension::{
@@ -45,30 +53,35 @@ pub use self::context::{
 
 mod resource;
 pub use self::resource::{
-    Embedding, EmbeddingWithCID,
+    Embedding, EmbeddingWithCId,
     Attachment,
-    BodyWithEmbeddings
 };
 
 mod template;
 pub use self::template::{
-    Template, TemplateEngine
+    MailParts, BodyPart, TemplateEngine
 };
 
 pub mod default_impl;
+
+#[cfg(feature="render-template-engine")]
+pub mod render_template_engine;
+#[cfg(feature="tera-bindings")]
+pub mod tera;
+
+
+//################# preludes ###########################
 
 pub mod resource_prelude {
     pub use mail::file_buffer::FileBuffer;
     pub use core::utils::FileMeta;
     pub use mail::{ Resource, ResourceSpec };
-    pub use ::{ Embedding, Attachment, EmbeddingWithCID };
+    pub use ::{Embedding, Attachment, EmbeddingWithCId};
 }
 
 pub mod composition_prelude {
     pub type Encoder = ::core::codec::Encoder<::mail::Resource>;
     pub use core::*;
-    pub use core::error::*;
-    pub use core::grammar::MailType;
     pub use headers::components::{
         Mailbox,
         Email,
@@ -88,17 +101,15 @@ pub mod composition_prelude {
 }
 
 pub mod template_engine_prelude {
-    pub type StdError = ::std::error::Error;
-    pub type StdResult<R,E> = ::std::result::Result<R,E>;
     pub use serde::Serialize;
 
     pub use vec1::Vec1;
     pub use mail::mail::{
-        Resource
+        Resource, ResourceSpec
     };
     pub use ::{
-        Template, TemplateEngine,
+        MailParts, BodyPart, TemplateEngine,
         Context,
-        Attachment, Embedding
+        Attachment, EmbeddingWithCId
     };
  }

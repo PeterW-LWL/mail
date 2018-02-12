@@ -1,4 +1,5 @@
 use media_type::{MULTIPART, ALTERNATIVE, RELATED, MIXED};
+use vec1::Vec1;
 
 use core::error::{Result, ErrorKind};
 use core::header::HeaderMap;
@@ -8,7 +9,8 @@ use headers::components::Disposition;
 use mail::MediaType;
 use mail::{Resource, Mail, Builder};
 
-use resource::{EmbeddingWithCID, BodyWithEmbeddings, Attachment};
+use template::BodyPart;
+use resource::{EmbeddingWithCId,  Attachment};
 
 
 /// Ext. Trait which adds helper methods to the Builder type.
@@ -16,20 +18,14 @@ use resource::{EmbeddingWithCID, BodyWithEmbeddings, Attachment};
 pub trait BuilderExt {
 
     fn create_alternate_bodies<HM>(
-        bodies: Vec<BodyWithEmbeddings>,
+        bodies: Vec1<BodyPart>,
         header: HM
     ) -> Result<Mail>
         where HM: Into<Option<HeaderMap>>;
 
-    fn create_alternate_bodies_with_embeddings<HM>(
-        bodies: Vec<BodyWithEmbeddings>,
-        embeddings: Vec<EmbeddingWithCID>,
-        header: HM
-    ) -> Result<Mail>
-        where HM: Into<Option<HeaderMap>>;
 
     fn create_mail_body<HM>(
-        body: BodyWithEmbeddings,
+        body: BodyPart,
         headers: HM
     ) -> Result<Mail>
         where HM: Into<Option<HeaderMap>>;
@@ -47,13 +43,21 @@ pub trait BuilderExt {
     ) -> Result<Mail>
         where HM: Into<Option<HeaderMap>>;
 
-    fn create_body_with_embeddings<HM>(
+    fn create_body_with_embeddings<HM, EMB>(
         sub_body: Mail,
-        embeddings: Vec<EmbeddingWithCID>,
+        embeddings: EMB,
         headers: HM
     ) -> Result<Mail>
-        where HM: Into<Option<HeaderMap>>;
+        where HM: Into<Option<HeaderMap>>,
+              EMB: Iterator<Item=EmbeddingWithCId> + ExactSizeIterator;
 
+    fn create_alternate_bodies_with_embeddings<HM, EMB>(
+        bodies: Vec1<BodyPart>,
+        embeddings: EMB,
+        header: HM
+    ) -> Result<Mail>
+        where HM: Into<Option<HeaderMap>>,
+              EMB: Iterator<Item=EmbeddingWithCId> + ExactSizeIterator;
 }
 
 
@@ -61,16 +65,16 @@ pub trait BuilderExt {
 impl BuilderExt for Builder {
 
     fn create_alternate_bodies<HM>(
-        bodies: Vec<BodyWithEmbeddings>,
+        bodies: Vec1<BodyPart>,
         headers: HM
     ) -> Result<Mail>
         where HM: Into<Option<HeaderMap>>
     {
-        let mut bodies = bodies;
+        let bodies = bodies;
 
         match bodies.len() {
-            0 => bail!( ErrorKind::NeedPlainAndOrHtmlMailBody ),
-            1 => return Self::create_mail_body(bodies.pop().unwrap(), headers ),
+            0 => bail!( ErrorKind::NeedAtLastOneBodyInMultipartMail ),
+            1 => return Self::create_mail_body(bodies.into_vec().pop().unwrap(), headers ),
             _n => {}
         }
 
@@ -87,12 +91,13 @@ impl BuilderExt for Builder {
         builder.build()
     }
 
-    fn create_alternate_bodies_with_embeddings<HM>(
-        bodies: Vec<BodyWithEmbeddings>,
-        embeddings: Vec<EmbeddingWithCID>,
+    fn create_alternate_bodies_with_embeddings<HM, EMB>(
+        bodies: Vec1<BodyPart>,
+        embeddings: EMB,
         headers: HM
     ) -> Result<Mail>
-        where HM: Into<Option<HeaderMap>>
+        where HM: Into<Option<HeaderMap>>,
+              EMB: Iterator<Item=EmbeddingWithCId> + ExactSizeIterator
     {
         match embeddings.len() {
             0 => {
@@ -109,20 +114,20 @@ impl BuilderExt for Builder {
     }
 
     fn create_mail_body<HM>(
-        body: BodyWithEmbeddings,
+        body: BodyPart,
         headers: HM
     ) -> Result<Mail>
         where HM: Into<Option<HeaderMap>>
     {
-        let (resource, embeddings) = body;
+        let BodyPart { body_resource, embeddings } = body;
         if embeddings.len() > 0 {
             Self::create_body_with_embeddings(
-                Self::create_body_from_resource( resource, None )?,
-                embeddings,
+                Self::create_body_from_resource( body_resource, None )?,
+                embeddings.into_iter(),
                 headers
             )
         } else {
-            Self::create_body_from_resource( resource, headers )
+            Self::create_body_from_resource( body_resource, headers )
         }
     }
 
@@ -139,12 +144,13 @@ impl BuilderExt for Builder {
         builder.build()
     }
 
-    fn create_body_with_embeddings<HM>(
+    fn create_body_with_embeddings<HM, EMB>(
         sub_body: Mail,
-        embeddings: Vec<EmbeddingWithCID>,
+        embeddings: EMB,
         headers: HM
     ) -> Result<Mail>
-        where HM: Into<Option<HeaderMap>>
+        where HM: Into<Option<HeaderMap>>,
+              EMB: Iterator<Item=EmbeddingWithCId> + ExactSizeIterator
     {
 
         if embeddings.len() == 0 {
