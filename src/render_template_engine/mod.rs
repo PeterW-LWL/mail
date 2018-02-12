@@ -1,6 +1,8 @@
 use std::path::{Path, PathBuf};
 use std::collections::HashMap;
 use std::mem::replace;
+use std::error::{Error as StdError};
+use std::result::{Result as StdResult};
 
 use serde::{Serialize, Serializer};
 

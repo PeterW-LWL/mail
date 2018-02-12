@@ -82,7 +82,6 @@ pub mod resource_prelude {
 pub mod composition_prelude {
     pub type Encoder = ::core::codec::Encoder<::mail::Resource>;
     pub use core::*;
-    pub use core::error::*;
     pub use headers::components::{
         Mailbox,
         Email,
@@ -102,8 +101,6 @@ pub mod composition_prelude {
 }
 
 pub mod template_engine_prelude {
-    pub use ::std::error::Error as StdError;
-    pub use ::std::result::Result as StdResult;
     pub use serde::Serialize;
 
     pub use vec1::Vec1;

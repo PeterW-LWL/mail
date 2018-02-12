@@ -14,7 +14,6 @@ use std::fs::File;
 use regex::Regex;
 use futures::Future;
 
-use compose::composition_prelude::Result;
 use compose::composition_prelude::*;
 use compose::resource_prelude::*;
 use compose::default_impl::{NoNameComposer};
@@ -76,6 +75,7 @@ mod tmp_context {
     use futures_cpupool::{ CpuPool, Builder };
 
     use mail::prelude::*;
+    use mail::error::{Result, Error};
     use mail::utils::SendBoxFuture;
     use mail::context::{ FileLoader, RunElsewhere, CompositeBuilderContext };
     use mail::default_impl::VFSFileLoader;
