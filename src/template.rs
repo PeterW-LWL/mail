@@ -1,5 +1,7 @@
 use std::result::{ Result as StdResult };
 use std::error::{ Error as StdError };
+use std::ops::Deref;
+use std::sync::Arc;
 
 use serde::Serialize;
 
@@ -50,4 +52,53 @@ pub struct BodyPart {
     /// be embedded)
     pub embeddings: Vec<EmbeddingWithCId>,
 
+}
+
+impl<C, T> TemplateEngine<C> for Arc<T>
+    where T: TemplateEngine<C>, C: Context
+{
+    type TemplateId = T::TemplateId;
+    type Error = T::Error;
+
+    fn use_templates<D: Serialize>(
+        &self,  ctx: &C, id: &Self::TemplateId, data: &D
+    ) -> StdResult<MailParts, Self::Error > {
+        self.deref().use_templates(ctx, id, data)
+    }
+}
+
+impl<C, T> TemplateEngine<C> for Box<T>
+    where T: TemplateEngine<C>, C: Context
+{
+    type TemplateId = T::TemplateId;
+    type Error = T::Error;
+
+    fn use_templates<D: Serialize>(
+        &self,  ctx: &C, id: &Self::TemplateId, data: &D
+    ) -> StdResult<MailParts, Self::Error > {
+        self.deref().use_templates(ctx, id, data)
+    }
+}
+
+
+#[cfg(test)]
+mod test {
+
+    mod TemplateEngine {
+        #![allow(non_snake_case)]
+
+        use std::sync::Arc;
+        use ::Context;
+        use super::super::TemplateEngine;
+
+        //just a compiler time type check
+        fn _auto_impl_for_arc_and_box<C,T>(dumy: Option<T>)
+            where T: TemplateEngine<C>, C: Context
+        {
+            if dumy.is_some() {
+                _auto_impl_for_arc_and_box(dumy.map(|te| Arc::new(Box::new(te))))
+            }
+        }
+
+    }
 }
