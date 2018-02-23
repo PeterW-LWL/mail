@@ -1,25 +1,25 @@
 MIME\-Version: 1\.0
 Content\-Type: multipart/related;
- boundary="=_\^(?P<boundary_0>[^"]{63})"
+ boundary="=_(?P<boundary_0>[^"]{64})"
 From: <a@b\.c>
 To: <d@e\.f>
 Subject: Dear randomness
 Date: [[:word:]]+, [0123]?[0-9] [[:word:]]+ 20[0-9]{2} [012][0-9]:[0-6][0-9]:[0-6][0-9] \+0000
 
-\-\-=_\^(?P<boundary_0>[^"]{63})
+\-\-=_(?P<boundary_0>[^"]{64})
 Content\-Type: multipart/alternative;
- boundary="=_\^(?P<boundary_1>[^"]{63})"
+ boundary="=_(?P<boundary_1>[^"]{64})"
 
-\-\-=_\^(?P<boundary_1>[^"]{63})
+\-\-=_(?P<boundary_1>[^"]{64})
 Content\-Type: text/plain; charset=utf\-8
 Content\-Transfer\-Encoding: quoted\-printable
 
 Hy abcdefg\.
-\-\-=_\^(?P<boundary_1>[^"]{63})
+\-\-=_(?P<boundary_1>[^"]{64})
 Content\-Type: multipart/related;
- boundary="=_\^(?P<boundary_2>[^"]{63})"
+ boundary="=_(?P<boundary_2>[^"]{64})"
 
-\-\-=_\^(?P<boundary_2>[^"]{63})
+\-\-=_(?P<boundary_2>[^"]{64})
 Content\-Type: text/html; charset=utf\-8
 Content\-Transfer\-Encoding: quoted\-printable
 
@@ -34,7 +34,7 @@ MAIL ON ITSELF \-\->
     logo: <img src=3D"cid:(?P<use_cid>[[:word:]]+)@company_a\.not_a_domain"> Hy abcdefg\.
 </body>
 </html>
-\-\-=_\^(?P<boundary_2>[^"]{63})
+\-\-=_(?P<boundary_2>[^"]{64})
 Content\-Id: <(?P<def_cid>[[:word:]]+)@company_a\.not_a_domain>
 Content\-Disposition: inline
 Content\-Type: image/png; charset=binary
@@ -46,9 +46,9 @@ zUlEQVQY0z1PS66FIAylpRSDkqgDJ27AHbptTfADpvQOyHtnev6w7/u2bcuyrOva932tFQCcc8zMzF
 RrDSEQUUpJRFS10d77EALN8wwAOWdE/L5PVa21zjkRMcbQOI7ee2ZGxJyziCBi13UAYIyhaZpCCN77
 \+75LKSJirUVEIso5Y4wxxthaa636h1LKcRw0z3PTWmuZuYU75wDgPE9qTapqjMk5/09737eUQn3fO\+
 este/7MrOqNvd1Xc/z0DAMRCQizNyOAQAzp5SMMT/2yHYgvmSL1AAAAABJRU5ErkJggg==
-\-\-=_\^(?P<boundary_2>[^"]{63})\-\-
-\-\-=_\^(?P<boundary_1>[^"]{63})\-\-
-\-\-=_\^(?P<boundary_0>[^"]{63})
+\-\-=_(?P<boundary_2>[^"]{64})\-\-
+\-\-=_(?P<boundary_1>[^"]{64})\-\-
+\-\-=_(?P<boundary_0>[^"]{64})
 Content\-Id: <(?:[[:word:]]+)@company_a\.not_a_domain>
 Content\-Disposition: inline
 Content\-Type: application/pdf; charset=binary
@@ -594,4 +594,4 @@ NUY3RUI1MTVGPiA8REQ1NjBBNDBEODUzMjQ4MEU1MEI0MzQ1RjdFQjUxNUY\+XQovTGVuZ3RoIDc4IC
 AgICAgICAKL0ZpbHRlciAvRmxhdGVEZWNvZGUKPj4Kc3RyZWFtCnjaFcq3FYBAEENB7eI5vCmFRws0
 BAEJVVEf/AtGCiRJn8tl10N6gQkGR4LS1MctRYYcHXoMaFGhNr3xF2w/YjcYMWPBaucmu4N\+SicFrA
 plbmRzdHJlYW0KZW5kb2JqCnN0YXJ0eHJlZgozMTI0MwolJUVPRgo=
-\-\-=_\^(?P<boundary_0>[^"]{63})\-\-
+\-\-=_(?P<boundary_0>[^"]{64})\-\-

@@ -1,3 +1,6 @@
+//
+// !! YOU MIGHT WANT TO TAKE A LOOK AT tests/tera/main.rs WHICH IS A BETTER EXAMPLE !!
+//
 extern crate mail_codec as mail;
 extern crate mail_codec_composition as compose;
 extern crate futures;
@@ -6,24 +9,43 @@ extern crate serde;
 extern crate serde_json;
 #[macro_use]
 extern crate serde_derive;
+extern crate futures_cpupool;
 
+use std::borrow::Cow;
+
+use futures_cpupool::{CpuPool, Builder as CpuPoolBuilder};
 use futures::Future;
+
 use template_engine::Teng;
 
-//IDEFIX: code inspection is sadly not clever enough to handle glob imported type overrides
-// and would "hint" that Result in _main should have two type arguments instead of one
-use compose::composition_prelude::Result;
+use compose::error::Error;
 use compose::composition_prelude::*;
 use compose::resource_prelude::*;
-use compose::default_impl::{SimpleContext, NoNameComposer};
 
+use compose::default_impl::{RandomContentId, NoNameComposer};
+use compose::CompositeContext;
+use mail::default_impl::FsResourceLoader;
+use mail::context::CompositeBuilderContext;
+
+type MyContext =
+CompositeContext<RandomContentId, CompositeBuilderContext<FsResourceLoader, CpuPool>>;
+
+fn setup_context() -> MyContext {
+    CompositeContext::new(
+        RandomContentId::new("content_id_postfix.is.this"),
+        CompositeBuilderContext::new(
+            FsResourceLoader::with_cwd_root().unwrap(),
+            CpuPoolBuilder::new().create()
+        )
+    )
+}
 
 fn main() {
     _main().unwrap();
 }
 
-fn _main() -> Result<()> {
-    let context = SimpleContext::new( "content_id_postfix.is.this".into() );
+fn _main() -> Result<(), Error> {
+    let context = setup_context();
     let composer = Compositor::new( Teng::new(), context.clone(), NoNameComposer );
 
     let data = Resorts {
@@ -31,48 +53,52 @@ fn _main() -> Result<()> {
             Resort {
                 name: "The Naping Lake".into(),
                 image: fake_avatar(0),
-                portfolio: Resource::from_text( "da naps'de weg".into() ).into(),
+                portfolio: fake_resource("da naps'de weg").into(),
             },
             Resort {
                 name: "Snoring Dog Tower".into(),
                 image: fake_avatar(1),
-                portfolio: Resource::from_text( "Our Motto: wau\r\nwau wau\r\nwau".into() ).into(),
+                portfolio: fake_resource("Our Motto: wau\r\nwau wau\r\nwau").into(),
             }
         ]
     };
 
-    let from_to = MailSendContext::new(
+    let send_data = MailSendData::simple_new(
         Email::try_from( "my@sender.yupyup" )?.into(),
         Email::try_from( "goblin@dog.spider" )?.into(),
-        "Dear randomness".into()
+        "Dear randomness",
+        Cow::Borrowed("the_template_id_ignored_in_this_examples"),
+        data
     );
 
-    let mail = composer.compose_mail(
-        from_to,
-        "the_template_id_ignored_in_this_examples",
-        data,
-    )?;
+    let mail = composer.compose_mail(send_data)?;
 
     let mut encoder = Encoder::new( MailType::Ascii );
     let encodable_mail = mail.into_encodeable_mail( &context ).wait().unwrap();
     encodable_mail.encode( &mut encoder )?;
 
 
-    println!( "{}", encoder.into_string_lossy().unwrap() );
+    println!( "{}", encoder.to_string_lossy().unwrap() );
 
     Ok( () )
 }
 
+fn fake_resource(str: &str) -> Resource {
+    use mail::file_buffer::FileBuffer;
+    use mail::MediaType;
+    let media_type = MediaType::parse("text/plain; charset=utf-8").unwrap();
+    let fb = FileBuffer::new(media_type, str.as_bytes().to_owned());
+    Resource::sourceless_from_buffer(fb)
+}
 
 fn fake_avatar(nr: u32) -> Embedding {
-    let mut resource = Resource::from_text(
+    let resource = fake_resource(
         if nr == 0 {
             r#"this should be an image ¯\_(ツ)_/¯"#.into()
         } else {
-            r#" another image..."#.into()
+            r#" another image which isn't one..."#.into()
         }
     );
-    resource.set_preferred_encoding( TransferEncoding::Base64 );
     Embedding::new( resource )
 }
 
@@ -90,6 +116,7 @@ struct Resort {
 
 
 mod template_engine {
+    use super::fake_resource;
     use serde_json;
     use compose::template_engine_prelude::*;
 
@@ -111,7 +138,7 @@ mod template_engine {
             _ctx: &C,
             _id: &Self::TemplateId,
             data: &D
-        ) -> StdResult<MailParts, Self::Error> {
+        ) -> Result<MailParts, Self::Error> {
             // Note: we can use `_ctx` to if we really need to, e.g. to generate ContentID's,
             // through notice, that we can always use Embedding without a content ID
             // and the compositor will handle that part for us.
@@ -132,7 +159,7 @@ mod template_engine {
                 " the data, use an embedding if you want to refere to it/inline it\r\n"
             ), stringified);
             let bodies = Vec1::new(BodyPart {
-                body_resource: Resource::from_text(text),
+                body_resource: fake_resource(&text),
                 embeddings: Default::default(),
             });
             Ok(MailParts {

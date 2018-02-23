@@ -3,57 +3,97 @@ extern crate mail_codec as mail;
 extern crate futures;
 #[macro_use]
 extern crate serde_derive;
-extern crate futures_cpupool;
 extern crate regex;
+extern crate futures_cpupool;
 
 use std::result::{Result as StdResult};
-use std::io::{Read, BufRead, BufReader};
-use std::path::Path;
+use std::io::{BufRead, BufReader};
 use std::fs::File;
 use std::collections::HashMap;
+use std::borrow::Cow;
 
+use futures_cpupool::{CpuPool, Builder as CpuPoolBuilder};
 use regex::Regex;
 use futures::Future;
 
+
+use mail::Mail;
 use compose::composition_prelude::*;
-use compose::resource_prelude::*;
-use compose::default_impl::{NoNameComposer};
 use compose::render_template_engine::{RenderTemplateEngine, DEFAULT_SETTINGS};
 use compose::tera::TeraRenderEngine;
 
+use compose::default_impl::{NoNameComposer, RandomContentId};
+use mail::default_impl::FsResourceLoader;
+use compose::{Context, CompositeContext};
+use mail::context::CompositeBuilderContext;
+
 #[derive(Serialize)]
-struct Name {
+struct UserData {
     name: &'static str
+}
+
+//TODO add a SimpleContext type which is just this to default_impl
+type MyContext =
+    CompositeContext<RandomContentId, CompositeBuilderContext<FsResourceLoader, CpuPool>>;
+
+fn setup_context() -> MyContext {
+    CompositeContext::new(
+        RandomContentId::new("company_a.not_a_domain"),
+        CompositeBuilderContext::new(
+            FsResourceLoader::with_cwd_root().unwrap(),
+            CpuPoolBuilder::new().create()
+        )
+    )
+}
+
+type Compositor<C> = compose::Compositor<
+    RenderTemplateEngine<TeraRenderEngine>,
+    C,
+    NoNameComposer,
+    UserData
+>;
+
+fn setup_compositor<C: Context>(ctx: C) -> Compositor<C> {
+    let tera = TeraRenderEngine::new("./test_resources/tera_base/**/*").unwrap();
+    let mut rte = RenderTemplateEngine::new(tera);
+    rte.load_specs_from_dir("./test_resources/templates", &*DEFAULT_SETTINGS).unwrap();
+    Compositor::new( rte, ctx, NoNameComposer )
+}
+
+fn send_mail_to_string<C>(mail: Mail, ctx: &C) -> String
+    where C: Context
+{
+    let mut encoder = Encoder::new( MailType::Ascii );
+    let encodable_mail = mail.into_encodeable_mail(ctx).wait().unwrap();
+    encodable_mail.encode( &mut encoder ).unwrap();
+    encoder.to_string().unwrap()
 }
 
 #[test]
 fn use_tera_template_a() {
-    use std::collections::hash_map::Entry::*;
-    let tera = TeraRenderEngine::new("./test_resources/tera_base/**/*").unwrap();
-    let mut rte = RenderTemplateEngine::new(tera);
-    rte.load_specs_from_dir("./test_resources/templates", &*DEFAULT_SETTINGS).unwrap();
+    let context = setup_context();
+    let compositor = setup_compositor(context.clone());
 
-    let context = self::tmp_context::SimpleContext::new( "company_a.not_a_domain".into() );
-    let composer = Compositor::new( rte, context.clone(), NoNameComposer );
+    let from        = Email::try_from("a@b.c").unwrap().into();
+    let to          = Email::try_from("d@e.f").unwrap().into();
+    let subject     = "Dear randomness";
+    let template_id = Cow::Borrowed("template_a");
+    let data        = UserData { name: "abcdefg" };
 
-    let data = Name { name: "abcdefg" };
-
-    let from_to = MailSendContext::new(
-        Email::try_from( "a@b.c" ).unwrap().into(),
-        Email::try_from( "d@e.f" ).unwrap().into(),
-        "Dear randomness".into()
+    let send_data = MailSendData::simple_new(
+        from, to, subject,
+        template_id, data
     );
 
-    let mail = composer.compose_mail(from_to, "template_a", data).unwrap();
+    let mail = compositor.compose_mail(send_data).unwrap();
 
-    let mut encoder = Encoder::new( MailType::Ascii );
-    let encodable_mail = mail.into_encodeable_mail( &context ).wait().unwrap();
-    encodable_mail.encode( &mut encoder ).unwrap();
+    let out_string = send_mail_to_string(mail, &context);
 
-    //TODO use into_string().unwrap() and make into_string_lossy() nonfailable
-    let stringified = encoder.into_string_lossy().unwrap();
+    assert_mail_out_is_as_expected(out_string);
+}
 
-    let mut line_iter = stringified.lines();
+fn assert_mail_out_is_as_expected(mail_out: String) {
+    let mut line_iter = mail_out.lines();
     let mut capture_map = HashMap::new();
 
     let fd = File::open("./test_resources/template_a.out.regex").unwrap();
@@ -73,92 +113,4 @@ fn use_tera_template_a() {
         }
     }
     assert_eq!(line_iter.next(), None);
-}
-
-
-//this will just be a temporary solution until default_impl::SimpleContext is improved
-mod tmp_context {
-
-    use std::sync::Arc;
-    use std::fmt;
-    use std::path::Path;
-    use std::borrow::Cow;
-    use std::fs::File;
-    use std::io::Read;
-
-    use futures::{future, Future};
-    use futures_cpupool::{ CpuPool, Builder };
-
-    use mail::prelude::*;
-    use mail::error::{Result, Error};
-    use mail::utils::SendBoxFuture;
-    use mail::context::{ FileLoader, RunElsewhere, CompositeBuilderContext };
-    use mail::default_impl::VFSFileLoader;
-
-    use compose::ContentIdGen;
-    use compose::default_impl::RandomContentId;
-
-
-
-
-    #[derive(Debug, Clone)]
-    pub struct SimpleContext( Arc<SimpleContextInner> );
-
-    struct SimpleContextInner {
-        cpu_pool: CpuPool,
-        content_id_gen: RandomContentId
-    }
-
-    impl SimpleContext {
-
-        pub fn new( content_id_postfix: String ) -> Self {
-            SimpleContext(Arc::new(SimpleContextInner {
-                cpu_pool: Builder::new().create(),
-                content_id_gen: RandomContentId::new(content_id_postfix)
-            }))
-        }
-
-    }
-
-    impl fmt::Debug for SimpleContextInner {
-        fn fmt( &self, fter: &mut fmt::Formatter ) -> fmt::Result {
-            fter.debug_struct( "SimpleContext" )
-                .field( "content_id_gen", &self.content_id_gen )
-                .field( "elsewher", &"CpuPool { .. }" )
-                .finish()
-        }
-    }
-
-    impl FileLoader for SimpleContext {
-        type FileFuture = future::FutureResult<Vec<u8>, Error>;
-
-        fn load_file( &self, path: Cow<'static, Path> ) -> Self::FileFuture {
-            load_file_fn(path).into()
-        }
-    }
-
-    fn load_file_fn( path: Cow<'static, Path> ) -> Result<Vec<u8>> {
-        let mut buf = Vec::new();
-        let mut file  = File::open( path )?;
-        file.read_to_end( &mut buf )?;
-        Ok( buf )
-    }
-
-
-    impl RunElsewhere for SimpleContext {
-        fn execute<F>( &self, fut: F) -> SendBoxFuture<F::Item, F::Error>
-            where F: Future + Send + 'static,
-                  F::Item: Send+'static,
-                  F::Error: Send+'static
-        {
-            self.0.cpu_pool.execute( fut )
-        }
-    }
-
-    impl ContentIdGen for SimpleContext {
-        fn new_content_id(&self) -> Result<MessageID> {
-            self.0.content_id_gen.new_content_id()
-        }
-    }
-
 }

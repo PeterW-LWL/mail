@@ -4,10 +4,9 @@ use std::result::{ Result as StdResult };
 use serde::{ self, Serialize, Serializer };
 
 use core::error::Result;
+use context::{Context, ContentIdGenComponent};
 use headers::components::ContentID;
 use mail::Resource;
-
-use context::ContentIdGen;
 
 
 //TODO consider to rename it to "in-data-embedding"
@@ -67,7 +66,7 @@ impl Embedding {
         self.content_id.borrow().is_some()
     }
 
-    pub fn with_cid_assured<CIDGen: ContentIdGen + ?Sized>(
+    pub fn with_cid_assured<CIDGen: Context>(
         self,
         cid_gen: &CIDGen
     ) -> Result<EmbeddingWithCId> {
@@ -81,10 +80,9 @@ impl Embedding {
         Ok( EmbeddingWithCId { resource, content_id } )
     }
 
-    fn assure_content_id<CIDGen: ContentIdGen + ?Sized>(
-        &self,
-        cid_gen: &CIDGen
-    ) -> Result<ContentID> {
+    fn assure_content_id<CIDGen: ?Sized >(&self, cid_gen: &CIDGen) -> Result<ContentID>
+        where CIDGen: ContentIdGenComponent
+    {
 
         let mut cid = self.content_id.borrow_mut();
         Ok( if cid.is_some() {
@@ -238,7 +236,7 @@ struct ExtractionDump {
     embeddings: Vec<EmbeddingWithCId>,
     attachments: Vec<Attachment>,
     //BLOCKED(unsized_thread_locals): use ContentIdGen instead in another thread_local when possible
-    cid_gen: Box<ContentIdGen>
+    cid_gen: Box<ContentIdGenComponent>
 }
 
 scoped_thread_local!(static EXTRACTION_DUMP: RefCell<ExtractionDump> );
@@ -265,7 +263,7 @@ scoped_thread_local!(static EXTRACTION_DUMP: RefCell<ExtractionDump> );
 /// the reason why it is public is so that other/custom composition code can use it, too.
 ///
 pub fn with_resource_sidechanel<FN, R, E>(
-    cid_gen: Box<ContentIdGen>,
+    cid_gen: Box<ContentIdGenComponent>,
     func: FN
 ) -> StdResult<(R, Vec<EmbeddingWithCId>, Vec<Attachment> ), E>
     where FN: FnOnce() -> StdResult<R, E>

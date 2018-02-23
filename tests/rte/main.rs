@@ -19,9 +19,10 @@ fn load_template_a() {
     let embeddings = a_spec.embeddings();
     assert_eq!(embeddings.len(), 1);
     let emb_0 = embeddings.get("portfolio").unwrap();
-    assert_eq!(emb_0.path, Path::new("./test_resources/templates/template_a/portfolio.pdf"));
-    assert_eq!(emb_0.name, Some("portfolio.pdf".to_owned()));
-    assert_eq!(emb_0.media_type.as_str_repr(), "application/pdf; charset=binary");
+    assert_eq!(
+        emb_0.source().unwrap().iri.as_str(),
+        "path:./test_resources/templates/template_a/portfolio.pdf"
+    );
 
     // 3. test subtemplate spec
     let sub_specs = a_spec.sub_specs();
@@ -39,9 +40,10 @@ fn load_template_a() {
     let embeddings = html.embeddings();
     assert_eq!(embeddings.len(), 1);
     let logo = embeddings.get("logo").unwrap();
-    assert_eq!(logo.path, Path::new("./test_resources/templates/template_a/html/logo.png"));
-    assert_eq!(logo.media_type.as_str_repr(), "image/png; charset=binary");
-    assert_eq!(logo.name, Some("logo.png".to_owned()));
+    assert_eq!(
+        logo.source().unwrap().iri.as_str(),
+        "path:./test_resources/templates/template_a/html/logo.png"
+    );
     assert!(text.attachments().is_empty());
 }
 

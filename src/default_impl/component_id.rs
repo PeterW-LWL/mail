@@ -1,3 +1,4 @@
+use std::sync::Arc;
 
 use rand::{ self, Rng };
 
@@ -5,23 +6,28 @@ use core::error::Result;
 use core::utils::HeaderTryFrom;
 use headers::components::MessageID;
 
-use context::ContentIdGen;
+use context::ContentIdGenComponent;
 
 #[derive( Debug, Clone, Hash, Eq, PartialEq )]
 pub struct RandomContentId {
-    postfix: String
+    postfix: Arc<str>
 }
 
 impl RandomContentId {
 
-    pub fn new( postfix: String ) -> Self {
-        RandomContentId { postfix }
+    pub fn new<I>( postfix: I ) -> Self
+        where I: Into<String>
+    {
+        let string = postfix.into();
+        let boxed = string.into_boxed_str();
+        let arced = Arc::from(boxed);
+        RandomContentId { postfix: arced }
     }
 
 }
 
 
-impl ContentIdGen for RandomContentId {
+impl ContentIdGenComponent for RandomContentId {
 
 
     fn new_content_id( &self ) -> Result<MessageID> {

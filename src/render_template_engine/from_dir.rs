@@ -3,10 +3,11 @@ use std::collections::HashMap;
 
 use vec1::Vec1;
 
-use mail::{Resource, ResourceSpec};
+use mail::context::Source;
+use mail::{Resource, IRI};
 
 use super::error::SpecError;
-use super::utils::new_string_path;
+use super::utils::{new_string_path, new_str_path};
 use super::{TemplateSpec, SubTemplateSpec};
 use super::settings::{LoadSpecSettings, Type};
 
@@ -102,17 +103,32 @@ fn embedding_from_path(path: PathBuf, settings: &LoadSpecSettings)
 
     let name = file_name.split(".")
         .next()
-        //UNWRAP_SAFE: Split iterator has alway at last one element
+        //UNWRAP_SAFE: Split iterator has always at last one element
         .unwrap()
         .to_owned();
 
+    //TODO we can remove the media type sniffing from here
     let media_type = settings.determine_media_type(&path)?;
 
-    let resource_spec = ResourceSpec {
-        path, media_type,
-        name: Some(file_name),
+    let source = Source {
+        iri: iri_from_path(path)?,
+        use_name: None,
+        use_media_type: Some(media_type)
     };
-    let resource = Resource::from_spec(resource_spec);
+
+    let resource = Resource::new(source);
 
     Ok((name, resource))
+}
+
+fn iri_from_path<IP: AsRef<Path> + Into<PathBuf>>(path: IP) -> Result<IRI, SpecError> {
+    {
+        let path_ref = path.as_ref();
+        if let Ok(strfy) = new_str_path(&path_ref) {
+            if let Ok(iri) = IRI::from_parts("path", strfy) {
+                return Ok(iri)
+            }
+        }
+    }
+    Err(SpecError::IRIConstructionFailed("path", path.into()))
 }

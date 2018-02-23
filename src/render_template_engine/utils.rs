@@ -26,9 +26,15 @@ pub(crate) fn string_path_set(field: &mut String, new_path: &Path) -> Result<Pat
 pub(crate) fn new_string_path<S>(path: S) -> Result<String, SpecError>
     where S: AsRef<OsStr>
 {
+    new_str_path(&path.as_ref()).map(|s|s.to_owned())
+}
+
+pub(crate) fn new_str_path<S>(path: &S) -> Result<&str, SpecError>
+    where S: AsRef<OsStr>
+{
     let path = path.as_ref();
     if let Some(path) = path.to_str() {
-        Ok(path.to_owned())
+        Ok(path)
     } else {
         Err(SpecError::NonStringPath(path.to_owned().into()))
     }

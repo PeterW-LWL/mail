@@ -21,7 +21,7 @@ use context::Context;
 /// current server configuration, preventing the need for the
 /// template engine to store a handle to it/copy of it itself.
 pub trait TemplateEngine<C: Context> {
-    type TemplateId: ?Sized;
+    type TemplateId: ?Sized + ToOwned;
     type Error: StdError + Send + 'static;
 
     fn use_templates<D: Serialize>(

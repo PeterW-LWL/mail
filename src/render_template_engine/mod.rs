@@ -168,7 +168,7 @@ impl<R, C> TemplateEngine<C> for RenderTemplateEngine<R>
                 };
 
             let buffer = FileBuffer::new(template.media_type().clone(), rendered.into());
-            let resource = Resource::from_buffer(buffer);
+            let resource = Resource::sourceless_from_buffer(buffer);
 
             attachments.extend(template.attachments().iter()
                 .map(|resource| Attachment::new(resource.clone())));
