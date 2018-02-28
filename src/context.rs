@@ -1,49 +1,10 @@
-use std::borrow::Cow;
-
-use serde::Serialize;
-
 use futures::{Future, IntoFuture};
-use mail::utils::SendBoxFuture;
 
+use mail::utils::SendBoxFuture;
 use core::error::Result;
 use mail::context::{BuilderContext, Source, LoadResourceFuture};
-use headers::components::{ Mailbox, MailboxList,  MessageID };
+use headers::components::MessageID;
 
-//TODO maybe convert into a mail address bilder supporting
-// From(1+), To(1+), Subject, Bcc, Cc
-// e.g. .cc(Mailbox).bcc(Mailbox).from(Mailbox).to(Mailbox)
-//      .sender(Mailbox) //adds Mailbox at pos 0 as sender overides previous sender if there is one
-//      .to(Mailbox) //adds other_from
-pub struct MailSendData<'a, TId: ?Sized + 'a, D>
-    where TId: ToOwned, D: Serialize
-{
-    pub sender: Mailbox,
-    pub other_from: Vec<Mailbox>,
-    pub to: MailboxList,
-    pub subject: String,
-    pub template_id: Cow<'a, TId>,
-    pub data: D
-}
-
-impl<'a, T: ?Sized + 'a, D> MailSendData<'a, T, D>
-    where T: ToOwned, D: Serialize
-{
-    pub fn simple_new<I>(
-        from: Mailbox, to: Mailbox,
-        subject: I,
-        template_id: Cow<'a, T>, data: D
-    ) -> Self
-        where I: Into<String>
-    {
-        MailSendData {
-            sender: from,
-            other_from: Vec::new(),
-            to: MailboxList(vec1![to]),
-            subject: subject.into(),
-            template_id, data
-        }
-    }
-}
 
 // TODO extend interface to allow some per mail specifics e.g. gen content id
 //      like `format!(_prefix_{}_{}, mail_cid_count, random)`

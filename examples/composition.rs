@@ -46,7 +46,7 @@ fn main() {
 
 fn _main() -> Result<(), Error> {
     let context = setup_context();
-    let composer = Compositor::new( Teng::new(), context.clone(), NoNameComposer );
+    let template_engine = Teng::new();
 
     let data = Resorts {
         listing: vec![
@@ -63,7 +63,7 @@ fn _main() -> Result<(), Error> {
         ]
     };
 
-    let send_data = MailSendData::simple_new(
+    let mut send_data = MailSendData::simple_new(
         Email::try_from( "my@sender.yupyup" )?.into(),
         Email::try_from( "goblin@dog.spider" )?.into(),
         "Dear randomness",
@@ -71,7 +71,10 @@ fn _main() -> Result<(), Error> {
         data
     );
 
-    let mail = composer.compose_mail(send_data)?;
+    //this doesn't realy do anything as the NoNameComposer is used
+    send_data.auto_gen_display_names(NoNameComposer)?;
+
+    let mail = (&context, &template_engine).compose_mail(send_data)?;
 
     let mut encoder = Encoder::new( MailType::Ascii );
     let encodable_mail = mail.into_encodeable_mail( &context ).wait().unwrap();

@@ -4,8 +4,8 @@ use std::ops::Deref;
 use std::sync::Arc;
 
 use serde::Serialize;
-
 use vec1::Vec1;
+
 use mail::Resource;
 
 use resource::{EmbeddingWithCId, Attachment};
@@ -79,6 +79,8 @@ impl<C, T> TemplateEngine<C> for Box<T>
         self.deref().use_templates(ctx, id, data)
     }
 }
+
+//TODO if a `use_parking_lot` feature is included provide parking lot RwLock/Mutex wrapper impl. too
 
 
 #[cfg(test)]

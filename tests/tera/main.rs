@@ -22,7 +22,7 @@ use compose::composition_prelude::*;
 use compose::render_template_engine::{RenderTemplateEngine, DEFAULT_SETTINGS};
 use compose::tera::TeraRenderEngine;
 
-use compose::default_impl::{NoNameComposer, RandomContentId};
+use compose::default_impl::RandomContentId;
 use mail::default_impl::FsResourceLoader;
 use compose::{Context, CompositeContext};
 use mail::context::CompositeBuilderContext;
@@ -46,18 +46,14 @@ fn setup_context() -> MyContext {
     )
 }
 
-type Compositor<C> = compose::Compositor<
-    RenderTemplateEngine<TeraRenderEngine>,
-    C,
-    NoNameComposer,
-    UserData
->;
+type Compositor<C> = SimpleCompositionBase<C, RenderTemplateEngine<TeraRenderEngine>>;
+
 
 fn setup_compositor<C: Context>(ctx: C) -> Compositor<C> {
     let tera = TeraRenderEngine::new("./test_resources/tera_base/**/*").unwrap();
     let mut rte = RenderTemplateEngine::new(tera);
     rte.load_specs_from_dir("./test_resources/templates", &*DEFAULT_SETTINGS).unwrap();
-    Compositor::new( rte, ctx, NoNameComposer )
+    Compositor::new(ctx, rte)
 }
 
 fn send_mail_to_string<C>(mail: Mail, ctx: &C) -> String

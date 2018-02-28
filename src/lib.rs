@@ -30,7 +30,7 @@ extern crate lazy_static;
 #[cfg(feature="tera-bindings")]
 extern crate tera as tera_crate;
 
-
+pub mod error;
 mod builder_extension;
 pub use self::builder_extension::{
     BuilderExt
@@ -38,18 +38,20 @@ pub use self::builder_extension::{
 
 mod compositor;
 pub use self::compositor::{
-    Compositor, NameComposer,
+    CompositionBase, NameComposer,
+    MailSendData, MailSendDataBuilder,
+    SharedCompositionBase, SimpleCompositionBase
 };
 
 mod utils;
 
 mod context;
 pub use self::context::{
-    MailSendContext,
-    ContentIdGen,
     Context,
-    ComposedContext
+    ContentIdGenComponent,
+    CompositeContext
 };
+
 
 mod resource;
 pub use self::resource::{
@@ -68,14 +70,16 @@ pub mod default_impl;
 pub mod render_template_engine;
 #[cfg(feature="tera-bindings")]
 pub mod tera;
-
+#[cfg(feature="smtp")]
+pub mod smtp;
 
 //################# preludes ###########################
 
 pub mod resource_prelude {
     pub use mail::file_buffer::FileBuffer;
     pub use core::utils::FileMeta;
-    pub use mail::{ Resource, ResourceSpec };
+    pub use mail::Resource;
+    pub use mail::context::Source;
     pub use ::{Embedding, Attachment, EmbeddingWithCId};
 }
 
@@ -94,9 +98,11 @@ pub mod composition_prelude {
         Encodable
     };
     pub use ::{
-        Compositor,
+        CompositionBase,
+        SimpleCompositionBase,
+        SharedCompositionBase,
         NameComposer,
-        MailSendContext,
+        MailSendData,
     };
 }
 
@@ -105,8 +111,9 @@ pub mod template_engine_prelude {
 
     pub use vec1::Vec1;
     pub use mail::mail::{
-        Resource, ResourceSpec
+        Resource
     };
+    pub use mail::context::Source;
     pub use ::{
         MailParts, BodyPart, TemplateEngine,
         Context,
