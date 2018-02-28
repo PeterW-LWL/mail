@@ -29,6 +29,8 @@ extern crate conduit_mime_types;
 extern crate lazy_static;
 #[cfg(feature="tera-bindings")]
 extern crate tera as tera_crate;
+#[cfg(feature="smtp")]
+extern crate tokio_smtp;
 
 pub mod error;
 mod builder_extension;
