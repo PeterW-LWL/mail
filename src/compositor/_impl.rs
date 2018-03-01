@@ -21,7 +21,7 @@ use template::{
 };
 
 use super::mail_send_data::MailSendData;
-use super::CompositionBase;
+use super::{CompositionBase, EnvelopData};
 
 pub(crate) trait InnerCompositionBaseExt: CompositionBase {
 
@@ -29,25 +29,27 @@ pub(crate) trait InnerCompositionBaseExt: CompositionBase {
         &self,
         send_data:
             MailSendData<<Self::TemplateEngine as TemplateEngine<Self::Context>>::TemplateId, D>
-    ) -> Result<Mail>
+    ) -> Result<(Mail, EnvelopData)>
         where D: Serialize
     {
-
+        let envelop = EnvelopData::from(&send_data);
         //compose display name => create Address with display name;
         let (core_headers, data, template_id) = self.process_mail_send_data(send_data)?;
 
         let MailParts { alternative_bodies, shared_embeddings, attachments }
-        = self.use_template_engine(&*template_id, data)?;
+            = self.use_template_engine(&*template_id, data)?;
 
-        self.build_mail( alternative_bodies, shared_embeddings.into_iter(), attachments,
-                         core_headers )
+        let mail = self.build_mail( alternative_bodies, shared_embeddings.into_iter(),
+                                    attachments, core_headers )?;
+
+        Ok((mail, envelop))
     }
 
     fn process_mail_send_data<'a, D>(
         &self,
         send_data:
             MailSendData<'a, <Self::TemplateEngine as TemplateEngine<Self::Context>>::TemplateId, D>
-    )  -> Result<(
+    ) -> Result<(
         HeaderMap,
         D,
         Cow<'a, <Self::TemplateEngine as TemplateEngine<Self::Context>>::TemplateId>

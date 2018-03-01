@@ -74,7 +74,7 @@ fn _main() -> Result<(), Error> {
     //this doesn't realy do anything as the NoNameComposer is used
     send_data.auto_gen_display_names(NoNameComposer)?;
 
-    let mail = (&context, &template_engine).compose_mail(send_data)?;
+    let (mail, _envelop) = (&context, &template_engine).compose_mail(send_data)?;
 
     let mut encoder = Encoder::new( MailType::Ascii );
     let encodable_mail = mail.into_encodeable_mail( &context ).wait().unwrap();

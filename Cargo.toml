@@ -31,6 +31,10 @@ tera = { version = "0.11.1", optional = true }
 conduit-mime-types = { version = "0.7.3", optional = true}
 lazy_static = { version = "1.0.0", optional = true }
 tokio-smtp = { path="../depends/tokio-smtp", optional=true }
+tokio-service = { version = "0.1", optional=true }
+tokio-proto = { version = "0.1", optional=true }
+# this is used by tokio-smtp, we need it to convert our Mailbox to their Mailbox struct
+emailaddress = { version = "0.4", optional=true }
 
 [dependencies.mime]
 git="https://github.com/1aim/mime"
@@ -47,7 +51,7 @@ futures-cpupool="0.1.5"
 debug_trace_tokens = []
 render-template-engine = ["conduit-mime-types", "lazy_static"]
 tera-bindings = ["tera", "render-template-engine"]
-smtp = ['tokio-smtp']
+smtp = ['tokio-smtp', 'tokio-service', 'tokio-proto', 'emailaddress']
 default = ["default_impl"]
 default_impl = [
     "default_impl_name_composer", "default_impl_component_id",

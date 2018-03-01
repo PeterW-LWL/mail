@@ -8,6 +8,8 @@ extern crate mail_codec_headers as headers;
 extern crate error_chain;
 extern crate log;
 extern crate mime as media_type;
+//#[cfg_attr(feature="smtp", macro_use)]
+#[macro_use]
 extern crate futures;
 extern crate serde;
 extern crate rand;
@@ -31,6 +33,15 @@ extern crate lazy_static;
 extern crate tera as tera_crate;
 #[cfg(feature="smtp")]
 extern crate tokio_smtp;
+#[cfg(feature="smtp")]
+extern crate tokio_service;
+#[cfg(feature="smtp")]
+extern crate tokio_proto;
+#[cfg(feature="smtp")]
+extern crate emailaddress;
+
+#[macro_use]
+mod macros;
 
 pub mod error;
 mod builder_extension;
@@ -42,7 +53,8 @@ mod compositor;
 pub use self::compositor::{
     CompositionBase, NameComposer,
     MailSendData, MailSendDataBuilder,
-    SharedCompositionBase, SimpleCompositionBase
+    SharedCompositionBase, SimpleCompositionBase,
+    EnvelopData
 };
 
 mod utils;
