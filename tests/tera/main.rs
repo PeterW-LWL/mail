@@ -81,7 +81,7 @@ fn use_tera_template_a() {
         template_id, data
     );
 
-    let (mail, envelop) = compositor.compose_mail(send_data).unwrap();
+    let (mail, _envelop) = compositor.compose_mail(send_data).unwrap();
 
     let out_string = send_mail_to_string(mail, &context);
 
