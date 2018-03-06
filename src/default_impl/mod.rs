@@ -10,9 +10,6 @@ mod component_id;
 pub use self::component_id::*;
 
 
-#[cfg(all(feature="default_impl_simple_context"))]
-mod simple_context;
-
-#[cfg(all(feature="default_impl_simple_context"))]
-pub use self::simple_context::*;
+#[cfg(feature="default_impl_simple_context")]
+pub mod simple_context;
 

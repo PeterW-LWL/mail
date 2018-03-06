@@ -54,9 +54,12 @@ tera-bindings = ["tera", "render-template-engine"]
 smtp = ['tokio-smtp', 'tokio-service', 'tokio-proto', 'emailaddress']
 default = ["default_impl"]
 default_impl = [
-    "default_impl_name_composer", "default_impl_component_id",
+    "default_impl_name_composer", "default_impl_component_id", "default_impl_simple_context"
 ]
 default_impl_name_composer = []
 default_impl_component_id = []
+default_impl_simple_context = [
+    "default_impl_component_id", "mail-codec/default_impl_fs", "mail-codec/default_impl_cpupool"
+]
 
 traceing = [ "mail-codec/traceing" ]
