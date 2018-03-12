@@ -2,28 +2,24 @@ use futures::sync::mpsc;
 use futures::sync::oneshot;
 use futures::{sink, Sink, Future, Poll, Async};
 
-use super::smtp_wrapper::{MailSendRequest, MailResponse, MailSendError};
+use super::common::{MailRequest, MailResponse};
+use super::error::MailSendError;
 
-
-type InnerChannel<RQ> = mpsc::Sender<(RQ, oneshot::Sender<Result<MailResponse, MailSendError>>)>;
+type InnerChannel = mpsc::Sender<(MailRequest, oneshot::Sender<Result<MailResponse, MailSendError>>)>;
 
 #[derive(Debug, Clone)]
-pub struct MailServiceHandle<RQ>
-    where RQ: MailSendRequest
-{
-    channel: InnerChannel<RQ>
+pub struct MailServiceHandle {
+    channel: InnerChannel
 }
 
 
-impl<RQ> MailServiceHandle<RQ>
-    where RQ: MailSendRequest
-{
+impl MailServiceHandle {
 
-    pub(crate) fn new(sender: InnerChannel<RQ>) -> Self {
+    pub(crate) fn new(sender: InnerChannel) -> Self {
         MailServiceHandle { channel: sender }
     }
 
-    pub fn send_mail(self, mail_request: RQ) -> MailEnqueueFuture<RQ> {
+    pub fn send_mail(self, mail_request: MailRequest) -> MailEnqueueFuture {
         let (sender, rx) = oneshot::channel();
 
         let send = self.channel.send((mail_request, sender));
@@ -38,25 +34,20 @@ impl<RQ> MailServiceHandle<RQ>
 //        SmtpMailStream::new(self.channel, stream, max_buffer)
 //    }
 
-    pub fn into_inner(self)
-        -> mpsc::Sender<(RQ, oneshot::Sender<Result<MailResponse, MailSendError>>)>
-    {
+    pub fn into_inner(self) -> InnerChannel {
         self.channel
     }
 
 }
 
-pub struct MailEnqueueFuture<RQ>
-    where RQ: MailSendRequest
-{
-    send: sink::Send<InnerChannel<RQ>>,
+pub struct MailEnqueueFuture {
+    send: sink::Send<InnerChannel>,
     rx: Option<oneshot::Receiver<Result<MailResponse, MailSendError>>>
 }
 
-impl<RQ> Future for MailEnqueueFuture<RQ>
-    where RQ: MailSendRequest
-{
-    type Item = (MailServiceHandle<RQ>, MailResponseFuture);
+impl Future for MailEnqueueFuture {
+
+    type Item = (MailServiceHandle, MailResponseFuture);
     type Error = MailSendError;
 
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
@@ -221,7 +212,7 @@ impl Future for MailResponseFuture  {
 //impl<RQ, S> Stream for SmtpMailStream<RQ, S>
 //    where RQ: MailSendRequest,
 //          S: Stream<Item = RQ>,
-//          //FIXME(tokio 0.2) use error Never??
+//          //FIXME[tokio 0.2] use error Never??
 //          S::Error: Into<MailSendError>
 //{
 //    type Item = Result<MailResponse, MailSendError>;

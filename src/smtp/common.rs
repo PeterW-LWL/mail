@@ -1,19 +1,25 @@
 //! This modules contains some of the data types used, like e.g. Response, Request, Envelop etc.
-use tokio_smtp::request::Mailbox;
+
 use vec1::Vec1;
 
 use tokio_smtp::request::{Mailbox as SmtpMailbox};
 
 use mail::headers::{Sender, From, To};
+use mail::headers::components::Mailbox;
 use mail::Mail;
 use super::error::EnvelopFromMailError;
 
+#[derive(Debug)]
 pub struct EnvelopData {
     from: SmtpMailbox,
     to: Vec1<SmtpMailbox>
 }
 
 impl EnvelopData {
+    pub fn new(from: SmtpMailbox, to: Vec1<SmtpMailbox>) -> Self {
+        EnvelopData { from, to }
+    }
+
     pub fn split(self) -> (SmtpMailbox, Vec1<SmtpMailbox>) {
         let EnvelopData { from, to } = self;
         (from, to)
@@ -26,7 +32,7 @@ impl EnvelopData {
             if let Some(sender) = headers.get_single(Sender) {
                 let sender = sender.map_err(|tpr| EnvelopFromMailError::TypeError(tpr))?;
                 //TODO double check with from field
-                mailbox2smtp_mailbox(sender);
+                mailbox2smtp_mailbox(sender)
             } else {
                 let from = headers.get_single(From)
                     .ok_or(EnvelopFromMailError::NeitherSenderNorFrom)?
@@ -36,7 +42,7 @@ impl EnvelopData {
                     return Err(EnvelopFromMailError::NoSenderAndMoreThanOneFrom);
                 }
 
-                mailbox2smtp_mailbox(from.first());
+                mailbox2smtp_mailbox(from.first())
             };
 
         let smtp_to =
@@ -61,14 +67,24 @@ impl EnvelopData {
 pub struct MailResponse;
 
 
-#[derive(Debug, Clone)]
+//TODO derive(Clone): requires clone for Box<EncodableMail+'static>
+#[derive(Debug)]
 pub struct MailRequest {
     mail: Mail,
     envelop_data: Option<EnvelopData>
 }
 
 
+
 impl MailRequest {
+
+    pub fn new(mail: Mail) -> Self {
+        MailRequest { mail, envelop_data: None }
+    }
+
+    pub fn new_with_envelop(mail: Mail, envelop: EnvelopData) -> Self {
+        MailRequest { mail, envelop_data: Some(envelop) }
+    }
 
     pub fn into_mail_with_envelop(self) -> Result<(Mail, EnvelopData), EnvelopFromMailError> {
         let envelop =
