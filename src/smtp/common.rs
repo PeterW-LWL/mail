@@ -4,7 +4,7 @@ use vec1::Vec1;
 
 use tokio_smtp::request::{Mailbox as SmtpMailbox};
 
-use mail::headers::{Sender, From, To};
+use mail::headers::{Sender, From as _From, To};
 use mail::headers::components::Mailbox;
 use mail::Mail;
 use super::error::EnvelopFromMailError;
@@ -34,7 +34,7 @@ impl EnvelopData {
                 //TODO double check with from field
                 mailbox2smtp_mailbox(sender)
             } else {
-                let from = headers.get_single(From)
+                let from = headers.get_single(_From)
                     .ok_or(EnvelopFromMailError::NeitherSenderNorFrom)?
                     .map_err(|tpr| EnvelopFromMailError::TypeError(tpr))?;
 
@@ -62,7 +62,6 @@ impl EnvelopData {
     }
 }
 
-
 #[derive(Debug, Clone)]
 pub struct MailResponse;
 
@@ -72,6 +71,12 @@ pub struct MailResponse;
 pub struct MailRequest {
     mail: Mail,
     envelop_data: Option<EnvelopData>
+}
+
+impl From<Mail> for MailRequest {
+    fn from(mail: Mail) -> Self {
+        MailRequest::new(mail)
+    }
 }
 
 
