@@ -17,7 +17,7 @@ use mail::prelude::{Encoder, Encodable, MailType};
 use mail::utils::SendBoxFuture;
 use mail::context::BuilderContext;
 
-use super::smtp_wrapper::send_mail;
+use super::smtp_wrapper::{send_mail, close_smtp_conn};
 use super::common::{MailResponse, MailRequest, EnvelopData};
 use super::handle::MailServiceHandle;
 use super::error::MailSendError;
@@ -129,7 +129,7 @@ impl<SUP> MailService<SUP>
         self.stop_handle.clone()
     }
 
-    fn poll_connect(&mut self) -> Poll<(), SUP::NotConnectingError> {
+    fn poll_state(&mut self) -> Poll<bool, SUP::NotConnectingError> {
         use self::ServiceState::*;
         let mut state = mem::replace(&mut self.service, ServiceState::Dead);
         let mut result = None;
@@ -139,7 +139,6 @@ impl<SUP> MailService<SUP>
                 Connecting(mut fut) => {
                     match fut.poll() {
                         Ok(Async::Ready(service)) => {
-                            result = Some(Ok(Async::Ready(())));
                             Connected(service)
                         },
                         Ok(Async::NotReady) => {
@@ -153,9 +152,26 @@ impl<SUP> MailService<SUP>
                     }
                 },
                 Connected(service) => {
-                    result = Some(Ok(Async::Ready(())));
+                    result = Some(Ok(Async::Ready(true)));
                     Connected(service)
                 },
+                Closing(mut fut) => {
+                    match fut.poll() {
+                        Ok(Async::Ready(())) => {
+                            result = Some(Ok(Async::Ready(false)));
+                            Initial
+                        },
+                        Ok(Async::NotReady) => {
+                            result = Some(Ok(Async::NotReady));
+                            Closing(fut)
+                        },
+                        Err(_) => {
+                            // sadly the can not fail is not yet encoded in the type system
+                            // waiting for tokio v0.2's `Never` and rusts `!` type
+                            unreachable!("closing future can not fail")
+                        }
+                    }
+                }
                 Dead => {
                     panic!("polled Service after completion through Err or Panic+catch_unwind")
                 }
@@ -183,24 +199,17 @@ impl<SUP> MailService<SUP>
                     Ok(Async::NotReady) => return false,
                     Err(err) => {
                         // if an error happend on smtp RSET we can just reconnect
-                        let reset_conn =
-                            match &err {
-                                &MailSendError::OnReset(_) => true,
-                                &MailSendError::Io(_) => true,
-                                // we should not reach here but intentionally just
-                                // ignore the fact that someone pretents to be us
-                                // and generates this errors
-                                &MailSendError::DriverDropped |
-                                &MailSendError::CanceledByDriver => false,
-                                _ => false
-                            };
 
-                        if reset_conn {
-                            //IMPROVE: we might want consider sending Quit, through it's not needed
-                            //  - one way to land here is a IoError in which we can't even do it
-                            //  - the other is if
-                            self.service.reset();
-                        }
+                        match &err {
+                            &MailSendError::OnRSET(_) => {
+                                self.service.close();
+                            },
+                            &MailSendError::Io(_) => {
+                                self.service.reset();
+                            },
+                            _ => {}
+                        };
+
                         Err(err)
                     }
                 }
@@ -224,24 +233,45 @@ impl<SUP> Future for MailService<SUP>
     type Error = SUP::NotConnectingError;
 
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-        if self.stop_handle.should_stop() {
-            // close the underlying streams ability to receive new messages,
-            // but the buffer still contains messages so continue with the rest
-            self.rx.get_mut().get_mut().close()
-        }
         loop {
-            // 1. complete the "current"/pending request (if there is any)
+            // 1. close rx, if we should_stop
+            let should_stop = self.stop_handle.should_stop();
+            if should_stop {
+                // close the underlying streams ability to receive new messages,
+                // but the buffer still contains messages so continue with the rest
+                self.rx.get_mut().get_mut().close()
+            }
+
+            // 2. complete the "current"/pending request (if there is any)
             if !self.poll_pending_complete() {
                 return Ok(Async::NotReady)
             }
 
-            // 2. make sure we are connected, the current request might have "broken" the connection
-            try_ready!(self.poll_connect());
+            // TODO we only want to open the connection on the first request
+            // TODO and close it with a timeout if not needed
+            // 3. make sure we are connected, the current request might have "broken" the connection
+            let is_connected = try_ready!(self.poll_state());
 
-            // 3. try to get a new request
+            // 4. if we arn't connected but also not in any state tranformation and should_stop
+            //    then we well do stop
+            if !is_connected {
+                if should_stop {
+                    return Ok(Async::Ready(()));
+                } else {
+                    // we closed it for some other reason so continue to loop
+                    // to start reopening the connection
+                    continue;
+                }
+            }
+
+            // 4. try to get a new request
             let item = match self.rx.poll() {
                 Ok(Async::Ready(Some(item))) => item,
-                Ok(Async::Ready(None)) => return Ok(Async::Ready(())),
+                Ok(Async::Ready(None)) => {
+                    self.stop_handle().stop();
+                    self.service.close();
+                    continue
+                },
                 Ok(Async::NotReady) => return Ok(Async::NotReady),
                 Err(_) => unreachable!("mpsc::Receiver.poll does not error")
             };
@@ -350,19 +380,45 @@ enum ServiceState<F> {
     Initial,
     Connecting(F),
     Connected(TokioSmtpService),
+
+    //CONSTRAINT: Error can never be reached
+    //FIXME[tokio v0.2]: Error=() => Error=Never
+    Closing(Box<Future<Item=(), Error=()>>),
     Dead
 }
 
-impl<F> ServiceState<F> {
+impl<F: 'static> ServiceState<F>
+    where F: Future<Item=TokioSmtpService>
+{
 
-    fn reset(&mut self) {
+    fn close(&mut self) {
         use self::ServiceState::*;
         let state = mem::replace(self, ServiceState::Dead);
         *self = match state {
+            Initial => Initial,
+            Connecting(fut) => {
+                Closing(Box::new(fut.then(|res| match res {
+                    Ok(mut service) => close_smtp_conn(&mut service),
+                    Err(_) => Box::new(future::ok(()))
+                })))
+            },
+            Connected(mut service) => {
+                Closing(close_smtp_conn(&mut service))
+            },
+            Closing(fut) => Closing(fut),
             Dead => Dead,
-            _ => Initial
         }
     }
+
+    fn reset(&mut self) {
+        if let &mut ServiceState::Dead = self {}
+        else { *self = ServiceState::Initial }
+    }
+
+
+//    fn force_stop(&mut self) {
+//        mem::replace(self, ServiceState::Dead);
+//    }
 }
 
 
@@ -476,9 +532,11 @@ mod test {
                     from: "djinns@are.magic".parse().unwrap(), params: Vec::new() }),
                 Normal(SmtpRequest::Rcpt {
                     to: "lord.of@the.bottle".parse().unwrap(), params: Vec::new() }),
-                Body(SmtpRequest::Data, expected_body.to_owned().into_bytes())
+                Body(SmtpRequest::Data, expected_body.to_owned().into_bytes()),
+                Normal(SmtpRequest::Quit)
             ],
             vec![
+                Ok(SmtpResponse::parse(b"250 Ok\r\n").unwrap().1),
                 Ok(SmtpResponse::parse(b"250 Ok\r\n").unwrap().1),
                 Ok(SmtpResponse::parse(b"250 Ok\r\n").unwrap().1),
                 Ok(SmtpResponse::parse(b"250 Ok\r\n").unwrap().1),
@@ -511,11 +569,13 @@ mod test {
                     from: "djinns@are.magic".parse().unwrap(), params: Vec::new() }),
                 Normal(SmtpRequest::Rcpt {
                     to: "lord.of@the.bottle".parse().unwrap(), params: Vec::new() }),
-                Body(SmtpRequest::Data, expected_body.to_owned().into_bytes())
+                Body(SmtpRequest::Data, expected_body.to_owned().into_bytes()),
+                Normal(SmtpRequest::Quit)
             ],
             vec![
                 Err(example_io_error()),
                 Err(example_io_error()),
+                Ok(SmtpResponse::parse(b"250 Ok\r\n").unwrap().1),
                 Ok(SmtpResponse::parse(b"250 Ok\r\n").unwrap().1),
                 Ok(SmtpResponse::parse(b"250 Ok\r\n").unwrap().1),
                 Ok(SmtpResponse::parse(b"250 Ok\r\n").unwrap().1),

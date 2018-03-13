@@ -52,6 +52,21 @@ use super::common::{EnvelopData, MailResponse};
 //        where CB: CompositionBase;
 //}
 
+//FIXME[impl Trait]
+pub(crate) fn close_smtp_conn<I: 'static>(service: &mut I) -> Box<Future<Item=(), Error=()>>
+    where I: Clone + TokioService<
+        Request=Message<SmtpRequest, Body<Vec<u8>, IoError>>,
+        Response=SmtpResponse,
+        Error=IoError
+    >
+{
+    let fut = service.call(Message::WithoutBody(SmtpRequest::Quit))
+        // we are already quiting there is no reason to bother with
+        // handling io errors or strange server responses
+        .then(|_| Ok(()));
+
+    Box::new(fut)
+}
 
 pub(crate) fn send_mail<I: 'static>(
     service: &mut I,
@@ -109,7 +124,7 @@ pub(crate) fn send_mail<I: 'static>(
                         if response.code.severity.is_positive() {
                             Err(MailSendError::Smtp(errors))
                         } else {
-                            Err(MailSendError::OnReset(response))
+                            Err(MailSendError::OnRSET(response))
                         }
                     });
                 Either::B(fut)
@@ -247,12 +262,12 @@ mod test {
                 .then(|res| match res {
                     Ok(MailResponse) => Err(TestError("unexpectadly no error".to_owned())),
                     Err(err) => {
-                        if let MailSendError::OnReset(resp) = err {
+                        if let MailSendError::OnRSET(resp) = err {
                             if resp == worse_response {
                                 Ok(())
                             } else {
                                 Err(TestError(format!("unexpected error kind {:?}",
-                                                      MailSendError::OnReset(resp))))
+                                                      MailSendError::OnRSET(resp))))
                             }
                         } else {
                             Err(TestError(format!("unexpected error kind {:?}", err)))

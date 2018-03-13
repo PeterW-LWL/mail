@@ -20,7 +20,7 @@ pub enum MailSendError {
     /// error on RSET, this should be fine, while it's not perfect it's not worth
     /// the additional impl. cost for servers which are not RFC conform in a strange
     /// way, as there is no reason for a server to behave this way).
-    OnReset(SmtpResponse),
+    OnRSET(SmtpResponse),
     DriverDropped,
     CanceledByDriver
 }
