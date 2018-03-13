@@ -31,7 +31,7 @@ pub type TokioSmtpService = ClientProxy<
     Message<SmtpRequest, Body<Vec<u8>, IoError>>,
     SmtpResponse, IoError>;
 
-pub trait SmtpSetup: Send {
+pub trait SmtpSetup {
 
     /// The future returned which returns a Smtp connection,
     ///
