@@ -16,7 +16,10 @@ use mail::prelude::*;
 use std::convert::From;
 
 pub(crate) struct FakeSmtpServer {
-    rx: Receiver<Message<SmtpRequest, Body<Vec<u8>, IoError>>, SmtpResponse, IoError>,
+    rx: Receiver<
+        Message<SmtpRequest, Body<Vec<u8>, IoError>>,
+        Message<SmtpResponse, Body<(), IoError>>,
+        IoError>,
     expected_requests: Vec<RequestMock>,
     use_responses: Vec<ResponseMock>,
     stop_flag: StopServiceHandle
@@ -143,15 +146,17 @@ impl FakeSmtpServer {
         }
     }
 
-    fn send_next_response(&mut self, tx: oneshot::Sender<Result<SmtpResponse, IoError>>)
-                          -> Result<(), TestError>
+    fn send_next_response(
+        &mut self,
+        tx: oneshot::Sender<Result<Message<SmtpResponse, Body<(), IoError>>, IoError>>
+    ) -> Result<(), TestError>
     {
         let next_response = match self.use_responses.pop() {
             Some(resp) => resp,
             None => return Err(TestError("[test] run out of responses".to_owned()))
         };
 
-        tx.send(next_response)
+        tx.send(next_response.map(|res| Message::WithoutBody(res)))
             .map_err(|_|
                 TestError("[test] Smtp ClientProxy call response future dropped early".to_owned()))
     }

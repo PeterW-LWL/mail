@@ -29,7 +29,8 @@ use super::error::MailSendError;
 
 pub type TokioSmtpService = ClientProxy<
     Message<SmtpRequest, Body<Vec<u8>, IoError>>,
-    SmtpResponse, IoError>;
+    Message<SmtpResponse, Body<(), IoError>>,
+    IoError>;
 
 pub trait SmtpSetup {
 

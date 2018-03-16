@@ -56,7 +56,7 @@ use super::common::{EnvelopData, MailResponse};
 pub(crate) fn close_smtp_conn<I: 'static>(service: &mut I) -> Box<Future<Item=(), Error=()>>
     where I: Clone + TokioService<
         Request=Message<SmtpRequest, Body<Vec<u8>, IoError>>,
-        Response=SmtpResponse,
+        Response=Message<SmtpResponse, Body<(), IoError>>,
         Error=IoError
     >
 {
@@ -75,7 +75,7 @@ pub(crate) fn send_mail<I: 'static>(
 ) -> Box<Future<Item=MailResponse, Error=MailSendError>>
     where I: Clone + TokioService<
         Request=Message<SmtpRequest, Body<Vec<u8>, IoError>>,
-        Response=SmtpResponse,
+        Response=Message<SmtpResponse, Body<(), IoError>>,
         Error=IoError
     >
 {
@@ -100,7 +100,14 @@ pub(crate) fn send_mail<I: 'static>(
         .and_then(cloned!([service] => move |results| {
             //this does not mean it was successful, just that there was no IOError
             let errors = results.into_iter()
-                .filter(|res| !res.code.severity.is_positive())
+                .filter_map(|message| {
+                    let inner = message.into_inner();
+                    if !inner.code.severity.is_positive() {
+                        Some(inner)
+                    } else {
+                        None
+                    }
+                })
                 .collect::<Vec<_>>();
 
             if errors.is_empty() {
@@ -108,6 +115,7 @@ pub(crate) fn send_mail<I: 'static>(
                     .call(Message::WithBody(SmtpRequest::Data, body))
                     .map_err(|e| MailSendError::Io(e))
                     .and_then(|response| {
+                        let response = response.into_inner();
                         if response.code.severity.is_positive() {
                             Ok(MailResponse)
                         } else {
@@ -121,6 +129,7 @@ pub(crate) fn send_mail<I: 'static>(
                     .call(Message::WithoutBody(SmtpRequest::Reset))
                     .map_err(|e| MailSendError::Io(e))
                     .and_then(|response| {
+                        let response = response.into_inner();
                         if response.code.severity.is_positive() {
                             Err(MailSendError::Smtp(errors))
                         } else {
@@ -186,7 +195,7 @@ mod test {
         ], |mut service| {
             send_mail(&mut service, body.clone(), from_to)
                 .then(|res| match res {
-                    Ok(MailResponse) => Ok(()),
+                    Ok(_) => Ok(()),
                     Err(e) => Err(TestError(format!("err result: {:?}", e)))
                 })
         })
