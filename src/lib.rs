@@ -8,8 +8,7 @@ extern crate mail_codec_headers as headers;
 extern crate error_chain;
 extern crate log;
 extern crate mime as media_type;
-//#[cfg_attr(feature="smtp", macro_use)]
-#[macro_use]
+
 extern crate futures;
 extern crate serde;
 extern crate rand;
