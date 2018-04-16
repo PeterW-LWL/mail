@@ -1,6 +1,8 @@
 extern crate mail_codec_composition as compos;
 extern crate mail_codec as mail;
 
+#[cfg(not(feature="render-template-engine"))]
+compile_error!("need feature \"render_template_engine\" to run tests");
 
 use std::path::Path;
 

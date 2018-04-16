@@ -9,11 +9,9 @@ extern crate serde;
 extern crate serde_json;
 #[macro_use]
 extern crate serde_derive;
-extern crate futures_cpupool;
 
 use std::borrow::Cow;
 
-use futures_cpupool::{CpuPool, Builder as CpuPoolBuilder};
 use futures::Future;
 
 use template_engine::Teng;
@@ -22,30 +20,15 @@ use compose::error::Error;
 use compose::composition_prelude::*;
 use compose::resource_prelude::*;
 
-use compose::default_impl::{RandomContentId, NoNameComposer};
-use compose::CompositeContext;
-use mail::default_impl::FsResourceLoader;
-use mail::context::CompositeBuilderContext;
+use compose::default_impl::simple_context;
 
-type MyContext =
-CompositeContext<RandomContentId, CompositeBuilderContext<FsResourceLoader, CpuPool>>;
-
-fn setup_context() -> MyContext {
-    CompositeContext::new(
-        RandomContentId::new("content_id_postfix.is.this"),
-        CompositeBuilderContext::new(
-            FsResourceLoader::with_cwd_root().unwrap(),
-            CpuPoolBuilder::new().create()
-        )
-    )
-}
 
 fn main() {
     _main().unwrap();
 }
 
 fn _main() -> Result<(), Error> {
-    let context = setup_context();
+    let context = simple_context::new("blablup").unwrap();
     let template_engine = Teng::new();
 
     let data = Resorts {
@@ -63,7 +46,7 @@ fn _main() -> Result<(), Error> {
         ]
     };
 
-    let mut send_data = MailSendData::simple_new(
+    let send_data = MailSendData::simple_new(
         Email::try_from( "my@sender.yupyup" )?.into(),
         Email::try_from( "goblin@dog.spider" )?.into(),
         "Dear randomness",
@@ -71,10 +54,8 @@ fn _main() -> Result<(), Error> {
         data
     );
 
-    //this doesn't realy do anything as the NoNameComposer is used
-    send_data.auto_gen_display_names(NoNameComposer)?;
 
-    let mail = (&context, &template_engine).compose_mail(send_data)?;
+    let (mail, _envelop) = (&context, &template_engine).compose_mail(send_data)?;
 
     let mut encoder = Encoder::new( MailType::Ascii );
     let encodable_mail = mail.into_encodeable_mail( &context ).wait().unwrap();

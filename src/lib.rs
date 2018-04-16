@@ -8,6 +8,8 @@ extern crate mail_codec_headers as headers;
 extern crate error_chain;
 extern crate log;
 extern crate mime as media_type;
+//#[cfg_attr(feature="smtp", macro_use)]
+#[macro_use]
 extern crate futures;
 extern crate serde;
 extern crate rand;
@@ -30,6 +32,9 @@ extern crate lazy_static;
 #[cfg(feature="tera-bindings")]
 extern crate tera as tera_crate;
 
+#[macro_use]
+mod macros;
+
 pub mod error;
 mod builder_extension;
 pub use self::builder_extension::{
@@ -40,7 +45,8 @@ mod compositor;
 pub use self::compositor::{
     CompositionBase, NameComposer,
     MailSendData, MailSendDataBuilder,
-    SharedCompositionBase, SimpleCompositionBase
+    SharedCompositionBase, SimpleCompositionBase,
+    EnvelopData
 };
 
 mod utils;
@@ -70,8 +76,6 @@ pub mod default_impl;
 pub mod render_template_engine;
 #[cfg(feature="tera-bindings")]
 pub mod tera;
-#[cfg(feature="smtp")]
-pub mod smtp;
 
 //################# preludes ###########################
 

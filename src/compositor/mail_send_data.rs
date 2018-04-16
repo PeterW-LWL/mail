@@ -113,15 +113,13 @@ impl<'a, TId: ?Sized + 'a, D> MailSendData<'a, TId, D>
         }
     }
 
-    pub fn sender(&self) -> Option<&Mailbox> {
-        self.sender.as_ref()
+    /// returns a reference to a explicity set sender or else the first (and only) from mailbox
+    pub fn sender(&self) -> &Mailbox {
+        self.sender.as_ref().unwrap_or_else(|| self.from.first())
     }
 
-    pub fn sender_mut(&mut self) -> Option<&mut Mailbox> {
-        self.sender.as_mut()
-    }
 
-    pub fn from(&self) -> &MailboxList {
+    pub fn _from(&self) -> &MailboxList {
         &self.from
     }
 
@@ -129,7 +127,7 @@ impl<'a, TId: ?Sized + 'a, D> MailSendData<'a, TId, D>
     ///
     /// this does only expose a &mut Slice of Mailboxes, instead of a &mut MailboxList
     /// to make sure that no from mailbox can be added as sender might be empty
-    pub fn from_mut(&mut self) -> &mut [Mailbox] {
+    pub fn _from_mut(&mut self) -> &mut [Mailbox] {
         &mut self.from
     }
 
@@ -137,11 +135,11 @@ impl<'a, TId: ?Sized + 'a, D> MailSendData<'a, TId, D>
     //TODO add try_add_from method failing if sender is None
     //TODO maybe add a try_set_from(MailboxList) too
 
-    pub fn to(&self) -> &MailboxList {
+    pub fn _to(&self) -> &MailboxList {
         &self.to
     }
 
-    pub fn to_mut(&mut self) -> &mut MailboxList {
+    pub fn _to_mut(&mut self) -> &mut MailboxList {
         &mut self.to
     }
 

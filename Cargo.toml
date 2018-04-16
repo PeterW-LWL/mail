@@ -40,7 +40,6 @@ version="0.4.0"
 [dev-dependencies]
 serde_json = "1.0.2"
 regex = "0.2.6"
-futures-cpupool="0.1.5"
 
 [features]
 debug_trace_tokens = []
@@ -48,9 +47,13 @@ render-template-engine = ["conduit-mime-types", "lazy_static"]
 tera-bindings = ["tera", "render-template-engine"]
 default = ["default_impl"]
 default_impl = [
-    "default_impl_name_composer", "default_impl_component_id",
+    "default_impl_name_composer", "default_impl_component_id", "default_impl_simple_context"
 ]
 default_impl_name_composer = []
 default_impl_component_id = []
+default_impl_simple_context = [
+    "default_impl_component_id", "mail-codec/default_impl_fs", "mail-codec/default_impl_cpupool",
+    "futures-cpupool"
+]
 
 traceing = [ "mail-codec/traceing" ]
