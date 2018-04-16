@@ -31,14 +31,6 @@ extern crate conduit_mime_types;
 extern crate lazy_static;
 #[cfg(feature="tera-bindings")]
 extern crate tera as tera_crate;
-#[cfg(feature="smtp")]
-extern crate tokio_smtp;
-#[cfg(feature="smtp")]
-extern crate tokio_service;
-#[cfg(feature="smtp")]
-extern crate tokio_proto;
-#[cfg(feature="smtp")]
-extern crate emailaddress;
 
 #[macro_use]
 mod macros;
@@ -84,8 +76,6 @@ pub mod default_impl;
 pub mod render_template_engine;
 #[cfg(feature="tera-bindings")]
 pub mod tera;
-#[cfg(feature="smtp")]
-pub mod smtp;
 
 //################# preludes ###########################
 
