@@ -6,25 +6,25 @@ use vec1::Vec1;
 use mail::context::Source;
 use mail::{Resource, IRI};
 
-use super::error::SpecError;
-use super::utils::{new_string_path, new_str_path};
-use super::{TemplateSpec, SubTemplateSpec};
-use super::settings::{LoadSpecSettings, Type};
+use ::render_template_engine::error::{LoadingSpecError, LoadingSpecErrorVariant};
+use ::render_template_engine::utils::{new_string_path, new_str_path};
+use ::render_template_engine::{TemplateSpec, SubTemplateSpec};
+use ::render_template_engine::settings::{LoadSpecSettings, Type};
 
 //TODO missing global template level embeddings
 //TODO missing caching (of Resources)
 
 
-pub(crate) fn from_dir(base_path: &Path, settings: &LoadSpecSettings) -> Result<TemplateSpec, SpecError> {
+pub(crate) fn from_dir(base_path: &Path, settings: &LoadSpecSettings) -> Result<TemplateSpec, LoadingSpecError> {
     let mut glob_embeddings = HashMap::new();
     let mut sub_template_dirs = Vec::new();
     for folder in base_path.read_dir()? {
         let entry = folder?;
         if entry.file_type()?.is_dir() {
             let type_name = entry.file_name()
-                .into_string().map_err(|_| SpecError::NonStringPath(entry.path()))?;
+                .into_string().map_err(|_| LoadingSpecErrorVariant::NonStringPath(entry.path().into()))?;
             let (prio, type_) = settings.get_type_with_priority(&*type_name)
-                .ok_or_else(|| SpecError::MissingTypeInfo(type_name.clone()))?;
+                .ok_or_else(|| LoadingSpecErrorVariant::MissingTypeInfo { type_name: type_name.clone() })?;
             sub_template_dirs.push((prio, entry.path(), type_));
         } else {
             let (name, resource_spec) = embedding_from_path(entry.path(), settings)?;
@@ -40,7 +40,7 @@ pub(crate) fn from_dir(base_path: &Path, settings: &LoadSpecSettings) -> Result<
     }
 
     let sub_specs = Vec1::from_vec(sub_specs)
-        .map_err(|_| SpecError::NoSubTemplatesFound(base_path.to_owned()))?;
+        .map_err(|_| LoadingSpecErrorVariant::NoSubTemplatesFound { dir: base_path.into() })?;
     TemplateSpec::new_with_embeddings_and_base_path(
         sub_specs, glob_embeddings, base_path.to_owned())
 }
@@ -49,7 +49,7 @@ pub(crate) fn from_dir(base_path: &Path, settings: &LoadSpecSettings) -> Result<
 //NOTE: if this is provided as a pub utility provide a wrapper function instead which
 // only accepts dir_path + settings and gets the rest from it
 fn sub_template_from_dir(dir: &Path, type_: &Type, settings: &LoadSpecSettings)
-    -> Result<SubTemplateSpec, SpecError>
+    -> Result<SubTemplateSpec, LoadingSpecError>
 {
     let template_file = find_template_file(dir, type_)?;
     let media_type = type_.to_media_type_for(&*template_file)?;
@@ -58,18 +58,20 @@ fn sub_template_from_dir(dir: &Path, type_: &Type, settings: &LoadSpecSettings)
     SubTemplateSpec::new(template_file, media_type, embeddings, Vec::new())
 }
 
-fn find_template_file(dir: &Path, type_: &Type) -> Result<PathBuf, SpecError> {
+fn find_template_file(dir: &Path, type_: &Type) -> Result<PathBuf, LoadingSpecError> {
     let base_name = type_.template_base_name();
-    type_.suffixes()
+    let file = type_.suffixes()
         .iter()
         .map(|suffix| dir.join(base_name.to_owned() + suffix))
         .find(|path| path.exists())
-        .ok_or_else(|| SpecError::TemplateFileMissing(dir.to_owned()))
+        .ok_or_else(|| LoadingSpecErrorVariant::TemplateFileMissing { dir: dir.into() })?;
+
+    Ok(file)
 }
 
 
 fn find_embeddings(target_path: &Path, template_file: &Path, settings: &LoadSpecSettings)
-    -> Result<HashMap<String, Resource>, SpecError>
+    -> Result<HashMap<String, Resource>, LoadingSpecError>
 {
     use std::collections::hash_map::Entry::*;
 
@@ -80,7 +82,9 @@ fn find_embeddings(target_path: &Path, template_file: &Path, settings: &LoadSpec
         if path != template_file {
             let (key, value) = embedding_from_path(path, settings)?;
             match embeddings.entry(key) {
-                Occupied(oe) => return Err(SpecError::DuplicateEmbeddingName(oe.key().clone())),
+                Occupied(oe) => {
+                    return Err(LoadingSpecErrorVariant::DuplicateEmbeddingName { name: oe.key().clone() }.into());
+                },
                 Vacant(ve) => {ve.insert(value);}
             }
         }
@@ -89,10 +93,10 @@ fn find_embeddings(target_path: &Path, template_file: &Path, settings: &LoadSpec
 }
 
 fn embedding_from_path(path: PathBuf, settings: &LoadSpecSettings)
-                       -> Result<(String, Resource), SpecError>
+                       -> Result<(String, Resource), LoadingSpecError>
 {
     if !path.is_file() {
-        return Err(SpecError::NotAFile(path.to_owned()));
+        return Err(LoadingSpecErrorVariant::NotAFile(path.into()).into());
     }
 
     let file_name = new_string_path(
@@ -121,7 +125,7 @@ fn embedding_from_path(path: PathBuf, settings: &LoadSpecSettings)
     Ok((name, resource))
 }
 
-fn iri_from_path<IP: AsRef<Path> + Into<PathBuf>>(path: IP) -> Result<IRI, SpecError> {
+fn iri_from_path<IP: AsRef<Path> + Into<PathBuf>>(path: IP) -> Result<IRI, LoadingSpecError> {
     {
         let path_ref = path.as_ref();
         if let Ok(strfy) = new_str_path(&path_ref) {
@@ -130,5 +134,8 @@ fn iri_from_path<IP: AsRef<Path> + Into<PathBuf>>(path: IP) -> Result<IRI, SpecE
             }
         }
     }
-    Err(SpecError::IRIConstructionFailed("path", path.into()))
+    Err(LoadingSpecErrorVariant::IRIConstructionFailed {
+        scheme: "path",
+        tail: path.into().into()
+    }.into())
 }

@@ -6,12 +6,14 @@ use std::fmt::{self, Debug};
 use serde::Serialize;
 use vec1::Vec1;
 
-use error::Error;
-use core::HeaderTryFrom;
-use mail::headers::components::{
+use headers::HeaderTryFrom;
+use headers::error::ComponentCreationError;
+use headers::components::{
     Mailbox, MailboxList,
     Phrase, Email
 };
+
+use ::error::{MailSendDataError, MailSendDataErrorKind, WithSource, WithSourceExt};
 
 /// A type containing all per-Mail specific information
 ///
@@ -37,13 +39,14 @@ use mail::headers::components::{
 /// # Example (Construction)
 ///
 /// ```
-/// # extern crate mail_codec as mail;
-/// # extern crate mail_codec_composition as compose;
-/// # extern crate mail_codec_core as core;
+/// # extern crate mail_common as common;
+/// # extern crate mail_headers as headers;
+/// # extern crate mail_type as mail;
+/// # extern crate mail_template as compose;
 /// # use std::collections::HashMap;
+/// # use headers::HeaderTryFrom;
+/// # use headers::components::{Mailbox, Email};
 /// # use compose::MailSendDataBuilder;
-/// # use mail::headers::components::{Mailbox, Email};
-/// # use core::HeaderTryFrom;
 /// #
 /// # fn main() {
 /// #
@@ -175,7 +178,7 @@ impl<'a, TId: ?Sized + 'a, D> MailSendData<'a, TId, D>
         (sender, from, to, subject, template_id, data)
     }
 
-    pub fn auto_gen_display_names<NC>(&mut self, name_composer: NC) -> Result<(), Error>
+    pub fn auto_gen_display_names<NC>(&mut self, name_composer: NC) -> Result<(), ComponentCreationError>
         where NC: NameComposer<D>
     {
         let data = &mut self.data;
@@ -226,7 +229,7 @@ pub trait NameComposer<D> {
     /// _not_ be returned if there is "just" not enough data to create a display
     /// name, in which `Ok(None)` should be returned indicating that there is
     /// no display name.
-    fn compose_from_name( &self, email: &Email, data: &mut D ) -> Result<Option<String>, Error>;
+    fn compose_from_name( &self, email: &Email, data: &mut D ) -> Result<Option<String>, ComponentCreationError>;
 
     /// generates a display name used in a To header based on email address and mails data
     /// The data is passed in as a `&mut` ref so that the generated name can
@@ -243,17 +246,17 @@ pub trait NameComposer<D> {
     /// _not_ be returned if there is "just" not enough data to create a display
     /// name, in which `Ok(None)` should be returned indicating that there is
     /// no display name.
-    fn compose_to_name( &self, email: &Email, data: &mut D ) -> Result<Option<String>, Error>;
+    fn compose_to_name( &self, email: &Email, data: &mut D ) -> Result<Option<String>, ComponentCreationError>;
 
 }
 
 impl<D, T> NameComposer<D> for Arc<T>
     where T: NameComposer<D>, D: Serialize
 {
-    fn compose_from_name( &self, email: &Email, data: &mut D ) -> Result<Option<String>, Error> {
+    fn compose_from_name( &self, email: &Email, data: &mut D ) -> Result<Option<String>, ComponentCreationError> {
         self.deref().compose_from_name(email, data)
     }
-    fn compose_to_name( &self, email: &Email, data: &mut D ) -> Result<Option<String>, Error> {
+    fn compose_to_name( &self, email: &Email, data: &mut D ) -> Result<Option<String>, ComponentCreationError> {
         self.deref().compose_to_name(email, data)
     }
 }
@@ -261,10 +264,10 @@ impl<D, T> NameComposer<D> for Arc<T>
 impl<D, T> NameComposer<D> for Box<T>
     where T: NameComposer<D>, D: Serialize
 {
-    fn compose_from_name( &self, email: &Email, data: &mut D ) -> Result<Option<String>, Error> {
+    fn compose_from_name( &self, email: &Email, data: &mut D ) -> Result<Option<String>, ComponentCreationError> {
         self.deref().compose_from_name(email, data)
     }
-    fn compose_to_name( &self, email: &Email, data: &mut D ) -> Result<Option<String>, Error> {
+    fn compose_to_name( &self, email: &Email, data: &mut D ) -> Result<Option<String>, ComponentCreationError> {
         self.deref().compose_to_name(email, data)
     }
 }
@@ -272,7 +275,7 @@ impl<D, T> NameComposer<D> for Box<T>
 
 /// Builder to create `MailSendData`
 pub struct MailSendDataBuilder<'a, TId: ?Sized + 'a, D>
-    where TId: ToOwned, D: Serialize
+    where TId: ToOwned + Debug, TId::Owned: Debug, D: Serialize + Debug
 {
     sender: Option<Mailbox>,
     from: Vec<Mailbox>,
@@ -283,7 +286,7 @@ pub struct MailSendDataBuilder<'a, TId: ?Sized + 'a, D>
 }
 
 impl<'a, TId: ?Sized + 'a, D> Debug for MailSendDataBuilder<'a, TId, D>
-    where TId: ToOwned + Debug, <TId as ToOwned>::Owned: Debug, D: Serialize + Debug
+    where TId: ToOwned + Debug, TId::Owned: Debug, D: Serialize + Debug
 {
     fn fmt(&self, fter: &mut fmt::Formatter) -> fmt::Result {
         fter.debug_struct("MailSendData")
@@ -300,7 +303,7 @@ impl<'a, TId: ?Sized + 'a, D> Debug for MailSendDataBuilder<'a, TId, D>
 // Sadly I can not used derive(Default) (it want's a bound on TId)
 // if the deriviate create is stable, I could use them for that
 impl<'a, TId: ?Sized + 'a, D> Default for MailSendDataBuilder<'a, TId, D>
-    where TId: ToOwned, D: Serialize
+    where TId: ToOwned + Debug, TId::Owned: Debug, D: Serialize + Debug
 {
     fn default() -> Self {
         Self::new()
@@ -308,7 +311,7 @@ impl<'a, TId: ?Sized + 'a, D> Default for MailSendDataBuilder<'a, TId, D>
 }
 
 impl<'a, TId: ?Sized + 'a, D> MailSendDataBuilder<'a, TId, D>
-    where TId: ToOwned, D: Serialize
+    where TId: ToOwned + Debug, TId::Owned: Debug, D: Serialize + Debug
 {
     pub fn new() -> Self {
         MailSendDataBuilder {
@@ -398,15 +401,18 @@ impl<'a, TId: ?Sized + 'a, D> MailSendDataBuilder<'a, TId, D>
     ///
     /// - no data, template_id, from or to was set
     /// - more than one from was set, but no sender was set
-    pub fn build(self) -> Result<MailSendData<'a, TId, D>, Self> {
-        if self.from.is_empty() || self.to.is_empty()
-            || self.subject.is_none() || self.template_id.is_none()
-            || self.data.is_none()
-        {
-            return Err(self)
+    pub fn build(self)
+        -> Result<MailSendData<'a, TId, D>, WithSource<MailSendDataError, Self>>
+    {
+        match self.check_fields_are_set() {
+            Ok(_) => {},
+            Err(err) => return Err(err.with_source(self))
         }
+
         if self.from.len() > 1 && self.sender.is_none() {
-            return Err(self)
+            return Err(MailSendDataError
+                ::from(MailSendDataErrorKind::MultiFromButNoSender)
+                .with_source(self));
         }
 
 
@@ -425,5 +431,25 @@ impl<'a, TId: ?Sized + 'a, D> MailSendDataBuilder<'a, TId, D>
             template_id,
             data
         })
+    }
+
+    fn check_fields_are_set(&self) -> Result<(), MailSendDataError> {
+        use self::MailSendDataErrorKind::*;
+        let kind =
+            if self.from.is_empty() {
+                MissingFrom
+            } else if self.to.is_empty() {
+                MissingTo
+            } else if self.subject.is_none() {
+                MissingSubject
+            } else if self.template_id.is_none() {
+                MissingTemplateId
+            } else if self.data.is_none() {
+                MissingTemplateData
+            } else {
+                return Ok(());
+            };
+
+        Err(MailSendDataError::from(kind))
     }
 }

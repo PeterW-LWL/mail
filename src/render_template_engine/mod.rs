@@ -1,16 +1,21 @@
 use std::path::{Path, PathBuf};
 use std::collections::HashMap;
 use std::mem::replace;
-use std::error::{Error as StdError};
-use std::result::{Result as StdResult};
 
+use failure::Fail;
 use serde::{Serialize, Serializer};
+use vec1::Vec1;
 
-use ::template_engine_prelude::*;
+use mail::Resource;
 use mail::file_buffer::FileBuffer;
-use mail::MediaType;
+use headers::components::MediaType;
 
-use self::error::{SpecError, Error, Result};
+use ::{TemplateEngine, Context};
+use ::template::{BodyPart, MailParts};
+use ::resource::{Attachment, EmbeddingWithCId};
+
+
+use self::error::{Error, LoadingSpecError, LoadingSpecErrorVariant};
 use self::utils::{new_string_path, string_path_set, check_string_path, fix_newlines};
 
 pub mod error;
@@ -21,9 +26,9 @@ mod from_dir;
 
 pub trait RenderEngine {
     const PRODUCES_VALID_NEWLINES: bool;
-    type Error: StdError + Send + 'static;
+    type Error: Fail;
     //any caching is done inside transparently
-    fn render<D: Serialize>(&self, id: &str, data: &D) -> StdResult<String, Self::Error>;
+    fn render<D: Serialize>(&self, id: &str, data: &D) -> Result<String, Self::Error>;
 
 }
 
@@ -69,17 +74,17 @@ impl<R> RenderTemplateEngine<R>
 //        &mut self.specs()
 //    }
 
-    pub fn lookup_spec(&self, template_id: &str) -> Result<&TemplateSpec, R::Error> {
+    pub fn lookup_spec(&self, template_id: &str) -> Result<&TemplateSpec, Error<R::Error>> {
         self.id2spec
             .get(template_id)
-            .ok_or_else(|| Error::UnknownTemplateId(template_id.to_owned()))
+            .ok_or_else(|| Error::from_unknown_template_id(template_id))
     }
 
     pub fn load_specs_from_dir<P>(
         &mut self,
         dir_path: P,
         settings: &LoadSpecSettings
-    ) -> StdResult<(), SpecError>
+    ) -> Result<(), LoadingSpecError>
         where P: AsRef<Path>
     {
         self._load_specs_from_dir(dir_path.as_ref(), settings, false)
@@ -89,7 +94,7 @@ impl<R> RenderTemplateEngine<R>
         &mut self,
         dir_path: P,
         settings: &LoadSpecSettings
-    ) -> StdResult<(), SpecError>
+    ) -> Result<(), LoadingSpecError>
         where P: AsRef<Path>
     {
         self._load_specs_from_dir(dir_path.as_ref(), settings, true)
@@ -100,20 +105,20 @@ impl<R> RenderTemplateEngine<R>
         dir_path: &Path,
         settings: &LoadSpecSettings,
         allow_override: bool
-    ) -> StdResult<(), SpecError>
+    ) -> Result<(), LoadingSpecError>
     {
         for entry in dir_path.read_dir()? {
             let entry = entry?;
             if entry.metadata()?.is_dir() {
                 let id = entry.file_name()
                     .into_string()
-                    .map_err(|file_name| SpecError::NonStringPath(file_name.into()))?;
+                    .map_err(|file_name| LoadingSpecErrorVariant::NonStringPath(file_name.into()))?;
                 let spec = TemplateSpec::from_dir(entry.path(), settings)?;
                 let old = self.add_spec(id, spec);
                 if old.is_some() && !allow_override {
                     // we already know that the file name can be converted into a string
                     let file_name = entry.file_name().into_string().unwrap();
-                    return Err(SpecError::AccidentalSpecOverride(file_name));
+                    return Err(LoadingSpecErrorVariant::AccidentalSpecOverride { id: file_name }.into());
                 }
             }
         }
@@ -133,7 +138,7 @@ impl<R, C> TemplateEngine<C> for RenderTemplateEngine<R>
         ctx: &C,
         template_id: &str,
         data: &D
-    ) -> StdResult<MailParts, Self::Error >
+    ) -> Result<MailParts, Self::Error >
     {
         let spec = self.lookup_spec(template_id)?;
 
@@ -142,7 +147,7 @@ impl<R, C> TemplateEngine<C> for RenderTemplateEngine<R>
         let shared_embeddings = spec.embeddings().iter()
             .map(|(key, resource_spec)|
                 create_embedding(key.to_owned(),resource_spec.clone(), ctx))
-            .collect::<Result<HashMap<_,_>,_>>()?;
+            .collect::<HashMap<_,_>>();
 
         let mut attachments = Vec::new();
         let bodies = spec.sub_specs().try_mapped_ref(|template| {
@@ -150,7 +155,7 @@ impl<R, C> TemplateEngine<C> for RenderTemplateEngine<R>
             let embeddings = template.embeddings.iter()
                 .map(|(key, resource_spec)|
                     create_embedding(key.to_owned(),resource_spec.clone(), ctx))
-                .collect::<Result<HashMap<_,_>,_>>()?;
+                .collect::<HashMap<_,_>>();
 
             let rendered = {
                 // make CIds available to render engine
@@ -187,12 +192,11 @@ impl<R, C> TemplateEngine<C> for RenderTemplateEngine<R>
     }
 }
 
-fn create_embedding<R, C>(key: String, resource: Resource, ctx: &C)
-    -> Result<(String, EmbeddingWithCId), R>
-    where C: Context, R: StdError
+fn create_embedding<C>(key: String, resource: Resource, ctx: &C) -> (String, EmbeddingWithCId)
+    where C: Context
 {
-    let cid = ctx.new_content_id().map_err(|err| Error::CIdGenFailed(err))?;
-    Ok((key, EmbeddingWithCId::new(resource, cid)))
+    let cid = ctx.new_content_id();
+    (key, EmbeddingWithCId::new(resource, cid))
 }
 
 
@@ -222,7 +226,7 @@ impl TemplateSpec {
     /// Note:  the file name "this.is.a" is interprete as name "this" with suffix/type ".is.a"
     ///        so it's cid gan be accessed with "cids.this"
     #[inline]
-    pub fn from_dir<P>(base_path: P, settings: &LoadSpecSettings) -> StdResult<TemplateSpec, SpecError>
+    pub fn from_dir<P>(base_path: P, settings: &LoadSpecSettings) -> Result<TemplateSpec, LoadingSpecError>
         where P: AsRef<Path>
     {
         from_dir::from_dir(base_path.as_ref(), settings)
@@ -240,7 +244,7 @@ impl TemplateSpec {
     }
 
     pub fn new_with_base_path<P>(templates: Vec1<SubTemplateSpec>, base_path: P)
-        -> StdResult<Self, SpecError>
+        -> Result<Self, LoadingSpecError>
         where P: AsRef<Path>
     {
         Self::new_with_embeddings_and_base_path(
@@ -252,7 +256,7 @@ impl TemplateSpec {
         templates: Vec1<SubTemplateSpec>,
         embeddings: HashMap<String, Resource>,
         base_path: P
-    ) -> StdResult<Self, SpecError>
+    ) -> Result<Self, LoadingSpecError>
         where P: AsRef<Path>
     {
         let path = base_path.as_ref().to_owned();
@@ -281,7 +285,7 @@ impl TemplateSpec {
         self.base_path.as_ref().map(|r| &**r)
     }
 
-    pub fn set_base_path<P>(&mut self, new_path: P) -> StdResult<Option<PathBuf>, SpecError>
+    pub fn set_base_path<P>(&mut self, new_path: P) -> Result<Option<PathBuf>, LoadingSpecError>
         where P: AsRef<Path>
     {
         let path = new_path.as_ref();
@@ -313,7 +317,7 @@ impl SubTemplateSpec {
                   media_type: MediaType,
                   embeddings: HashMap<String, Resource>,
                   attachments: Vec<Resource>
-    ) -> StdResult<Self, SpecError>
+    ) -> Result<Self, LoadingSpecError>
         where P: AsRef<Path>
     {
         let path = new_string_path(path.as_ref())?;
@@ -328,7 +332,7 @@ impl SubTemplateSpec {
         &self.path
     }
 
-    pub fn set_path<P>(&mut self, new_path: P) -> StdResult<PathBuf, SpecError>
+    pub fn set_path<P>(&mut self, new_path: P) -> Result<PathBuf, LoadingSpecError>
         where P: AsRef<Path>
     {
         string_path_set(&mut self.path, new_path.as_ref())
@@ -375,7 +379,7 @@ struct DataWrapper<'a, D: Serialize + 'a> {
 fn cid_mapped_serialize<'a, S>(
     cids: &(&'a HashMap<String, EmbeddingWithCId>, &'a HashMap<String, EmbeddingWithCId>),
     serializer: S
-) -> StdResult<S::Ok, S::Error>
+) -> Result<S::Ok, S::Error>
     where S: Serializer
 {
     serializer.collect_map(cids.0.iter().chain(cids.1.iter()).map(|(k, v)| {

@@ -1,14 +1,17 @@
 use std::sync::RwLock;
 
-use tera_crate::{self, Tera, TesterFn, FilterFn, GlobalFn};
-use template_engine_prelude::*;
-use render_template_engine::RenderEngine;
+use serde::Serialize;
+use tera_crate::{Tera, TesterFn, FilterFn, GlobalFn};
+
+use ::render_template_engine::RenderEngine;
+
+use self::error::TeraError;
+
+pub mod error;
 
 pub struct TeraRenderEngine {
     tera: RwLock<Tera>
 }
-
-type Error = <TeraRenderEngine as RenderEngine>::Error;
 
 impl TeraRenderEngine {
 
@@ -22,7 +25,7 @@ impl TeraRenderEngine {
     /// the `RenderTemplateEngine`_. It contains only tera templates to be reused at
     /// other places.
     ///
-    pub fn new(base_templats_glob: &str) -> Result<Self, Error> {
+    pub fn new(base_templats_glob: &str) -> Result<Self, TeraError> {
         let tera = Tera::new(base_templats_glob)?;
 
         Ok(TeraRenderEngine { tera: RwLock::new(tera) })
@@ -32,7 +35,7 @@ impl TeraRenderEngine {
     /// After a reload `RenderTemplateEngine` specific templates will be loaded when
     /// they are used the next time.
     ///
-    pub fn reload_base_only(&mut self) -> Result<(), Error> {
+    pub fn reload_base_only(&mut self) -> Result<(), TeraError> {
         //full_reload doe NOT a full reload what it does is
         // 1. discard all templates which are from a Tera::extend call
         //    (yes you can't reload them at all)
@@ -41,7 +44,7 @@ impl TeraRenderEngine {
         // No template path is used at all, even through all templates do have path's assigned
         // them if they where added through a path, well this actually happens to be exactly what
         // we want even through it's not what it says it is.
-        self.tera.get_mut().unwrap().full_reload()
+        Ok(self.tera.get_mut().unwrap().full_reload()?)
     }
 
     /// expose `Tera::register_filter`
@@ -66,8 +69,8 @@ impl TeraRenderEngine {
 
     /// preloads a `RenderTemplateEngine` template, templates loaded this
     /// way will be discarded once `reload_base_only` is called.
-    pub fn preload_rte_template(&mut self, id: &str) -> Result<(), Error> {
-        self.tera.get_mut().unwrap().add_template_file(id, None)
+    pub fn preload_rte_template(&mut self, id: &str) -> Result<(), TeraError> {
+        Ok(self.tera.get_mut().unwrap().add_template_file(id, None)?)
     }
 }
 
@@ -76,13 +79,13 @@ impl RenderEngine for TeraRenderEngine {
     // nothing gurantees that the templates use \r\n, so by default fix newlines
     // but it can be disabled
     const PRODUCES_VALID_NEWLINES: bool = false;
-    type Error = tera_crate::Error;
+    type Error = TeraError;
 
     fn render<D: Serialize>(&self, id: &str, data: &D) -> Result<String, Self::Error> {
         {
             let tera = self.tera.read().unwrap();
             if tera.templates.contains_key(id) {
-                return tera.render(id, data);
+                return Ok(tera.render(id, data)?);
             }
         }
         {
@@ -90,8 +93,9 @@ impl RenderEngine for TeraRenderEngine {
             if !tera.templates.contains_key(id) {
                 tera.add_template_file(id, None)?;
             }
-            tera.render(id, data)
+            Ok(tera.render(id, data)?)
         }
 
     }
 }
+

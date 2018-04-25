@@ -1,13 +1,14 @@
 use std::collections::HashMap;
 use std::path::Path;
 
+use failure::Fail;
 use media_type::CHARSET;
 use vec1::Vec1;
 
-use mail::MediaType;
+use headers::components::MediaType;
 
-use super::error::SpecError;
-use super::utils;
+use ::render_template_engine::error::{LoadingSpecError, LoadingSpecErrorVariant};
+use ::render_template_engine::utils;
 
 
 //Type::find_media_type(Path)
@@ -94,19 +95,19 @@ impl LoadSpecSettings {
 
     pub fn set_type_lookup<I>(
         &mut self, name: I, type_: Type, prioritize_over: Option<&str>
-    ) -> Result<(), SpecError>
+    ) -> Result<(), LoadingSpecError>
         where I: Into<String>
     {
         self._set_type_lookup(name.into(), type_, prioritize_over)
     }
 
     fn _set_type_lookup(&mut self, name: String, type_: Type, prioritize_over: Option<&str>)
-        -> Result<(), SpecError>
+        -> Result<(), LoadingSpecError>
     {
         let new_priority =
             if let Some(other) = prioritize_over {
                 let other_prio = self.get_priority_idx(other)
-                    .ok_or_else(|| SpecError::NoMediaTypeFor(other.to_owned()))?;
+                    .ok_or_else(|| LoadingSpecErrorVariant::NoMediaTypeFor { stem: other.to_owned() })?;
                 other_prio + 1
             } else {
                 0
@@ -171,7 +172,7 @@ impl LoadSpecSettings {
 
 
     #[inline]
-    pub fn determine_media_type<P>(&self, path: P) -> Result<MediaType, SpecError>
+    pub fn determine_media_type<P>(&self, path: P) -> Result<MediaType, LoadingSpecError>
         where P: AsRef<Path>
     {
         utils::sniff_media_type(path.as_ref())
@@ -188,27 +189,30 @@ pub struct Type {
 
 impl Type {
 
-    pub fn to_media_type_for<P>(&self, path: P) -> Result<MediaType, SpecError>
+    pub fn to_media_type_for<P>(&self, path: P) -> Result<MediaType, LoadingSpecError>
         where P: AsRef<Path>
     {
         self._as_media_type_for(path.as_ref())
     }
 
-    fn _as_media_type_for(&self, _path: &Path) -> Result<MediaType, SpecError> {
+    fn _as_media_type_for(&self, _path: &Path) -> Result<MediaType, LoadingSpecError> {
         //FEAT: consider charset sniffing or validate sniffing, allow other parameters for more
         // unusual bodies
         // for now this is just creating a media type and set a preset charset,
         // not trying to verify the charset or anything else
-        if let Some(charset) = self.charset.as_ref() {
-            MediaType::new_with_params(&self.base_type, &self.base_subtype, vec![
-                (CHARSET, charset)
-            ])
-        } else {
-            MediaType::new(&self.base_type, &self.base_subtype)
-        }
-            .map_err(|e| {
-                SpecError::BodyMediaTypeCreationFailure(Box::new(e))
-            })
+        let media_type_res =
+            if let Some(charset) = self.charset.as_ref() {
+                MediaType::new_with_params(&self.base_type, &self.base_subtype, vec![
+                    (CHARSET, charset)
+                ])
+            } else {
+                MediaType::new(&self.base_type, &self.base_subtype)
+            };
+
+        let media_type = media_type_res
+            .map_err(|err| err.context(LoadingSpecErrorVariant::BodyMediaTypeCreationFailure))?;
+
+        Ok(media_type)
     }
 
     pub fn suffixes(&self) -> &Vec1<String> {

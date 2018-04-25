@@ -2,12 +2,12 @@ use std::borrow::ToOwned;
 
 use serde::Serialize;
 
-use error::Result;
-use context::Context;
-use template::TemplateEngine;
 use mail::Mail;
-use mail::headers::components::{MailboxList, Mailbox};
+use headers::components::{MailboxList, Mailbox};
 
+use ::context::Context;
+use ::template::TemplateEngine;
+use ::error::CompositionError;
 //TODO make sure Box/Arc auto wrapping is impl for all parts
 use self::_impl::InnerCompositionBaseExt;
 
@@ -36,7 +36,10 @@ pub trait CompositionBase {
         &self,
         send_data: MailSendData<
             <Self::TemplateEngine as TemplateEngine<Self::Context>>::TemplateId, D>
-    ) -> Result<(Mail, EnvelopData)>
+    ) -> Result<
+        (Mail, EnvelopData),
+        CompositionError<<Self::TemplateEngine as TemplateEngine<Self::Context>>::Error>
+    >
         where D: Serialize
     {
         InnerCompositionBaseExt::_compose_mail(self, send_data)

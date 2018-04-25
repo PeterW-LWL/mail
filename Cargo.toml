@@ -1,31 +1,32 @@
 [package]
+name = "mail-template"
+version = "0.2.0"
+description = "[internal/mail-api] provides a \"composition through template\"  api for the Mail type from the mail-api crates"
 authors = ["Philipp Korber <p.korber@1aim.com>"]
+keywords = ["mail-api", "internal"]
 categories = []
-description = "TODO"
-documentation = "https://docs.rs/mail-codec-composition"
-keywords = ["mail", "codec", "mime", "smtp"]
 license = "MIT OR Apache-2.0"
-name = "mail-codec-composition"
 readme = "./README.md"
-repository = "https://github.com/1aim/mail-codec-composition"
-version = "0.1.0"
+documentation = "https://docs.rs/mail-template"
+repository = "https://github.com/1aim/mail-template"
 
 
 [dependencies]
+mail-type = { git="https://github.com/1aim/mail-codec" }
+mail-common = { git="https://github.com/1aim/mail-common" }
+mail-headers = { git="https://github.com/1aim/mail-headers" }
+
+failure = "0.1.1"
 futures = "0.1.14"
 log = "0.3.8"
 rand = "0.3.15"
 scoped-tls = "0.1.0"
 serde = "1.0.10"
 serde_derive = "1.0.10"
-vec1 = { git="https://github.com/1aim/vec1" }
-total-order-multi-map = { git="https://github.com/1aim/total-order-multi-map" }
-mail-codec = { git="https://github.com/1aim/mail-codec" }
-mail-codec-core = { git="https://github.com/1aim/mail-codec-core" }
-mail-codec-headers = { git="https://github.com/1aim/mail-codec-headers" }
-error-chain = "0.11.0"
 chrono = "0.4.0"
+vec1 = { git="https://github.com/1aim/vec1" }
 soft-ascii-string = "0.2.0"
+
 futures-cpupool = { version = "0.1.5", optional = true }
 tera = { version = "0.11.1", optional = true }
 conduit-mime-types = { version = "0.7.3", optional = true}
@@ -45,15 +46,19 @@ regex = "0.2.6"
 debug_trace_tokens = []
 render-template-engine = ["conduit-mime-types", "lazy_static"]
 tera-bindings = ["tera", "render-template-engine"]
-default = ["default_impl"]
-default_impl = [
-    "default_impl_name_composer", "default_impl_component_id", "default_impl_simple_context"
+
+default = [
+    "default_impl_name_composer",
+    "default_impl_component_id",
+    "default_impl_simple_context"
 ]
 default_impl_name_composer = []
 default_impl_component_id = []
 default_impl_simple_context = [
-    "default_impl_component_id", "mail-codec/default_impl_fs", "mail-codec/default_impl_cpupool",
+    "default_impl_component_id",
+    "mail-type/default_impl_fs",
+    "mail-type/default_impl_cpupool",
     "futures-cpupool"
 ]
 
-traceing = [ "mail-codec/traceing" ]
+traceing = [ "mail-type/traceing" ]

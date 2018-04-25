@@ -1,15 +1,14 @@
-use std::result::{ Result as StdResult };
-use std::error::{ Error as StdError };
 use std::ops::Deref;
 use std::sync::Arc;
 
+use failure::Fail;
 use serde::Serialize;
 use vec1::Vec1;
 
 use mail::Resource;
 
-use resource::{EmbeddingWithCId, Attachment};
-use context::Context;
+use ::resource::{EmbeddingWithCId, Attachment};
+use ::context::Context;
 
 ///
 /// # Why is Context a generic of the Type?
@@ -24,11 +23,11 @@ use context::Context;
 /// template engine to store a handle to it/copy of it itself.
 pub trait TemplateEngine<C: Context> {
     type TemplateId: ?Sized + ToOwned;
-    type Error: StdError + Send + 'static;
+    type Error: Fail;
 
     fn use_templates<D: Serialize>(
         &self,  ctx: &C, id: &Self::TemplateId, data: &D
-    ) -> StdResult<MailParts, Self::Error >;
+    ) -> Result<MailParts, Self::Error >;
 }
 
 pub struct MailParts {
@@ -62,7 +61,7 @@ impl<C, T> TemplateEngine<C> for Arc<T>
 
     fn use_templates<D: Serialize>(
         &self,  ctx: &C, id: &Self::TemplateId, data: &D
-    ) -> StdResult<MailParts, Self::Error > {
+    ) -> Result<MailParts, Self::Error > {
         self.deref().use_templates(ctx, id, data)
     }
 }
@@ -75,7 +74,7 @@ impl<C, T> TemplateEngine<C> for Box<T>
 
     fn use_templates<D: Serialize>(
         &self,  ctx: &C, id: &Self::TemplateId, data: &D
-    ) -> StdResult<MailParts, Self::Error > {
+    ) -> Result<MailParts, Self::Error > {
         self.deref().use_templates(ctx, id, data)
     }
 }

@@ -1,221 +1,219 @@
-use std::{result, error};
 use std::fmt::{self, Display};
-use std::path::PathBuf;
-use std::io::{Error as IoError};
-use std::string::FromUtf8Error;
+use std::path::{Path, PathBuf};
+use std::ops::Deref;
+use std::cmp::PartialEq;
+use std::io;
+use std::ffi::{OsStr, OsString};
 
+use failure::{Fail, Backtrace, Context};
 
-use core::error::{Error as MailError};
+#[derive(Debug, Fail)]
+pub enum Error<RE: Fail> {
+    #[fail(display = "unknown template id: {:?}", template_id)]
+    UnknownTemplateId {
+        template_id: String,
+        backtrace: Backtrace
+    },
 
-pub type Result<T, E> = result::Result<T, Error<E>>;
-
-
-#[derive(Debug)]
-pub enum Error<RE: error::Error> {
-    UnknownTemplateId(String),
-    CIdGenFailed(MailError),
+    #[fail(display = "{}", _0)]
     RenderError(RE),
 }
 
+impl<RE: Fail> Error<RE> {
 
-impl<R> error::Error for Error<R>
-    where R: error::Error
-{
-
-    fn description(&self) -> &str {
-        use self::Error::*;
-        match *self {
-            UnknownTemplateId(_) => "unknown template id",
-            CIdGenFailed(_) => "generating a cid failed",
-            RenderError(ref er) => er.description(),
-        }
-    }
-
-    fn cause(&self) -> Option<&error::Error> {
-        use self::Error::*;
-        match *self {
-            RenderError(ref er) => er.cause(),
-            CIdGenFailed(ref er) => er.cause(),
-            _ => None
+    pub fn from_unknown_template_id<I>(tid: I) -> Self
+        where I: Into<String>
+    {
+        Error::UnknownTemplateId {
+            template_id: tid.into(),
+            backtrace: Backtrace::new()
         }
     }
 }
-
-impl<R> Display for Error<R>
-    where R: error::Error
-{
-    fn fmt(&self, fter: &mut fmt::Formatter) -> fmt::Result {
-        use self::Error::*;
-        match *self {
-            UnknownTemplateId(ref id) => {
-                write!(fter, "unknwon template id: {:?}", id)
-            },
-            CIdGenFailed(ref err) => {
-                write!(fter, "generating cid failed:")?;
-                err.fmt(fter)
-            }
-            RenderError(ref re) => <R as fmt::Display>::fmt(re, fter)
-        }
-    }
-}
-
 
 #[derive(Debug)]
-pub enum SpecError {
-    /// error if the path is not a valid string
-    NonStringPath(PathBuf),
-    MissingTypeInfo(String),
-    //FEAT potentially change from Box<Error> to a concrete type
-    BodyMediaTypeCreationFailure(Box<error::Error+'static>),
-    ResourceMediaTypeCreationFailure(Box<error::Error+'static>),
-    IoError(IoError),
-    DuplicateEmbeddingName(String),
-    NoSubTemplatesFound(PathBuf),
-    TemplateFileMissing(PathBuf),
-    NotAFile(PathBuf),
-    NoValidFileStem(PathBuf),
-    NoMediaTypeFor(String),
+pub struct LoadingSpecError {
+    inner: Context<LoadingSpecErrorVariant>
+}
+
+impl LoadingSpecError {
+
+    pub fn variant(&self) -> &LoadingSpecErrorVariant {
+        self.inner.get_context()
+    }
+}
+impl Fail for LoadingSpecError {
+    fn backtrace(&self) -> Option<&Backtrace> {
+        self.inner.backtrace()
+    }
+
+    fn cause(&self) -> Option<&Fail> {
+        self.inner.cause()
+    }
+}
+
+impl Display for LoadingSpecError {
+    fn fmt(&self, fter: &mut fmt::Formatter) -> fmt::Result {
+        Display::fmt(&self.inner, fter)
+    }
+}
+
+impl From<LoadingSpecErrorVariant>for LoadingSpecError {
+    fn from(variant: LoadingSpecErrorVariant) -> Self {
+        LoadingSpecError::from(Context::new(variant))
+    }
+}
+
+impl From<Context<LoadingSpecErrorVariant>> for LoadingSpecError {
+    fn from(inner: Context<LoadingSpecErrorVariant>) -> Self {
+        LoadingSpecError { inner }
+    }
+}
+
+impl From<io::Error> for LoadingSpecError {
+    fn from(io_err: io::Error) -> Self {
+        io_err.context(LoadingSpecErrorVariant::IoError).into()
+    }
+}
+
+
+
+#[derive(Debug, Fail)]
+pub enum LoadingSpecErrorVariant {
+
+    #[fail(display = "path must also be valid string, got: {}", _0)]
+    NonStringPath(DisplayPath),
+
+    #[fail(display =  "no type info in settings for: {:?}", type_name)]
+    MissingTypeInfo { type_name: String },
+
+    #[fail(display = "media type creation for body failed")]
+    BodyMediaTypeCreationFailure,
+
+    #[fail(display = "media type creation for Embedding/Attachment failed")]
+    ResourceMediaTypeCreationFailure,
+
+    #[fail(display = "multiple embeddings with the in-template name {:?} where found", name)]
+    DuplicateEmbeddingName { name: String },
+
+    #[fail(display = "template dir has to contain at last one sub-template. dir: {}", dir)]
+    NoSubTemplatesFound { dir: DisplayPath },
+
+    #[fail(display = "sub-template folder does not contain a template file: {}", dir)]
+    TemplateFileMissing { dir: DisplayPath },
+
+    #[fail(display = "I/O Error occurred when loading the spec")]
+    IoError,
+
+    #[fail(display = "the template/embedding/attachment <{}> is not a file", _0)]
+    NotAFile(DisplayPath),
+
+    #[fail(display = "given file does not have a valid (i.e. us-ascii/utf8) file stem: {}", _0)]
+    NoValidFileStem { file: DisplayPath },
+
+    #[fail(display = "no media type is registered for the file stem {:?}", stem)]
+    NoMediaTypeFor { stem: String },
+
+    #[fail(display = "stem and content type differ: {:?} != {:?} wrt. {}",
+        by_extension, by_content, path)]
     FileStemAndContentDifferInMediaType {
-        path: PathBuf,
+        path: DisplayPath,
         by_extension: String,
         by_content: String
     },
-    NonUtf8MediaType(FromUtf8Error),
-    NotAMediaType(MailError),
-    AccidentalSpecOverride(String),
-    IRIConstructionFailed(&'static str, PathBuf)
-}
 
-impl error::Error for SpecError {
+    #[fail(display = "media type is not valid utf-8")]
+    NonUtf8MediaType,
 
-    fn cause(&self) -> Option<&error::Error> {
-        use self::SpecError::*;
-        match *self {
-            BodyMediaTypeCreationFailure(ref err) => Some(&**err),
-            ResourceMediaTypeCreationFailure(ref err) => Some(&**err),
-            IoError(ref err) => Some(err),
-            NonUtf8MediaType(ref err) => Some(err),
-            _ => None
-        }
-    }
-    fn description(&self) -> &str {
-        use self::SpecError::*;
-        match *self {
-            NonStringPath(_) => "path must also be valid string",
-            MissingTypeInfo(_) => "no type info included in settings for given type",
-            BodyMediaTypeCreationFailure(_) => "creating a media type for a mime body failed",
-            ResourceMediaTypeCreationFailure(_) =>
-                "creating a media type for a Embedding/Attachment failed",
-            IoError(_) => "a I/O-Error occurred",
-            DuplicateEmbeddingName(_) =>
-                "multiple embedding with the same in-template name where found",
-            NoSubTemplatesFound(_) =>
-                "template folder needs to contain at last one subtemplate e.g. text or html",
-            TemplateFileMissing(_) =>
-                "sub-template folder does not contain a template file (e.g. `mail.html`)",
-            NotAFile(_) =>
-                "template_file, embedding or attachment was not a file",
-            NoValidFileStem(_) =>
-                "file does not have a valid (i.e. us-ascii/utf8) file stem",
-            NoMediaTypeFor(_) =>
-                "no media type is registered for given file stem",
-            FileStemAndContentDifferInMediaType {..} =>
-                concat!(
-                    "the media type detected through the file stem and",
-                    "the one detected based on the content differ"
-                ),
-            NonUtf8MediaType(_) =>
-                "found media type is not valid utf-8",
-            NotAMediaType(_) =>
-                "the media type generated by a media type sniffer is invalid",
-            AccidentalSpecOverride(_) =>
-                "a spec was overridden by a load_from_* function loading a spec with the same name",
-            IRIConstructionFailed(_, _) =>
-                "construction a IRI failed"
-        }
+    #[fail(display = "the media type generated by a media type sniffer is invalid")]
+    NotAMediaType,
+
+    #[fail(display = "the spec with the id {:?} was overriden through a load_from_* function", id)]
+    AccidentalSpecOverride { id: String },
+
+    #[fail(display = "constructing a IRI with the scheme {} and the path {} failed", scheme, tail)]
+    IRIConstructionFailed {
+        scheme: &'static str,
+        tail: DisplayPath
     }
 }
 
-impl Display for SpecError {
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct DisplayPath(pub PathBuf);
+
+impl DisplayPath {
+    pub fn as_path(&self) -> &Path {
+        self.0.as_path()
+    }
+}
+
+impl Display for DisplayPath {
     fn fmt(&self, fter: &mut fmt::Formatter) -> fmt::Result {
-        use self::SpecError::*;
-        match *self {
-            NonStringPath(ref path) => {
-                write!(fter, "path must also be valid string, got: {}", path.display())
-            },
-
-            MissingTypeInfo(ref type_) => {
-                write!(fter, "no type info in settings for: {:?}", type_)
-            },
-
-            BodyMediaTypeCreationFailure(ref err) => {
-                write!(fter, "media type creation for body failed: {}", err)
-            },
-
-            ResourceMediaTypeCreationFailure(ref err) => {
-                write!(fter, "media type creation for Embedding/Attachment failed: {}", err)
-            },
-
-            IoError(ref err) => {
-                write!(fter, "I/O-Error: {}", err)
-            },
-
-            DuplicateEmbeddingName(ref e) => {
-                write!(fter, "multiple embeddings with the in-template name {:?} where found", e)
-            },
-
-            NoSubTemplatesFound(ref dir) => {
-                write!(fter, "template dir has to contain at last one sub-template. dir: {}",
-                       dir.display())
-            },
-
-            TemplateFileMissing(ref dir) => {
-                write!(fter, "sub-template folder does not contain a template file: {}",
-                       dir.display())
-            },
-
-            NotAFile(ref path) => {
-                write!(fter, "the template/embedding/attachment {} is not a file", path.display())
-            },
-
-            NoValidFileStem(ref path) => {
-                write!(fter, "given file does not have a valid (i.e. us-ascii/utf8) file stem: {}",
-                    path.display())
-            }
-
-            NoMediaTypeFor(ref stem) => {
-                write!(fter, "no media type is registered for the file stem {:?}", stem)
-            }
-
-            FileStemAndContentDifferInMediaType {
-                ref path, ref by_extension, ref by_content
-            } => {
-                write!(fter, "{:?} != {:?} at {}", by_extension, by_content, path.display())
-            }
-
-            NonUtf8MediaType(ref err) => {
-                write!(fter, "media type is not valid utf-8: {}", err)
-            }
-
-            NotAMediaType(ref err) => {
-                write!(fter, "the media type generated by a media type sniffer is invalid: {}", err)
-            }
-
-            AccidentalSpecOverride(ref name) => {
-                write!(fter, "the spec with the id {:?} was overriden through a load_from_* function", name)
-            }
-
-            IRIConstructionFailed(ref scheme, ref tail) => {
-                write!(fter, "constructing a IRI with the scheme {scheme} and the path {tail} failed",
-                    scheme=scheme, tail=tail.display())
-            }
-
-        }
+        Display::fmt(&self.0.display(), fter)
     }
 }
 
-impl From<IoError> for SpecError {
-    fn from(val: IoError) -> Self {
-        SpecError::IoError(val)
+impl<'a> From<&'a OsStr> for DisplayPath {
+    fn from(path: &'a OsStr) -> Self {
+        DisplayPath(Path::new(path).to_owned())
+    }
+}
+
+impl<'a> From<&'a Path> for DisplayPath {
+    fn from(path: &'a Path) -> Self {
+        DisplayPath(PathBuf::from(path))
+    }
+}
+
+impl From<PathBuf> for DisplayPath {
+    fn from(path: PathBuf) -> Self {
+        DisplayPath(path)
+    }
+}
+
+impl From<OsString> for DisplayPath {
+    fn from(path: OsString) -> Self {
+        DisplayPath(path.into())
+    }
+}
+
+impl From<DisplayPath> for PathBuf {
+    fn from(dp: DisplayPath) -> Self {
+        dp.0
+    }
+}
+
+impl AsRef<Path> for DisplayPath {
+    fn as_ref(&self) -> &Path {
+        self
+    }
+}
+
+impl Deref for DisplayPath {
+    type Target = Path;
+
+    fn deref(&self) -> &Self::Target {
+        self.as_path()
+    }
+}
+
+impl PartialEq<Path> for DisplayPath {
+
+    fn eq(&self, other: &Path) -> bool {
+        self.as_path() == other
+    }
+}
+
+impl<'a> PartialEq<&'a Path> for DisplayPath {
+    fn eq(&self, other: &&'a Path) -> bool {
+        self == *other
+    }
+}
+
+impl PartialEq<PathBuf> for DisplayPath {
+
+    fn eq(&self, other: &PathBuf) -> bool {
+        self.as_path() == other
     }
 }

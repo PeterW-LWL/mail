@@ -1,10 +1,17 @@
-extern crate mail_codec_composition as compose;
-extern crate mail_codec as mail;
+extern crate mail_common as common;
+extern crate mail_headers as headers;
+extern crate mail_type as mail;
+extern crate mail_template as template;
 extern crate futures;
 #[macro_use]
 extern crate serde_derive;
 extern crate regex;
 extern crate futures_cpupool;
+
+//TODO use custom integration test target for this
+#[cfg(not(feature = "tera-bindings"))]
+compile_error!("need feature \"tera-bindings\" to run tera integration tests");
+
 
 use std::result::{Result as StdResult};
 use std::io::{BufRead, BufReader};
@@ -16,16 +23,18 @@ use futures_cpupool::{CpuPool, Builder as CpuPoolBuilder};
 use regex::Regex;
 use futures::Future;
 
-
+use common::MailType;
+use common::encoder::EncodingBuffer;
 use mail::Mail;
-use compose::composition_prelude::*;
-use compose::render_template_engine::{RenderTemplateEngine, DEFAULT_SETTINGS};
-use compose::tera::TeraRenderEngine;
-
-use compose::default_impl::RandomContentId;
 use mail::default_impl::FsResourceLoader;
-use compose::{Context, CompositeContext};
 use mail::context::CompositeBuilderContext;
+use headers::components::Email;
+use headers::HeaderTryFrom;
+use template::{Context, CompositeContext, MailSendData, CompositionBase, SimpleCompositionBase};
+use template::default_impl::RandomContentId;
+use template::render_template_engine::{RenderTemplateEngine, DEFAULT_SETTINGS};
+use template::tera::TeraRenderEngine;
+
 
 #[derive(Serialize)]
 struct UserData {
@@ -59,7 +68,7 @@ fn setup_compositor<C: Context>(ctx: C) -> Compositor<C> {
 fn send_mail_to_string<C>(mail: Mail, ctx: &C) -> String
     where C: Context
 {
-    let mut encoder = Encoder::new( MailType::Ascii );
+    let mut encoder = EncodingBuffer::new( MailType::Ascii );
     let encodable_mail = mail.into_encodeable_mail(ctx).wait().unwrap();
     encodable_mail.encode( &mut encoder ).unwrap();
     encoder.to_string().unwrap()

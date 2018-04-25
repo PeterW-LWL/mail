@@ -2,9 +2,8 @@ use std::sync::Arc;
 
 use rand::{ self, Rng };
 
-use core::error::Result;
-use core::utils::HeaderTryFrom;
-use headers::components::MessageID;
+use headers::HeaderTryFrom;
+use headers::components::ContentID;
 
 use context::ContentIdGenComponent;
 
@@ -30,12 +29,13 @@ impl RandomContentId {
 impl ContentIdGenComponent for RandomContentId {
 
 
-    fn new_content_id( &self ) -> Result<MessageID> {
+    fn new_content_id( &self ) -> ContentID {
         let mut rng = rand::thread_rng();
         let mut msg_id = rng.gen_ascii_chars().take( 10 ).collect::<String>();
-        msg_id.push( '@' );
-        msg_id += &*self.postfix;
-        MessageID::try_from(msg_id)
+        msg_id.push('@');
+        msg_id.push_str(&*self.postfix);
+        ContentID::try_from(msg_id)
+            .expect("[BUG] generated invalid ContentID")
     }
 }
 

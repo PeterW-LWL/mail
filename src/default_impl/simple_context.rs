@@ -1,14 +1,14 @@
 
-
+use std::io;
 use futures_cpupool::{CpuPool, Builder};
 
-use context::CompositeContext;
-use default_impl::RandomContentId;
-use ::error::Error;
 use mail::context::CompositeBuilderContext;
 use mail::default_impl::FsResourceLoader;
 
-pub fn new<I: Into<String>>(content_id_postfix: I) -> Result<SimpleContext, Error> {
+use ::context::CompositeContext;
+use ::default_impl::RandomContentId;
+
+pub fn new<I: Into<String>>(content_id_postfix: I) -> Result<SimpleContext, io::Error> {
     Ok(CompositeContext::new(
         RandomContentId::new(content_id_postfix),
         CompositeBuilderContext::new(
