@@ -12,7 +12,7 @@ repository = "https://github.com/1aim/mail-template"
 
 
 [dependencies]
-mail-type = { git="https://github.com/1aim/mail-codec" }
+mail-types = { git="https://github.com/1aim/mail-types" }
 mail-common = { git="https://github.com/1aim/mail-common" }
 mail-headers = { git="https://github.com/1aim/mail-headers" }
 
@@ -56,9 +56,9 @@ default_impl_name_composer = []
 default_impl_component_id = []
 default_impl_simple_context = [
     "default_impl_component_id",
-    "mail-type/default_impl_fs",
-    "mail-type/default_impl_cpupool",
+    "mail-types/default_impl_fs",
+    "mail-types/default_impl_cpupool",
     "futures-cpupool"
 ]
 
-traceing = [ "mail-type/traceing" ]
+traceing = [ "mail-types/traceing" ]

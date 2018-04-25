@@ -1,7 +1,7 @@
 //
 // !! YOU MIGHT WANT TO TAKE A LOOK AT tests/tera/main.rs WHICH IS A BETTER EXAMPLE !!
 //
-extern crate mail_type as mail;
+extern crate mail_types as mail;
 extern crate mail_template as compose;
 extern crate futures;
 extern crate mime;

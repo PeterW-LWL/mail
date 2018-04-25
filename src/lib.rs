@@ -1,6 +1,6 @@
 #![recursion_limit="128"]
 
-extern crate mail_type as mail;
+extern crate mail_types as mail;
 extern crate mail_common as common;
 #[macro_use]
 extern crate mail_headers as headers;

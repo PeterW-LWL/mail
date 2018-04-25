@@ -41,7 +41,7 @@ use ::error::{MailSendDataError, MailSendDataErrorKind, WithSource, WithSourceEx
 /// ```
 /// # extern crate mail_common as common;
 /// # extern crate mail_headers as headers;
-/// # extern crate mail_type as mail;
+/// # extern crate mail_types as mail;
 /// # extern crate mail_template as compose;
 /// # use std::collections::HashMap;
 /// # use headers::HeaderTryFrom;

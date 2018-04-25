@@ -1,5 +1,5 @@
 extern crate mail_template as compos;
-extern crate mail_type as mail;
+extern crate mail_types as mail;
 
 #[cfg(not(feature="render-template-engine"))]
 compile_error!("need feature \"render_template_engine\" to run tests");

@@ -1,5 +1,5 @@
 
-# mail-template &emsp; [![Build Status](https://travis-ci.org/1aim/mail_type.svg?branch=master)](https://travis-ci.org/1aim/mail_type)
+# mail-template &emsp; [![Build Status](https://travis-ci.org/1aim/mail_template.svg?branch=master)](https://travis-ci.org/1aim/mail_template)
 
 **TODO**
 
