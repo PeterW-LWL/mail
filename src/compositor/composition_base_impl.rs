@@ -16,6 +16,15 @@ impl<CTX, TE> SimpleCompositionBase<CTX, TE>
     pub fn new(context: CTX, template_engine: TE) -> Self {
         SimpleCompositionBase { template_engine, context }
     }
+
+
+    pub fn context_mut(&mut self) -> &mut CTX {
+        &mut self.context
+    }
+
+    pub fn template_engine_mut(&mut self) -> &TE {
+        &mut self.template_engine
+    }
 }
 
 
@@ -25,8 +34,12 @@ impl<CTX, TE> CompositionBase for SimpleCompositionBase<CTX, TE>
     type Context = CTX;
     type TemplateEngine = TE;
 
-    fn template_engine(&self) -> &Self::TemplateEngine { &self.template_engine }
-    fn context(&self) -> &Self::Context { &self.context }
+    fn template_engine(&self) -> &Self::TemplateEngine {
+        &self.template_engine
+    }
+    fn context(&self) -> &Self::Context {
+        &self.context
+    }
 }
 
 pub struct SharedCompositionBase<CTX, TE> {
