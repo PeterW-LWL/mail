@@ -4,7 +4,7 @@ use std::mem::drop;
 use failure::{Fail, Context, Backtrace};
 
 use headers::error::{
-    HeaderTypeError, HeaderInsertionError,
+    HeaderTypeError,
     ComponentCreationError
 };
 use mail::error::{BuilderError, OtherBuilderErrorKind};
@@ -188,12 +188,6 @@ impl From<HeaderTypeError> for ExtendedBuilderError {
 
 impl From<ComponentCreationError> for ExtendedBuilderError {
     fn from(err: ComponentCreationError) -> Self {
-        ExtendedBuilderError::Normal(err.into())
-    }
-}
-
-impl From<HeaderInsertionError> for ExtendedBuilderError {
-    fn from(err: HeaderInsertionError) -> Self {
         ExtendedBuilderError::Normal(err.into())
     }
 }
