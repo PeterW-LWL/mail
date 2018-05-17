@@ -22,7 +22,7 @@ use ::template::{
 use ::error::CompositionError;
 
 use super::mail_send_data::MailSendData;
-use super::{CompositionBase, EnvelopData};
+use super::CompositionBase;
 
 pub(crate) trait InnerCompositionBaseExt: CompositionBase {
 
@@ -31,12 +31,11 @@ pub(crate) trait InnerCompositionBaseExt: CompositionBase {
         send_data: MailSendData<
             <Self::TemplateEngine as TemplateEngine<Self::Context>>::TemplateId, D>
     ) -> Result<
-        (Mail, EnvelopData),
+        Mail,
         CompositionError<<Self::TemplateEngine as TemplateEngine<Self::Context>>::Error>
     >
         where D: Serialize
     {
-        let envelop = EnvelopData::from(&send_data);
         //compose display name => create Address with display name;
         let (core_headers, data, template_id) = self.process_mail_send_data(send_data)?;
 
@@ -46,7 +45,7 @@ pub(crate) trait InnerCompositionBaseExt: CompositionBase {
         let mail = self.build_mail(alternative_bodies, shared_embeddings.into_iter(),
                                     attachments, core_headers)?;
 
-        Ok((mail, envelop))
+        Ok(mail)
     }
 
     fn process_mail_send_data<'a, D>(

@@ -55,8 +55,7 @@ pub use self::builder_extension::BuilderExt;
 pub use self::compositor::{
     CompositionBase, NameComposer,
     MailSendData, MailSendDataBuilder,
-    SharedCompositionBase, SimpleCompositionBase,
-    EnvelopData
+    SharedCompositionBase, SimpleCompositionBase
 };
 pub use self::context::{
     Context,

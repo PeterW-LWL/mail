@@ -1,9 +1,6 @@
-use std::borrow::ToOwned;
-
 use serde::Serialize;
 
 use mail::Mail;
-use headers::components::{MailboxList, Mailbox};
 
 use ::context::Context;
 use ::template::TemplateEngine;
@@ -37,7 +34,7 @@ pub trait CompositionBase {
         send_data: MailSendData<
             <Self::TemplateEngine as TemplateEngine<Self::Context>>::TemplateId, D>
     ) -> Result<
-        (Mail, EnvelopData),
+        Mail,
         CompositionError<<Self::TemplateEngine as TemplateEngine<Self::Context>>::Error>
     >
         where D: Serialize
@@ -47,40 +44,4 @@ pub trait CompositionBase {
 
     fn template_engine(&self) -> &Self::TemplateEngine;
     fn context(&self) -> &Self::Context;
-}
-
-
-//NOTE: this might get more complex at some point, wrt. e.g. cc, bcc, resent etc.
-pub struct EnvelopData {
-    sender: Mailbox,
-    to: MailboxList
-    //cc: MailboxList, //add if added to MailSendData
-    //bcc: MailboxList, //add if added to MailSendData
-}
-
-impl EnvelopData {
-
-    pub fn new(sender: Mailbox, to: MailboxList) -> Self {
-        EnvelopData {
-            sender, to
-        }
-    }
-
-    pub fn sender(&self) -> &Mailbox {
-        &self.sender
-    }
-
-    pub fn _to(&self) -> &MailboxList {
-        &self.to
-    }
-}
-
-impl<'a, T: ?Sized, D> From<&'a MailSendData<'a, T, D>> for EnvelopData
-    where T: ToOwned, D: Serialize
-{
-    fn from(msd: &'a MailSendData<'a, T, D>) -> Self {
-        let sender = msd.sender().clone();
-        let to = msd._to().clone();
-        EnvelopData::new(sender, to)
-    }
 }
