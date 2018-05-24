@@ -1,8 +1,7 @@
 use serde::Serialize;
 
-use mail::Mail;
+use mail::{Mail, Context};
 
-use ::context::Context;
 use ::template::TemplateEngine;
 use ::error::CompositionError;
 //TODO make sure Box/Arc auto wrapping is impl for all parts

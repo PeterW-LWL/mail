@@ -2,6 +2,7 @@ extern crate mail_common as common;
 extern crate mail_headers as headers;
 extern crate mail_types as mail;
 extern crate mail_template as template;
+extern crate soft_ascii_string;
 extern crate futures;
 #[macro_use]
 extern crate serde_derive;
@@ -22,16 +23,17 @@ use std::borrow::Cow;
 use futures_cpupool::{CpuPool, Builder as CpuPoolBuilder};
 use regex::Regex;
 use futures::Future;
+use soft_ascii_string::SoftAsciiString;
 
 use common::MailType;
 use common::encoder::EncodingBuffer;
 use mail::Mail;
 use mail::default_impl::FsResourceLoader;
-use mail::context::CompositeBuilderContext;
-use headers::components::Email;
+use mail::context::{Context, CompositeContext};
+use mail::default_impl::simple_context;
+use headers::components::{Email, Domain};
 use headers::HeaderTryFrom;
-use template::{Context, CompositeContext, MailSendData, CompositionBase, SimpleCompositionBase};
-use template::default_impl::RandomContentId;
+use template::{MailSendData, CompositionBase, SimpleCompositionBase};
 use template::render_template_engine::{RenderTemplateEngine, DEFAULT_SETTINGS};
 use template::tera::TeraRenderEngine;
 
@@ -41,33 +43,25 @@ struct UserData {
     name: &'static str
 }
 
-//TODO add a SimpleContext type which is just this to default_impl
-type MyContext =
-    CompositeContext<RandomContentId, CompositeBuilderContext<FsResourceLoader, CpuPool>>;
-
-fn setup_context() -> MyContext {
-    CompositeContext::new(
-        RandomContentId::new("company_a.not_a_domain"),
-        CompositeBuilderContext::new(
-            FsResourceLoader::with_cwd_root().unwrap(),
-            CpuPoolBuilder::new().create()
-        )
-    )
-}
 
 type Compositor<C> = SimpleCompositionBase<C, RenderTemplateEngine<TeraRenderEngine>>;
 
+fn setup_context() -> simple_context::Context {
+    let msg_id_domain = Domain::try_from("company_a.test").unwrap();
+    let unique_part = SoftAsciiString::from_string("r73rc20").unwrap();
+    simple_context::new(msg_id_domain, unique_part).unwrap()
+}
 
-fn setup_compositor<C: Context>(ctx: C) -> Compositor<C> {
+fn setup_compositor<C>(ctx: C) -> Compositor<C>
+    where C: Context
+{
     let tera = TeraRenderEngine::new("./test_resources/tera_base/**/*").unwrap();
     let mut rte = RenderTemplateEngine::new(tera);
     rte.load_specs_from_dir("./test_resources/templates", &*DEFAULT_SETTINGS).unwrap();
     Compositor::new(ctx, rte)
 }
 
-fn send_mail_to_string<C>(mail: Mail, ctx: &C) -> String
-    where C: Context
-{
+fn send_mail_to_string(mail: Mail, ctx: impl Context) -> String {
     let mut encoder = EncodingBuffer::new( MailType::Ascii );
     let encodable_mail = mail.into_encodeable_mail(ctx).wait().unwrap();
     encodable_mail.encode( &mut encoder ).unwrap();
@@ -83,7 +77,7 @@ fn use_tera_template_a() {
     let to          = Email::try_from("d@e.f").unwrap().into();
     let subject     = "Dear randomness";
     let template_id = Cow::Borrowed("template_a");
-    let data        = UserData { name: "abcdefg" };
+    let data        = UserData { name: "Liz" };
 
     let send_data = MailSendData::simple_new(
         from, to, subject,
@@ -92,7 +86,9 @@ fn use_tera_template_a() {
 
     let mail = compositor.compose_mail(send_data).unwrap();
 
-    let out_string = send_mail_to_string(mail, &context);
+    // context's are meant to be cheaply cloneable,
+    // e.g. in this case it just cloning a `Arc`
+    let out_string = send_mail_to_string(mail, context.clone());
 
     assert_mail_out_is_as_expected(out_string);
 }

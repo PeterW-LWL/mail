@@ -35,7 +35,6 @@ extern crate tera as tera_crate;
 mod macros;
 mod utils;
 pub mod error;
-mod context;
 mod resource;
 mod template;
 mod builder_extension;
@@ -56,11 +55,6 @@ pub use self::compositor::{
     CompositionBase, NameComposer,
     MailSendData, MailSendDataBuilder,
     SharedCompositionBase, SimpleCompositionBase
-};
-pub use self::context::{
-    Context,
-    ContentIdGenComponent,
-    CompositeContext
 };
 pub use self::resource::{
     Embedding, EmbeddingWithCId,

@@ -5,10 +5,9 @@ use failure::Fail;
 use serde::Serialize;
 use vec1::Vec1;
 
-use mail::Resource;
+use mail::{Resource, Context};
 
 use ::resource::{EmbeddingWithCId, Attachment};
-use ::context::Context;
 
 ///
 /// # Why is Context a generic of the Type?
@@ -89,7 +88,7 @@ mod test {
         #![allow(non_snake_case)]
 
         use std::sync::Arc;
-        use ::Context;
+        use mail::Context;
         use super::super::TemplateEngine;
 
         //just a compiler time type check

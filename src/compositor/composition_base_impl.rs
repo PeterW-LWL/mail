@@ -1,15 +1,15 @@
 use std::sync::Arc;
 
 use template::TemplateEngine;
-use context::Context;
+use mail::Context;
 
 use super::CompositionBase;
 
 pub struct SimpleCompositionBase<CTX, TE> {
     template_engine: TE,
-    context: CTX,
-    //TODO CONTINUE add phantom shit
+    context: CTX
 }
+
 impl<CTX, TE> SimpleCompositionBase<CTX, TE>
     where TE: TemplateEngine<CTX>, CTX: Context
 {

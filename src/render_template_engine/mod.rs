@@ -6,11 +6,11 @@ use failure::Fail;
 use serde::{Serialize, Serializer};
 use vec1::Vec1;
 
-use mail::Resource;
+use mail::{Resource, Context};
 use mail::file_buffer::FileBuffer;
 use headers::components::MediaType;
 
-use ::{TemplateEngine, Context};
+use ::TemplateEngine;
 use ::template::{BodyPart, MailParts};
 use ::resource::{Attachment, EmbeddingWithCId};
 
@@ -195,7 +195,7 @@ impl<R, C> TemplateEngine<C> for RenderTemplateEngine<R>
 fn create_embedding<C>(key: String, resource: Resource, ctx: &C) -> (String, EmbeddingWithCId)
     where C: Context
 {
-    let cid = ctx.new_content_id();
+    let cid = ctx.generate_content_id();
     (key, EmbeddingWithCId::new(resource, cid))
 }
 

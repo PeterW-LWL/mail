@@ -90,9 +90,8 @@ pub(crate) trait InnerCompositionBaseExt: CompositionBase {
     ) -> Result<MailParts, CompositionError<<Self::TemplateEngine as TemplateEngine<Self::Context>>::Error>>
         where D: Serialize
     {
-        let id_gen = Box::new(self.context().clone());
         let ( mut mail_parts, embeddings, attachments ) =
-            with_resource_sidechanel(id_gen, || -> Result<_, CompositionError<<Self::TemplateEngine as TemplateEngine<Self::Context>>::Error>> {
+            with_resource_sidechanel(self.context(), || -> Result<_, CompositionError<<Self::TemplateEngine as TemplateEngine<Self::Context>>::Error>> {
                 // we just want to make sure that the template engine does
                 // really serialize the data, so we make it so that it can
                 // only do so (if we pass in the data directly it could use
