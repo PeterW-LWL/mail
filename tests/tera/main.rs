@@ -20,16 +20,13 @@ use std::fs::File;
 use std::collections::HashMap;
 use std::borrow::Cow;
 
-use futures_cpupool::{CpuPool, Builder as CpuPoolBuilder};
 use regex::Regex;
 use futures::Future;
 use soft_ascii_string::SoftAsciiString;
 
 use common::MailType;
 use common::encoder::EncodingBuffer;
-use mail::Mail;
-use mail::default_impl::FsResourceLoader;
-use mail::context::{Context, CompositeContext};
+use mail::{Mail, Context};
 use mail::default_impl::simple_context;
 use headers::components::{Email, Domain};
 use headers::HeaderTryFrom;

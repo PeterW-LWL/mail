@@ -39,7 +39,6 @@ mod resource;
 mod template;
 mod builder_extension;
 mod compositor;
-pub mod default_impl;
 
 #[cfg(feature="render-template-engine")]
 pub mod render_template_engine;

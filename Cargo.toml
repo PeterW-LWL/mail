@@ -46,19 +46,4 @@ regex = "0.2.6"
 debug_trace_tokens = []
 render-template-engine = ["conduit-mime-types", "lazy_static"]
 tera-bindings = ["tera", "render-template-engine"]
-
-default = [
-    "default_impl_name_composer",
-    "default_impl_component_id",
-    "default_impl_simple_context"
-]
-default_impl_name_composer = []
-default_impl_component_id = []
-default_impl_simple_context = [
-    "default_impl_component_id",
-    "mail-types/default_impl_fs",
-    "mail-types/default_impl_cpupool",
-    "futures-cpupool"
-]
-
-traceing = [ "mail-types/traceing" ]
+default = []
