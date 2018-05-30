@@ -142,16 +142,6 @@ pub enum ExtendedBuilderError {
 
 }
 
-//TODO[rust/bug?else specialization from]: use  wildcard for transitive impl
-// impl<T> From<T> for ExtendedBuilderError
-//     where BuilderError: From<T>
-// {
-//     fn from(err: T) -> Self {
-//         let be = BuilderError::from(err);
-//         ExtendedBuilderError::Normal(be)
-//     }
-// }
-
 impl From<BuilderError> for ExtendedBuilderError {
     fn from(error: BuilderError) -> Self {
         ExtendedBuilderError::Normal(error)

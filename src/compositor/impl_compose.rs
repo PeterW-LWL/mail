@@ -13,9 +13,11 @@ use ::resource::{
     Embedded, EmbeddedWithCId,
     InspectEmbeddedResources, Disposition
 };
-use ::builder_extension::BuilderExt;
+use ::builder_extension::{
+    BodyPart, BuilderExt
+};
 use ::template_engine::{
-    BodyPart, TemplateEngine, MailParts
+    TemplateEngine, MailParts
 };
 use ::error::CompositionError;
 

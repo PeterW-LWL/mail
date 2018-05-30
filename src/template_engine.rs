@@ -5,9 +5,10 @@ use std::rc::Rc;
 use failure::Fail;
 use vec1::Vec1;
 
-use mail::{Resource, Context};
+use mail::Context;
 
 use ::resource::{EmbeddedWithCId, InspectEmbeddedResources};
+use ::builder_extension::BodyPart;
 
 ///
 /// # Why is Context a generic of the Type?
@@ -43,20 +44,7 @@ pub struct MailParts {
 }
 
 //TODO move this to BuilderExt and just use it here (oh and rename it)
-/// A mail body created by a template engine
-pub struct BodyPart {
-    /// a body created by a template
-    pub body_resource: Resource,
 
-    /// embeddings added by the template engine
-    ///
-    /// It is a mapping of the name under which a embedding had been made available in the
-    /// template engine to the embedding (which has to contain a CId, as it already
-    /// was used in the template engine and CIds are used to link to the content which should
-    /// be embedded)
-    pub embeddings: Vec<EmbeddedWithCId>,
-
-}
 
 macro_rules! impl_for_1elem_container {
     ($($name:ident),*) => ($(

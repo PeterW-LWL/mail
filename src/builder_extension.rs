@@ -7,10 +7,24 @@ use headers::components::{Disposition, MediaType};
 use mail::{Resource, Mail, Builder};
 use mail::error::OtherBuilderErrorKind;
 
-use ::template_engine::BodyPart;
 use ::resource::EmbeddedWithCId;
 use ::error::{ExtendedBuilderError, ExtendedBuilderErrorKind};
 
+
+/// A mail body likely created by a template engine
+pub struct BodyPart {
+    /// a body created by a template
+    pub body_resource: Resource,
+
+    /// embeddings added by the template engine
+    ///
+    /// It is a mapping of the name under which a embedding had been made available in the
+    /// template engine to the embedding (which has to contain a CId, as it already
+    /// was used in the template engine and CIds are used to link to the content which should
+    /// be embedded)
+    pub embeddings: Vec<EmbeddedWithCId>,
+
+}
 
 /// Ext. Trait which adds helper methods to the Builder type.
 ///
