@@ -15,7 +15,7 @@ use ::resource::{EmbeddedWithCId, InspectEmbeddedResources};
 /// a context independent template engine can be simple implemented
 /// with `impl<C: Context> TemplateEngine<C> for TheEngine` the reason
 /// why `C` is not part of the `TemplateEngine::templates` function is
-/// so that a template engine can depend on a specifc context type.
+/// so that a template engine can depend on a specific context type.
 ///
 /// Such a context type could, for example, provide access to the
 /// current server configuration, preventing the need for the

@@ -196,4 +196,83 @@ macro_rules! impl_deref_like {
 
 impl_deref_like!(Box);
 
+impl<T> InspectEmbeddedResources for Option<T>
+    where T: InspectEmbeddedResources
+{
+    fn inspect_resources(&self, visitor: &mut impl FnMut(&Embedded)) {
+        if let Some(val) = self.as_ref() {
+            val.inspect_resources(visitor)
+        }
+    }
 
+    fn inspect_resources_mut(&mut self, visitor: &mut impl FnMut(&mut Embedded)) {
+        if let Some(val) = self.as_mut() {
+            val.inspect_resources_mut(visitor)
+        }
+    }
+}
+
+
+#[cfg(test)]
+mod test {
+
+    mod simple_derive_and_inspect {
+        use mail::Resource;
+        use ::resource::{InspectEmbeddedResources, Embedded};
+
+        #[derive(InspectEmbeddedResources)]
+        struct SomeTestStruct<'a> {
+            count: u32,
+            logo: Option<Embedded>,
+            ref_logo: &'a mut Option<Embedded>,
+            ref_logo2: Option<&'a mut  Embedded>,
+
+            #[mail(inspect_skip)]
+            no_auto_impl: Option<&'a Embedded>
+        }
+
+        #[test]
+        fn compiled_now_try_it_1() {
+            let mut logo = None;
+            let mut instance = SomeTestStruct {
+                count: 12,
+                logo: None,
+                ref_logo: &mut logo,
+                ref_logo2: None,
+                no_auto_impl: None
+            };
+
+            let mut counter = 0;
+
+            instance.inspect_resources(&mut |_| counter += 1);
+            instance.inspect_resources_mut(&mut |_| counter += 1);
+
+            assert_eq!(counter, 0)
+        }
+
+        fn any_embedded() -> Embedded {
+            Embedded::attachment(Resource::sourceless_from_string("abc"))
+        }
+
+        #[test]
+        fn compiled_now_try_it_2() {
+            let mut emb = any_embedded();
+            let emb2 = any_embedded();
+            let mut logo = Some(any_embedded());
+            let mut instance = SomeTestStruct {
+                count: 12,
+                logo: Some(any_embedded()),
+                ref_logo: &mut logo,
+                ref_logo2: Some(&mut emb),
+                no_auto_impl: Some(& emb2)
+            };
+
+            let mut counter = 0;
+
+            instance.inspect_resources(&mut |_| counter += 1);
+            instance.inspect_resources_mut(&mut |_| counter += 1);
+
+            assert_eq!(counter, 6)
+        }
+    }
+}

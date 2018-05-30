@@ -158,3 +158,55 @@ impl Into<(ContentId, Resource)> for EmbeddedWithCId {
 
 
 
+#[cfg(test)]
+mod test {
+    use soft_ascii_string::SoftAsciiString;
+    use mail::{Context, Resource};
+    use mail::default_impl::simple_context;
+    use headers::components::Domain;
+    use headers::HeaderTryFrom;
+
+    use ::resource::Disposition;
+
+    fn any_resource() -> Resource {
+        Resource::sourceless_from_string("abc")
+    }
+
+    fn ctx() -> impl Context {
+        simple_context::new(
+            Domain::try_from("hy.test").unwrap(),
+            SoftAsciiString::from_string_unchecked("9ddqdq")
+        ).unwrap()
+    }
+
+    mod Embedded {
+        #![allow(non_snake_case)]
+
+        use super::*;
+        use super::super::Embedded;
+
+        #[test]
+        fn inline_uses_disposition_inline() {
+            let emb = Embedded::inline(any_resource());
+
+            assert_eq!(emb.disposition(), Disposition::Inline)
+        }
+
+        #[test]
+        fn attachment_uses_disposition_attachment() {
+            let emb = Embedded::attachment(any_resource());
+
+            assert_eq!(emb.disposition(), Disposition::Attachment)
+        }
+
+        #[test]
+        fn assure_content_id_create_a_content_id() {
+            let ctx = ctx();
+            let mut emb = Embedded::inline(any_resource());
+            assert_eq!(emb.content_id(), None);
+
+            emb.assure_content_id(&ctx);
+            assert!(emb.content_id().is_some());
+        }
+    }
+}

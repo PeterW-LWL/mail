@@ -12,7 +12,7 @@ where recipients_data is a iterable mapping from address to recipient specific d
 e.g. `Vec<(Address, Data)>`
 
 and mail_gen is something like `trait MailGen { fn gen_mail( from, to, data, bits8support ) ->  MailBody; }`
- 
+
 `MailBody` is not `tokio_smtp::MailBody` but has to implement nessesray contraints,
 (e.g. implemnting `toki_smtp::IntoMailBody` not that for the beginning this will be
 hard encoded but later one a generic variation allowing `smtp` to be switched out
@@ -22,7 +22,7 @@ MailGen implementations are not done by hand but implemented ontop of something
 like a template spec e.g. `struct TemplateSpec { id_template: TemplateId, additional_appendixes: Vec<Appendix> }`
 
 Where `TemplateId` can is e.g. `reset_link` leading to the creation of a `html` with alternate `plain`
-mail iff there is a `reset_link.html` and a `reset_link.plain` template. A `reset_link.html.data` 
+mail iff there is a `reset_link.html` and a `reset_link.plain` template. A `reset_link.html.data`
 folder could be used to define inline (mime related) appendixes like embedded images,
 but we might want to have a way to define such embeddigns through the data (
 E.g. by mapping `Data => TemplateEnginData` and replacing `EmbeddedFile` variations
@@ -57,11 +57,11 @@ MUST NOT occur in body (except for newline)
 - there is a `domain-literal` version which does use somthing like `[some_thing]`,
   we can use puny code for converting domains into ascii but probably can't use
   this with `domain-literal`'s
-  
+
 - `local-part` is `dot-atom` which has leading and trailing `[CFWS]` so comments are alowed
 
 - MessageId uses a email address like syntax but without supporting spaces/comments
-  
+
 
 # MIME
 
@@ -112,17 +112,17 @@ Contend types:
 - `form-data`
 - `x-mixed-replace` (for server push, don't use by now there are better ways)
 - `byteranges`
-    
+
 
 Example mail structure:
 
 ```
-(multipart/mixed 
+(multipart/mixed
     (multipart/alternative
-        (text/plain ... ) 
-        (multipart/related 
-            (text/hmtl ... '<img src="cid:contentid@1aim.com"></img>' ... ) 
-            (image/png (Content-ID <contentid@1aim.com>) ... ) 
+        (text/plain ... )
+        (multipart/related
+            (text/hmtl ... '<img src="cid:ContentId@1aim.com"></img>' ... )
+            (image/png (Content-ID <ContentId@1aim.com>) ... )
             ... ))
     (image/png (Content-Disposition attachment) ...)
     (image/png (Content-Disposition attachment) ...))
@@ -131,15 +131,15 @@ Example mail structure:
 Possible alternate structure:
 
 ```
-(multipart/mixed 
+(multipart/mixed
     (multipart/related
-        
+
         (multipart/alternative
-            (text/plain ...  '[cid:contentid@1aim.com]' ... )  
-            (text/html ... '<img src="cid:contentid@1aim.com"></img>' ... ) )
-             
-        (image/png (Content-ID <contentid@1aim.com>) ... ) )
-        
+            (text/plain ...  '[cid:ContentId@1aim.com]' ... )
+            (text/html ... '<img src="cid:ContentId@1aim.com"></img>' ... ) )
+
+        (image/png (Content-ID <ContentId@1aim.com>) ... ) )
+
     (image/png (Content-Disposition attachment) ...)
     (image/png (Content-Disposition attachment) ...))
 ```
@@ -156,7 +156,7 @@ proposed filenames for attachments can be given through parameters of the dispos
 it does not allow non ascii character there!
 
 see rfc2231 for more information, it extends some part wrt.:
-    
+
 - splitting long parameters (e.g. long file names)
 - specifying language and character set
 - specifying language for encoded words
@@ -173,7 +173,7 @@ a "big" text chunk can be split in multiple encoded words seperated by b'\r\n '
 
 non encoded words and encoded words can apear in the same header field, but
 must be seperate by "linear-white-space" (space) which is NOT removed when
-decoding encoded words 
+decoding encoded words
 
 encoded words can appear in:
 
@@ -232,7 +232,7 @@ smtp still considers _the bytes_ corresponding to CR LF and DOT special.
 - there is a line length limit, lines terminate with b'CRLF'
 - b'.CRLF' does sill end the body (if preceeded by CRLF, or body starts with it)
     - so dot-staching is still done on protocol level
-    
+
 
 
 ## Hot to handle `obs-` parsings
@@ -290,7 +290,7 @@ therefore:
 
 
 warn when encoding a Disposition of kind Attachment which's
-file_meta has no name set 
+file_meta has no name set
 
 
 // From RFC 2183:
@@ -301,7 +301,7 @@ file_meta has no name set
 // be represented as `quoted-string'.  Parameter values longer than 78
 // characters, or which contain non-ASCII characters, MUST be encoded as
 // specified in [RFC 2184].
-provide a gnneral way for encoding header parameter which follow the scheme: 
+provide a gnneral way for encoding header parameter which follow the scheme:
 `<mainvalue> *(";" <key>"="<value> )` this are ContentType and ContentDisposition
  for now
 
@@ -313,20 +313,19 @@ possible checking for "more" validity then noew
 email::quote => do not escape WSP, and use FWS when encoding
 also make quote, generally available for library useers a
 create_quoted_string( .. )
- 
+
 # Dependencies
 
 quoted_printable and base64 have some problems:
 1. it's speaking of a 76 character limit where it is 78
    it seems they treated the RFC as 78 character including
    CRLF where the RFC speaks of 78 characters EXCLUDING
-   CRLF 
+   CRLF
 2. it's only suited for content transfer encoding the body
-   as there is a limit of the length of encoded words (75) 
+   as there is a limit of the length of encoded words (75)
    which can't be handled by both
-   
+
 also quoted_printable has another problem:
 3. in headers the number of character which can be displayed without
    encoding is more limited (e.g. no ' ' ) quoted_printable does not
    respect this? (TODO CHECK THIS)
- 
