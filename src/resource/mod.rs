@@ -163,7 +163,7 @@ mod test {
     use soft_ascii_string::SoftAsciiString;
     use mail::{Context, Resource};
     use mail::default_impl::simple_context;
-    use headers::components::Domain;
+    use headers::components::{ContentId, Domain};
     use headers::HeaderTryFrom;
 
     use ::resource::Disposition;
@@ -207,6 +207,39 @@ mod test {
 
             emb.assure_content_id(&ctx);
             assert!(emb.content_id().is_some());
+        }
+
+        #[test]
+        fn assure_content_id_create_a_content_id_only_if_needed() {
+            let ctx = ctx();
+            let mut emb = Embedded::inline(any_resource());
+            assert_eq!(emb.content_id(), None);
+
+            emb.assure_content_id(&ctx);
+
+            let cid = emb
+                .content_id()
+                .expect("content id should have been generated")
+                .clone();
+
+            emb.assure_content_id(&ctx);
+            assert_eq!(emb.content_id(), Some(&cid));
+        }
+    }
+
+    mod EmbeddedWithCId {
+        #![allow(non_snake_case)]
+        use super::*;
+        use super::super::{Embedded, EmbeddedWithCId};
+
+        #[test]
+        fn generates_a_cid() {
+            let ctx = ctx();
+
+            let emb_wcid = EmbeddedWithCId::inline(any_resource(), &ctx);
+            let emb: &Embedded = &emb_wcid;
+            assert!(emb.content_id().is_some());
+            let _: &ContentId = emb_wcid.content_id();
         }
     }
 }

@@ -25,8 +25,6 @@ extern crate mail_derive;
 pub use mail_derive::*;
 
 //modules are ordered in "after-can-import-from-before" order
-#[macro_use]
-mod macros;
 pub mod error;
 mod resource;
 mod template_engine;
