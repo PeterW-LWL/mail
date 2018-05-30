@@ -7,8 +7,8 @@ use headers::components::{Disposition, MediaType};
 use mail::{Resource, Mail, Builder};
 use mail::error::OtherBuilderErrorKind;
 
-use ::template::BodyPart;
-use ::resource::{EmbeddingWithCId,  Attachment};
+use ::template_engine::BodyPart;
+use ::resource::EmbeddedWithCId;
 use ::error::{ExtendedBuilderError, ExtendedBuilderErrorKind};
 
 
@@ -31,7 +31,7 @@ pub trait BuilderExt {
 
     fn create_with_attachments<HM>(
         body: Mail,
-        attachments: Vec<Attachment>,
+        attachments: Vec<EmbeddedWithCId>,
         headers: HM
     ) -> Result<Mail, ExtendedBuilderError>
         where HM: Into<Option<HeaderMap>>;
@@ -48,7 +48,7 @@ pub trait BuilderExt {
         headers: HM
     ) -> Result<Mail, ExtendedBuilderError>
         where HM: Into<Option<HeaderMap>>,
-              EMB: Iterator<Item=EmbeddingWithCId> + ExactSizeIterator;
+              EMB: Iterator<Item=EmbeddedWithCId> + ExactSizeIterator;
 
     fn create_alternate_bodies_with_embeddings<HM, EMB>(
         bodies: Vec1<BodyPart>,
@@ -56,7 +56,7 @@ pub trait BuilderExt {
         header: HM
     ) -> Result<Mail, ExtendedBuilderError>
         where HM: Into<Option<HeaderMap>>,
-              EMB: Iterator<Item=EmbeddingWithCId> + ExactSizeIterator;
+              EMB: Iterator<Item=EmbeddedWithCId> + ExactSizeIterator;
 }
 
 
@@ -96,7 +96,7 @@ impl BuilderExt for Builder {
         headers: HM
     ) -> Result<Mail, ExtendedBuilderError>
         where HM: Into<Option<HeaderMap>>,
-              EMB: Iterator<Item=EmbeddingWithCId> + ExactSizeIterator
+              EMB: Iterator<Item=EmbeddedWithCId> + ExactSizeIterator
     {
         match embeddings.len() {
             0 => {
@@ -149,7 +149,7 @@ impl BuilderExt for Builder {
         headers: HM
     ) -> Result<Mail, ExtendedBuilderError>
         where HM: Into<Option<HeaderMap>>,
-              EMB: Iterator<Item=EmbeddingWithCId> + ExactSizeIterator
+              EMB: Iterator<Item=EmbeddedWithCId> + ExactSizeIterator
     {
 
         if embeddings.len() == 0 {
@@ -179,7 +179,7 @@ impl BuilderExt for Builder {
 
     fn create_with_attachments<HM>(
         body: Mail,
-        attachments: Vec<Attachment>,
+        attachments: Vec<EmbeddedWithCId>,
         headers: HM
     )  -> Result<Mail, ExtendedBuilderError>
         where HM: Into<Option<HeaderMap>>

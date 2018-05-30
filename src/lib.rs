@@ -1,5 +1,5 @@
 #![recursion_limit="128"]
-
+#![cfg_attr(feature="specialization", feature(specialization))]
 extern crate mail_types as mail;
 extern crate mail_common as common;
 #[macro_use]
@@ -10,18 +10,11 @@ extern crate failure;
 extern crate log;
 extern crate mime as media_type;
 extern crate futures;
-extern crate serde;
 extern crate rand;
 extern crate soft_ascii_string;
 extern crate chrono;
 #[macro_use]
 extern crate vec1;
-#[macro_use]
-extern crate serde_derive;
-#[macro_use]
-extern crate scoped_tls;
-#[cfg(feature="default_impl_simple_context")]
-extern crate futures_cpupool;
 #[cfg(feature="render-template-engine")]
 extern crate conduit_mime_types;
 #[cfg(feature="render-template-engine")]
@@ -29,14 +22,19 @@ extern crate conduit_mime_types;
 extern crate lazy_static;
 #[cfg(feature="tera-bindings")]
 extern crate tera as tera_crate;
+#[macro_use]
+#[allow(unused_imports)]
+extern crate mail_derive;
+
+//re-export proc-macro
+pub use mail_derive::*;
 
 //modules are ordered in "after-can-import-from-before" order
 #[macro_use]
 mod macros;
-mod utils;
 pub mod error;
 mod resource;
-mod template;
+mod template_engine;
 mod builder_extension;
 mod compositor;
 
@@ -50,62 +48,6 @@ pub mod tera;
 
 // reexports
 pub use self::builder_extension::BuilderExt;
-pub use self::compositor::{
-    CompositionBase, NameComposer,
-    MailSendData, MailSendDataBuilder,
-    SharedCompositionBase, SimpleCompositionBase
-};
-pub use self::resource::{
-    Embedding, EmbeddingWithCId,
-    Attachment,
-};
-pub use self::template::{
-    MailParts, BodyPart, TemplateEngine
-};
-//################# preludes ###########################
-
-// pub mod resource_prelude {
-//     pub use mail::file_buffer::FileBuffer;
-//     pub use common::utils::FileMeta;
-//     pub use mail::Resource;
-//     pub use mail::context::Source;
-//     pub use ::{Embedding, Attachment, EmbeddingWithCId};
-// }
-
-// pub mod composition_prelude {
-//     pub type Encoder = ::common::codec::Encoder<::mail::Resource>;
-//     pub use common::*;
-//     pub use headers::components::{
-//         Mailbox,
-//         Email,
-//         TransferEncoding,
-//         MediaType
-//     };
-//     pub use common::codec::{
-//         EncodableInHeader,
-//         EncodeHandle,
-//         Encodable
-//     };
-//     pub use ::{
-//         CompositionBase,
-//         SimpleCompositionBase,
-//         SharedCompositionBase,
-//         NameComposer,
-//         MailSendData,
-//     };
-// }
-
-// pub mod template_engine_prelude {
-//     pub use serde::Serialize;
-
-//     pub use vec1::Vec1;
-//     pub use mail::mail::{
-//         Resource
-//     };
-//     pub use mail::context::Source;
-//     pub use ::{
-//         MailParts, BodyPart, TemplateEngine,
-//         Context,
-//         Attachment, EmbeddingWithCId
-//     };
-//  }
+pub use self::compositor::*;
+pub use self::resource::*;
+pub use self::template_engine::*;
