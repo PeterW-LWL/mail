@@ -42,4 +42,4 @@ regex = "0.2.6"
 
 [features]
 default = []
-askama_engine = ["askama"]
+askama-engine = ["askama"]

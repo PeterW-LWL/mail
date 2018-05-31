@@ -16,7 +16,7 @@ extern crate chrono;
 #[macro_use]
 extern crate vec1;
 
-#[cfg(feature="askama_engine")]
+#[cfg(feature="askama-engine")]
 #[cfg_attr(test, macro_use)]
 extern crate askama;
 
@@ -34,7 +34,7 @@ mod template_engine;
 mod builder_extension;
 mod compositor;
 
-#[cfg(feature="askama_engine")]
+#[cfg(feature="askama-engine")]
 pub mod askama_engine;
 
 // re-exports flatten crate
