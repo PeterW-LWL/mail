@@ -1,4 +1,3 @@
-#![recursion_limit="128"]
 extern crate mail_types as mail;
 extern crate mail_common as common;
 #[macro_use]
@@ -6,12 +5,9 @@ extern crate mail_headers as headers;
 
 #[macro_use]
 extern crate failure;
-extern crate log;
 extern crate mime as media_type;
 extern crate futures;
-extern crate rand;
 extern crate soft_ascii_string;
-extern crate chrono;
 #[macro_use]
 extern crate vec1;
 
