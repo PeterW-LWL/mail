@@ -3,11 +3,22 @@ use std::ops::Deref;
 use mail::Context;
 use headers::components::ContentId;
 use mail::Resource;
+#[cfg(feature="serialize-content-id")]
+use serde::{Serialize, Serializer, ser};
 
 pub use headers::components::DispositionKind as Disposition;
 
 mod impl_inspect;
 
+/// # Serialize (feature `serialize-content-id`)
+///
+/// If serialized this struct **turns into it's
+/// content id failing if it has no content id**.
+///
+/// Normally this struct would not be serializeable
+/// (Resource isn't) but for template engines which
+/// use serialization for data access serializing it
+/// to it's content id string is quite use full
 #[derive(Debug, Clone)]
 pub struct Embedded {
     content_id: Option<ContentId>,
@@ -70,6 +81,19 @@ impl Embedded {
     }
 }
 
+#[cfg(feature="serialize-content-id")]
+impl<'a> Serialize for Embedded {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where S: Serializer
+    {
+        if let Some(cid) = self.content_id() {
+            cid.serialize(serializer)
+        } else {
+            Err(ser::Error::custom("can not serialize Embedded without content id"))
+        }
+    }
+}
+
 pub trait InspectEmbeddedResources {
     fn inspect_resources(&self, visitor: &mut FnMut(&Embedded));
     fn inspect_resources_mut(&mut self, visitor: &mut FnMut(&mut Embedded));
@@ -93,6 +117,15 @@ impl Into<Resource> for Embedded {
 }
 
 
+/// # Serialize (feature `serialize-content-id`)
+///
+/// If serialized this struct **turns into it's
+/// content id**.
+///
+/// Normally this struct would not be serializeable
+/// (Resource isn't) but for template engines which
+/// use serialization for data access serializing it
+/// to it's content id string is quite use full
 #[derive(Debug, Clone)]
 pub struct EmbeddedWithCId {
     inner: Embedded
@@ -138,6 +171,14 @@ impl EmbeddedWithCId {
     }
 }
 
+#[cfg(feature="serialize-content-id")]
+impl<'a> Serialize for EmbeddedWithCId {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where S: Serializer
+    {
+        self.content_id().serialize(serializer)
+    }
+}
 impl Into<Resource> for EmbeddedWithCId {
     fn into(self) -> Resource {
         let EmbeddedWithCId { inner } = self;

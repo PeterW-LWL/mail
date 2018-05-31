@@ -11,6 +11,9 @@ extern crate soft_ascii_string;
 #[macro_use]
 extern crate vec1;
 
+#[cfg(feature="serialize-content-id")]
+extern crate serde;
+
 #[cfg(feature="askama-engine")]
 #[cfg_attr(test, macro_use)]
 extern crate askama;
