@@ -16,37 +16,37 @@ macro_rules! impl_leaf_simple_maybe_sized {
     ($($name:ident),*,) => (impl_leaf_unsized!($($name),*););
     ($($name:ident),*) => ($(
         impl InspectEmbeddedResources for $name {
-            fn inspect_resources(&self, _visitor: &mut impl FnMut(&Embedded)) {
+            fn inspect_resources(&self, _visitor: &mut FnMut(&Embedded)) {
                 //nop
             }
-            fn inspect_resources_mut(&mut self, _visitor: &mut impl FnMut(&mut Embedded)) {
+            fn inspect_resources_mut(&mut self, _visitor: &mut FnMut(&mut Embedded)) {
                 //nop
             }
         }
 
         impl<'a> InspectEmbeddedResources for &'a $name {
-            fn inspect_resources(&self, _visitor: &mut impl FnMut(&Embedded)) {
+            fn inspect_resources(&self, _visitor: &mut FnMut(&Embedded)) {
                 //nop
             }
-            fn inspect_resources_mut(&mut self, _visitor: &mut impl FnMut(&mut Embedded)) {
+            fn inspect_resources_mut(&mut self, _visitor: &mut FnMut(&mut Embedded)) {
                 //nop
             }
         }
 
         impl InspectEmbeddedResources for Arc<$name> {
-            fn inspect_resources(&self, _visitor: &mut impl FnMut(&Embedded)) {
+            fn inspect_resources(&self, _visitor: &mut FnMut(&Embedded)) {
                 //nop
             }
-            fn inspect_resources_mut(&mut self, _visitor: &mut impl FnMut(&mut Embedded)) {
+            fn inspect_resources_mut(&mut self, _visitor: &mut FnMut(&mut Embedded)) {
                 //nop
             }
         }
 
         impl InspectEmbeddedResources for Rc<$name> {
-            fn inspect_resources(&self, _visitor: &mut impl FnMut(&Embedded)) {
+            fn inspect_resources(&self, _visitor: &mut FnMut(&Embedded)) {
                 //nop
             }
-            fn inspect_resources_mut(&mut self, _visitor: &mut impl FnMut(&mut Embedded)) {
+            fn inspect_resources_mut(&mut self, _visitor: &mut FnMut(&mut Embedded)) {
                 //nop
             }
         }
@@ -64,10 +64,10 @@ macro_rules! impl_leaf_simple_sized {
 
 
         impl<'a> InspectEmbeddedResources for &'a [$name] {
-            fn inspect_resources(&self, _visitor: &mut impl FnMut(&Embedded)) {
+            fn inspect_resources(&self, _visitor: &mut FnMut(&Embedded)) {
                 //nop
             }
-            fn inspect_resources_mut(&mut self, _visitor: &mut impl FnMut(&mut Embedded)) {
+            fn inspect_resources_mut(&mut self, _visitor: &mut FnMut(&mut Embedded)) {
                 //nop
             }
         }
@@ -110,12 +110,12 @@ impl_leaf_simple_sized! {
 impl<T> InspectEmbeddedResources for [T]
     where T: InspectEmbeddedResources
 {
-    fn inspect_resources(&self, visitor: &mut impl FnMut(&Embedded)) {
+    fn inspect_resources(&self, visitor: &mut FnMut(&Embedded)) {
         for item in self.iter() {
             item.inspect_resources(visitor)
         }
     }
-    fn inspect_resources_mut(&mut self, visitor: &mut impl FnMut(&mut Embedded)) {
+    fn inspect_resources_mut(&mut self, visitor: &mut FnMut(&mut Embedded)) {
         for item in self.iter_mut() {
             item.inspect_resources_mut(visitor)
         }
@@ -125,10 +125,10 @@ impl<T> InspectEmbeddedResources for [T]
 impl<'a, T> InspectEmbeddedResources for &'a mut T
     where T: InspectEmbeddedResources
 {
-    fn inspect_resources(&self, visitor: &mut impl FnMut(&Embedded)) {
+    fn inspect_resources(&self, visitor: &mut FnMut(&Embedded)) {
         (**self).inspect_resources(visitor)
     }
-    fn inspect_resources_mut(&mut self, visitor: &mut impl FnMut(&mut Embedded)) {
+    fn inspect_resources_mut(&mut self, visitor: &mut FnMut(&mut Embedded)) {
         (**self).inspect_resources_mut(visitor)
     }
 }
@@ -138,13 +138,13 @@ macro_rules! impl_seq_like {
         impl<T> InspectEmbeddedResources for $name<T>
             where T: InspectEmbeddedResources
         {
-            fn inspect_resources(&self, visitor: &mut impl FnMut(&Embedded)) {
+            fn inspect_resources(&self, visitor: &mut FnMut(&Embedded)) {
                 for item in self.iter() {
                     item.inspect_resources(visitor)
                 }
             }
 
-            fn inspect_resources_mut(&mut self, visitor: &mut impl FnMut(&mut Embedded)) {
+            fn inspect_resources_mut(&mut self, visitor: &mut FnMut(&mut Embedded)) {
                 for item in self.iter_mut() {
                     item.inspect_resources_mut(visitor)
                 }
@@ -160,13 +160,13 @@ macro_rules! impl_map_like {
         impl<K, T> InspectEmbeddedResources for $name<K, T>
             where T: InspectEmbeddedResources, K: $($c)*
         {
-            fn inspect_resources(&self, visitor: &mut impl FnMut(&Embedded)) {
+            fn inspect_resources(&self, visitor: &mut FnMut(&Embedded)) {
                 for item in self.values() {
                     item.inspect_resources(visitor)
                 }
             }
 
-            fn inspect_resources_mut(&mut self, visitor: &mut impl FnMut(&mut Embedded)) {
+            fn inspect_resources_mut(&mut self, visitor: &mut FnMut(&mut Embedded)) {
                 for item in self.values_mut() {
                     item.inspect_resources_mut(visitor)
                 }
@@ -183,11 +183,11 @@ macro_rules! impl_deref_like {
         impl<T> InspectEmbeddedResources for $name<T>
             where T: InspectEmbeddedResources
         {
-            fn inspect_resources(&self, visitor: &mut impl FnMut(&Embedded)) {
+            fn inspect_resources(&self, visitor: &mut FnMut(&Embedded)) {
                 self.deref().inspect_resources(visitor)
             }
 
-            fn inspect_resources_mut(&mut self, visitor: &mut impl FnMut(&mut Embedded)) {
+            fn inspect_resources_mut(&mut self, visitor: &mut FnMut(&mut Embedded)) {
                 self.deref_mut().inspect_resources_mut(visitor)
             }
         }
@@ -199,13 +199,13 @@ impl_deref_like!(Box);
 impl<T> InspectEmbeddedResources for Option<T>
     where T: InspectEmbeddedResources
 {
-    fn inspect_resources(&self, visitor: &mut impl FnMut(&Embedded)) {
+    fn inspect_resources(&self, visitor: &mut FnMut(&Embedded)) {
         if let Some(val) = self.as_ref() {
             val.inspect_resources(visitor)
         }
     }
 
-    fn inspect_resources_mut(&mut self, visitor: &mut impl FnMut(&mut Embedded)) {
+    fn inspect_resources_mut(&mut self, visitor: &mut FnMut(&mut Embedded)) {
         if let Some(val) = self.as_mut() {
             val.inspect_resources_mut(visitor)
         }
