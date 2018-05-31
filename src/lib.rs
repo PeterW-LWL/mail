@@ -1,5 +1,4 @@
 #![recursion_limit="128"]
-#![cfg_attr(feature="specialization", feature(specialization))]
 extern crate mail_types as mail;
 extern crate mail_common as common;
 #[macro_use]
