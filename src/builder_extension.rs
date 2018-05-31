@@ -12,6 +12,7 @@ use ::error::{ExtendedBuilderError, ExtendedBuilderErrorKind};
 
 
 /// A mail body likely created by a template engine
+#[derive(Debug)]
 pub struct BodyPart {
     /// a body created by a template
     pub body_resource: Resource,

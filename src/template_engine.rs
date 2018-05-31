@@ -22,7 +22,7 @@ use ::builder_extension::BodyPart;
 /// current server configuration, preventing the need for the
 /// template engine to store a handle to it/copy of it itself.
 pub trait TemplateEngine<C, D>
-    where C: Context, D: InspectEmbeddedResources
+    where C: Context
 {
     type TemplateId: ?Sized + ToOwned;
     type Error: Fail;
