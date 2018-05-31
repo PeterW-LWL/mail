@@ -16,6 +16,9 @@ extern crate chrono;
 #[macro_use]
 extern crate vec1;
 
+#[cfg(feature="askama_engine")]
+#[cfg_attr(test, macro_use)]
+extern crate askama;
 
 #[macro_use]
 #[allow(unused_imports)]
@@ -31,8 +34,11 @@ mod template_engine;
 mod builder_extension;
 mod compositor;
 
-// reexports
-pub use self::builder_extension::BuilderExt;
+#[cfg(feature="askama_engine")]
+pub mod askama_engine;
+
+// re-exports flatten crate
+pub use self::builder_extension::*;
 pub use self::compositor::*;
 pub use self::resource::*;
 pub use self::template_engine::*;
