@@ -169,19 +169,32 @@ impl<'a, C: 'a> State<'a, C>
 
 #[cfg(test)]
 mod test {
-
     use std::ops::Deref;
+
+    use futures::Future;
+    use soft_ascii_string::SoftAsciiString;
     use askama::Template;
+
+    use mail::Context;
+    use mail::default_impl::simple_context;
+    use headers::components::Domain;
+    use headers::HeaderTryFrom;
+
+    use ::{InspectEmbeddedResources, Embedded};
     use super::*;
     //TODO test with alternate bodies and attachments
 
+    #[derive(InspectEmbeddedResources)]
     struct Person {
         name: &'static str,
-        name_prefix: &'static str
+        name_prefix: &'static str,
+        avatar: Embedded
     }
 
-    #[derive(Template)]
-    #[template(source="<h2>Dear {{name_prefix}} {{name}}</h2>", ext="html")]
+    #[derive(Template, InspectEmbeddedResources)]
+    #[template(
+        source="<img src=\"cid:{{ avatar.content_id().unwrap().as_str() }}\"><h2>Dear {{name_prefix}} {{name}}</h2>",
+        ext="html")]
     // #[askama_mail(media_type = "text/html; charset=utf-8")]
     // #[askama_mail(alternate=TextGreeting)]
     struct HtmlGreeting<'a> {
@@ -246,4 +259,58 @@ mod test {
         }
     }
 
+    fn ctx() -> impl Context {
+        let domain = Domain::try_from("bla.test").unwrap();
+        let unique = SoftAsciiString::from_string_unchecked("dq-9c2e");
+        simple_context::new(domain, unique).unwrap()
+    }
+
+    #[test]
+    fn use_template_works_as_expected() {
+        let ctx = ctx();
+
+        let mut person = Person {
+            name: "Liz",
+            name_prefix: "Prof. Dr. Ex. Gd. Frk.",
+            avatar: Embedded::attachment(Resource::sourceless_from_string("should be an image"))
+        };
+
+        let mut data = HtmlGreeting { person: &mut person };
+        // this is normally done by the compose mail parts
+        // this is also why HtmlGreeting takes a &mut Person
+        // instead of a &Person
+        let mut nr_visited = 0;
+        data.inspect_resources_mut(&mut |emb: &mut Embedded| {
+            emb.assure_content_id(&ctx);
+            nr_visited += 1;
+        });
+        assert_eq!(nr_visited, 1);
+
+        // this engine binds the template through the data, so no Id
+        let id = &();
+        let res = AskamaTemplateEngine.use_template(id, &data, &ctx);
+
+        let MailParts {
+            alternative_bodies,
+            attachments,
+            shared_embeddings
+        } = res.unwrap();
+
+        assert_eq!(alternative_bodies.len(), 2);
+        assert_eq!(attachments.len(), 3);
+        assert_eq!(shared_embeddings.len(), 0);
+
+        let first = alternative_bodies.first();
+        assert_eq!(first.embeddings.len(), 0);
+        let res = first.resource.create_loading_future(ctx.clone()).wait().unwrap();
+        let stringed = String::from_utf8(res.access().as_slice().to_owned()).unwrap();
+        assert!(stringed.starts_with("<img src=3D\"cid:dq-9c2e."));
+        assert!(stringed.ends_with("@bla.test\"><h2>Dear Prof. Dr. Ex. G=\r\nd. Frk. Liz</h2>"));
+
+        let last = alternative_bodies.last();
+        assert_eq!(last.embeddings.len(), 0);
+        let res = last.resource.create_loading_future(ctx.clone()).wait().unwrap();
+        let stringed = String::from_utf8(res.access().as_slice().to_owned()).unwrap();
+        assert_eq!(stringed, "Dear Prof. Dr. Ex. Gd. Frk. Liz")
+    }
 }
