@@ -141,7 +141,7 @@ impl<'a, C: 'a> State<'a, C>
         let media_type = template.media_type();
         let resource = Resource::sourceless(media_type, string);
         self.bodies.push(BodyPart {
-            body_resource: resource,
+            resource: resource,
             embeddings: Vec::new()
         });
 

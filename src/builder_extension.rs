@@ -15,7 +15,7 @@ use ::error::{ExtendedBuilderError, ExtendedBuilderErrorKind};
 #[derive(Debug)]
 pub struct BodyPart {
     /// a body created by a template
-    pub body_resource: Resource,
+    pub resource: Resource,
 
     /// embeddings added by the template engine
     ///
@@ -133,15 +133,15 @@ impl BuilderExt for Builder {
     ) -> Result<Mail, ExtendedBuilderError>
         where HM: Into<Option<HeaderMap>>
     {
-        let BodyPart { body_resource, embeddings } = body;
+        let BodyPart { resource, embeddings } = body;
         if embeddings.len() > 0 {
             Self::create_body_with_embeddings(
-                Self::create_body_from_resource(body_resource, None)?,
+                Self::create_body_from_resource(resource, None)?,
                 embeddings.into_iter(),
                 headers
             )
         } else {
-            Self::create_body_from_resource(body_resource, headers)
+            Self::create_body_from_resource(resource, headers)
         }
     }
 
