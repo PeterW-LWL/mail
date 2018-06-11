@@ -300,7 +300,7 @@ mod test {
     fn ctx() -> impl Context {
         simple_context::new(
             Domain::try_from("hy.test").unwrap(),
-            SoftAsciiString::from_string_unchecked("9ddqdq")
+            SoftAsciiString::from_unchecked("9ddqdq")
         ).unwrap()
     }
 

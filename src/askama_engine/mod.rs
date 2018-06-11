@@ -261,7 +261,7 @@ mod test {
 
     fn ctx() -> impl Context {
         let domain = Domain::try_from("bla.test").unwrap();
-        let unique = SoftAsciiString::from_string_unchecked("dq-9c2e");
+        let unique = SoftAsciiString::from_unchecked("dq-9c2e");
         simple_context::new(domain, unique).unwrap()
     }
 
