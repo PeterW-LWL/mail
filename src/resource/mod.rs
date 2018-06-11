@@ -94,6 +94,90 @@ impl<'a> Serialize for Embedded {
     }
 }
 
+/// This trait is used to iterate over all `Embedded` instances of "arbitrary" data.
+///
+/// This functionality is needed so that the Content-Id's for embedded resources
+/// and attachments can be retrieved and generated for any kind of data a user might
+/// pass to any kind of template engine.
+///
+/// This trait is implemented for many types from `std`, this include two kind
+/// of implementations:
+///
+/// 1. such for containers e.g. `Vec<T> where T: InspectEmbeddedResources`
+/// 2. such for values which definitely can _not_ contain a `Embedded` type,
+///    e.g. u32 or String (currently not all types of `std` for which this is
+///    the case have this "empty" implementation, more can/will be added)
+///
+/// For types which can contain a `Embedded` but accessing it `&mut` might
+/// not be possible not implementation is provided intentionally. This includes
+/// `Rc<T>`, `Mutex<T>` (might be locked/poisoned), etc. When specialization
+/// is stable this might be possible extended to include more cases where
+/// a only a "empty" implementation makes sense e.g. `Rc<u32>`.
+///
+/// (note a "empty" implementation simple does nothing when called, which
+///  is fine and more or less like not calling it at all in this case)
+///
+/// # Derive
+///
+/// There is a custom derive for this type which can
+/// be used as shown in the example below. It tries
+/// to call the `inspect_resources*` methods on every
+/// field and considers following (field) attributes:
+///
+/// - `#[mail(inspect_skip)]`
+///   skip field, does not call `inspect_resource*` on it
+/// - `#[mail(inspect_with="(some::path, another::path_mut)")]`
+///   use the functions `some::path` and `another::path_mut` to inspect
+///   the field (using the former for `inspect_resources` and the later
+///   for `inspect_resources_mut`)
+///
+/// The derive works for struct and enum types in all variations but not
+/// unions.
+///
+/// ```
+/// # #[macro_use]
+/// # extern crate mail_template;
+/// # use std::sync::{Mutex, Arc};
+///
+/// // due to some current limitations of rust the macro
+/// // can not import the types, so we need to do so
+/// use mail_template::{Embedded, InspectEmbeddedResources};
+///
+/// struct Bloop {
+///     //...
+/// # bla: u32
+/// }
+///
+/// #[derive(InspectEmbeddedResources)]
+/// struct Foo {
+///     // has an "empty" implementation
+///     field1: u32,
+///
+///     // skips this field
+///     #[mail(inspect_skip)]
+///     field2: Bloop,
+///
+///     // inspects this field
+///     dings: Vec<Embedded>,
+///
+///     // custom inspection handling (2 pathes to functions)
+///     #[mail(inspect_with="(inspect_mutex, inspect_mutex_mut)")]
+///     shared_dings: Arc<Mutex<Embedded>>
+/// }
+///
+/// // due too auto-deref we could use `me: &Mutex<Embedded>`
+/// fn inspect_mutex(me: &Arc<Mutex<Embedded>>, visitor: &mut FnMut(&Embedded)) {
+///     let embedded = me.lock().unwrap();
+///     visitor(&*embedded);
+/// }
+///
+/// fn inspect_mutex_mut(me: &mut Arc<Mutex<Embedded>>, visitor: &mut FnMut(&mut Embedded)) {
+///     let mut embedded = me.lock().unwrap();
+///     visitor(&mut *embedded);
+/// }
+///
+/// # fn main() {}
+/// ```
 pub trait InspectEmbeddedResources {
     fn inspect_resources(&self, visitor: &mut FnMut(&Embedded));
     fn inspect_resources_mut(&mut self, visitor: &mut FnMut(&mut Embedded));
