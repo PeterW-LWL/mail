@@ -223,25 +223,37 @@ impl Deref for EmbeddedWithCId {
     }
 }
 
-
-
-
 impl EmbeddedWithCId {
 
+    /// create a new embedding with an inline disposition
+    ///
+    /// The context is used to generate a fitting content id.
     pub fn inline(resource: Resource, ctx: &impl Context) -> Self {
         EmbeddedWithCId::new(resource, Disposition::Inline, ctx)
     }
 
+    /// create a new embedding with an attachment disposition
+    ///
+    /// The context is used to generate a fitting content id.
     pub fn attachment(resource: Resource, ctx: &impl Context) -> Self {
         EmbeddedWithCId::new(resource, Disposition::Attachment, ctx)
     }
 
+    /// create a new embedding
+    ///
+    /// The context is used to generate a fitting content id.
     pub fn new(resource: Resource, disposition: Disposition, ctx: &impl Context) -> Self {
         EmbeddedWithCId {
             inner: Embedded::with_content_id(resource, disposition, ctx.generate_content_id())
         }
     }
 
+    /// Tries to convert an `Embedded` instance to an `EmbeddedWithCId` instance.
+    ///
+    /// # Error
+    ///
+    /// If the `Embedded` instance doesn't have a content id the passed in
+    /// `Embedded` instance is returned as error.
     pub fn try_from(emb: Embedded) -> Result<EmbeddedWithCId, Embedded> {
         if emb.content_id().is_some() {
             Ok(EmbeddedWithCId { inner: emb })
@@ -250,6 +262,7 @@ impl EmbeddedWithCId {
         }
     }
 
+    /// return the content id
     pub fn content_id(&self) -> &ContentId {
         self.inner.content_id().unwrap()
     }
