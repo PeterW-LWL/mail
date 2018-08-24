@@ -229,7 +229,13 @@ impl<'a, TId: ?Sized + 'a, D> Debug for MailSendData<'a, TId, D>
     }
 }
 
-
+/// Trait for implementing a mechanism to auto-generate display names
+/// for from/to headers based on emails.
+///
+/// # Stability Note
+///
+/// This trait might become deprecated before 1.0 and might be dropped
+/// soon. Through this is not yet decided to treat with care.
 pub trait NameComposer<D> {
     /// generates a display name used in a From header based on email address and mails data
     ///

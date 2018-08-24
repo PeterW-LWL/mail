@@ -3,14 +3,37 @@ use std::ops::Deref;
 use mail::Context;
 use headers::components::ContentId;
 use mail::Resource;
-#[cfg(feature="serialize-content-id")]
+#[cfg(feature="serialize-to-content-id")]
 use serde::{Serialize, Serializer, ser};
 
 pub use headers::components::DispositionKind as Disposition;
 
 mod impl_inspect;
 
-/// # Serialize (feature `serialize-content-id`)
+/// Represents any leaf body which is not a main body of an mail.
+///
+/// This represents a `Resource` (which will be represented as
+/// a non multipart body in the mail later one) a content disposition
+/// to use for it (inline or attachment) and optionally a content id.
+///
+/// Instances of `Embedded` with an inline disposition will normally
+/// be placed in a `multipart/related` body with the main mail bodies
+/// so that they can be refered to through the content id. Note that
+/// thinks like having a text/plain body inline follow by a image followed
+/// by a text/plain body to represent a text with an image in it are
+/// not supported by the template system (through with the mail
+/// crate you can create them "by hand"). Nevertheless this should
+/// not be a problem as they are very bad style anyway for most
+/// usecases.
+///
+/// Instances of `Embedded` with an attachment disposition will normally
+/// be used as mail attachments.
+///
+/// Note that `InspectEmbeddedResources` is used to find all `Embedded`
+/// instances given in the mail template data so that they can be
+/// automatically added to the mail _and_ to also give them content ids.
+///
+/// # Serialize (feature `serialize-to-content-id`)
 ///
 /// If serialized this struct **turns into it's
 /// content id failing if it has no content id**.
@@ -27,14 +50,18 @@ pub struct Embedded {
 }
 
 impl Embedded {
+
+    /// Create a inline embedding from an `Resource`.
     pub fn inline(resource: Resource) -> Self {
         Embedded::new(resource, Disposition::Inline)
     }
 
+    /// Create a attachment embedding from an `Resource`.
     pub fn attachment(resource: Resource) -> Self {
         Embedded::new(resource, Disposition::Attachment)
     }
 
+    /// Create a new embedding from a resource using given disposition.
     pub fn new(resource: Resource, disposition: Disposition) -> Self {
         Embedded {
             content_id: None,
@@ -43,6 +70,7 @@ impl Embedded {
         }
     }
 
+    /// Create a new embedding from a `Resource` using given disposition and given content id.
     pub fn with_content_id(resource: Resource, disposition: Disposition, content_id: ContentId) -> Self {
         Embedded {
             content_id: Some(content_id),
@@ -51,22 +79,27 @@ impl Embedded {
         }
     }
 
+    /// Return a reference to the contained resource.
     pub fn resource(&self) -> &Resource {
         &self.resource
     }
 
+    /// Return a mutable reference to the contained resource.
     pub fn resource_mut(&mut self) -> &mut Resource {
         &mut self.resource
     }
 
+    /// Return a reference to the contained content id, if any.
     pub fn content_id(&self) -> Option<&ContentId> {
         self.content_id.as_ref()
     }
 
+    /// Return a reference to disposition to use for the embedding.
     pub fn disposition(&self) -> Disposition {
         self.disposition
     }
 
+    /// Generate and set a new content id if this embedding doesn't have a content id.
     pub fn assure_content_id(&mut self, ctx: &impl Context) -> &ContentId {
         if self.content_id.is_none() {
             self.content_id = Some(ctx.generate_content_id());
@@ -204,8 +237,9 @@ impl Into<Resource> for Embedded {
     }
 }
 
-
-/// # Serialize (feature `serialize-content-id`)
+/// A wrapper around `Embedded` which guarantees that a cid is given.
+///
+/// # Serialize (feature `serialize-to-content-id`)
 ///
 /// If serialized this struct **turns into it's
 /// content id**.
