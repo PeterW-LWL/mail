@@ -39,4 +39,4 @@ optional = true
 [features]
 default = []
 askama-engine = ["askama"]
-serialize-content-id = ["serde"]
+serialize-to-content-id = ["serde"]

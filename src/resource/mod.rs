@@ -75,13 +75,17 @@ impl Embedded {
         self.content_id().unwrap()
     }
 
+    /// Generate and set a new content id if needed and additionally clone the type into an `EmbeddedWithCId` instance.
+    ///
+    /// Given that `Resource` instances are meant to be cheap to clone this should not be very
+    /// expansive (at last if no new content is generated).
     pub fn assure_content_id_and_copy(&mut self, ctx: &impl Context) -> EmbeddedWithCId {
         self.assure_content_id(ctx);
         EmbeddedWithCId { inner: self.clone() }
     }
 }
 
-#[cfg(feature="serialize-content-id")]
+#[cfg(feature="serialize-to-content-id")]
 impl<'a> Serialize for Embedded {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
         where S: Serializer
@@ -268,7 +272,7 @@ impl EmbeddedWithCId {
     }
 }
 
-#[cfg(feature="serialize-content-id")]
+#[cfg(feature="serialize-to-content-id")]
 impl<'a> Serialize for EmbeddedWithCId {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
         where S: Serializer
