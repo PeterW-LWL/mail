@@ -174,6 +174,10 @@ pub mod default_impl {
     pub use mail::default_impl::*;
 }
 
+#[cfg(feature="test-utils")]
+pub mod test_utils {
+    pub use mail::test_utils::*;
+}
 
 pub use mail_internals::MailType;
 

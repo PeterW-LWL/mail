@@ -18,7 +18,7 @@ smtp = ["mail-smtp"]
 #render-template-engine = ["mail-render-template-engine"]
 
 traceing = ["mail-internals/traceing", "mail-headers/traceing"]
-
+test-utils = ["mail-core/test-utils"]
 
 
 [dependencies]
