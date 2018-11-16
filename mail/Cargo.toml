@@ -1,0 +1,42 @@
+[package]
+name = "mail"
+version = "0.1.0"
+authors = ["Philipp Korber <philippkorber@gmail.com>"]
+categories = []
+#TODO go through the keywords
+keywords = ["mail", "rfc5322", "email", "mime", "smtp", "template"]
+description = "mail, facade for a number of mail related crates for creating and sending mails"
+license = "MIT OR Apache-2.0"
+readme = "./README.md"
+repository = "https://github.com/1aim/mail"
+
+[features]
+smtp = ["mail-smtp"]
+#askama-engine = ["mail-template/askama-engine"]
+#tera-engine = ["render-template-engine", "mail-render-template-engine/tera-engine"]
+#handlebars-engine = ["render-template-engine", "mail-render-template-engine/handlebars-engine"]
+#render-template-engine = ["mail-render-template-engine"]
+
+traceing = ["mail-internals/traceing", "mail-headers/traceing"]
+
+
+
+[dependencies]
+mail-internals = { git="https://github.com/1aim/mail-internals" }
+mail-headers = { git="https://github.com/1aim/mail-headers" }
+mail-core = { git="https://github.com/1aim/mail-types" }
+#mail-template = { git="https://github.com/1aim/mail-template" }
+mail-derive = { git="https://github.com/1aim/mail-derive" }
+mail-smtp = { git="https://github.com/1aim/mail-smtp", optional=true }
+#mail-render-template-engine = {git="https://github.com/1aim/mail-render-template-engine", optional=true }
+
+[dev-dependencies]
+rpassword = "2.0.0"
+tokio = "0.1.1"
+serde = "1.0.10"
+serde_derive = "1.0.10"
+soft-ascii-string = "1.0"
+futures = "0.1.0"
+failure = "0.1.1"
+
+
