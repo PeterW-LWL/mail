@@ -251,7 +251,7 @@ mod tests {
 
         #[test]
         fn works_reasonable_for_cargo_files() {
-            let res = sniff_media_type("./Cargo.lock")
+            let res = sniff_media_type("./Cargo.toml")
                 .unwrap();
 
             // it currently doesn't take advantage of file endings so

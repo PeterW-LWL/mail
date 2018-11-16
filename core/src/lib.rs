@@ -28,6 +28,8 @@ extern crate serde_test;
 
 #[cfg(feature="default_impl_cpupool")]
 extern crate futures_cpupool;
+#[cfg(feature="test-utils")]
+extern crate lazy_static;
 
 
 
@@ -43,6 +45,8 @@ mod resource;
 mod encode;
 mod mail;
 pub mod compose;
+#[cfg(feature="test-utils")]
+pub mod test_utils;
 
 pub mod default_impl;
 
