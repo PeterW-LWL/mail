@@ -3,7 +3,8 @@ members = [
     "mail",
     "core",
     "headers",
-    "internals"
+    "internals",
+    "smtp"
 ]
 
 
