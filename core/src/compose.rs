@@ -20,24 +20,20 @@
 use media_type::{MULTIPART, ALTERNATIVE, RELATED, MIXED};
 use vec1::Vec1;
 
-#[cfg(feature="serde")]
-use serde::{Serialize, Deserialize};
-
 use headers::{
     HeaderKind,
     headers,
     header_components::{
-        ContentId,
         Disposition,
         DispositionKind,
         MediaType
     }
 };
 
-use ::mail::Mail;
-use ::context::Context;
-use ::resource::Resource;
-
+use crate::{
+    mail::Mail,
+    resource::Resource
+};
 
 /// Parts used to create a mail body (in a multipart mail).
 ///
@@ -53,14 +49,26 @@ pub struct BodyPart {
     /// A body created by a template.
     pub resource: Resource,
 
-    //TODO split in inline_embeddings, attachments ->
-    /// Embeddings added by the template engine.
+    /// A number of embeddings which should be displayed inline.
     ///
-    /// It is a mapping of the name under which a embedding had been made available in the
-    /// template engine to the embedding (which has to contain a CId, as it already
-    /// was used in the template engine and CIds are used to link to the content which should
-    /// be embedded)
-    pub embeddings: Vec<Embedded>,
+    /// This is normally used to embed images then displayed in
+    /// a html body. It is not in the scope of this part of the
+    /// library to bind content id's to resources to thinks using
+    /// them to display the embeddings. This part of the library
+    /// does "just" handle that they are correctly placed in the
+    /// resulting Mail. The `mail-templates` crate provides more
+    /// functionality for better ergonomics.
+    ///
+    /// Note that embeddings placed in a `BodyPart` instance are potentially
+    /// only usable in the body specified in the same `BodyPart` instance.
+    pub inline_embeddings: Vec<Resource>,
+
+    /// A number of embeddings which should be treated as attachments.
+    ///
+    /// Attachments of a `BodyPart` instance will be combined with
+    /// the attachments of other instances and the ones in the
+    /// `MailParts` instance.
+    pub attachments: Vec<Resource>
 
 }
 
@@ -96,92 +104,20 @@ pub struct MailParts {
     /// shown if possible.
     pub alternative_bodies: Vec1<BodyPart>,
 
-    //TODO split in to vec inline_embeddings, attachments
-    /// A number of embeddings.
+    /// A number of embeddings which should be displayed inline.
     ///
-    /// Depending on the disposition of the embeddings they will be either
-    /// used as attachments or as embedded resources to which bodies can
-    /// refer by there content id. In difference to the `embeddings` field
-    /// in `BodyParts` embedded resources placed here can be used in all
-    /// bodies created by `alternative_bodies`.
-    pub embeddings: Vec<Embedded>
+    /// This is normally used to embed images then displayed in
+    /// a html body. It is not in the scope of this part of the
+    /// library to bind content id's to resources to thinks using
+    /// them to display the embeddings. This part of the library
+    /// does "just" handle that they are correctly placed in the
+    /// resulting Mail. The `mail-templates` crate provides more
+    /// functionality for better ergonomics.
+    pub inline_embeddings: Vec<Resource>,
+
+    /// A number of embeddings which should be treated as attachments
+    pub attachments: Vec<Resource>
 }
-
-
-/// A resource embedded in a mail.
-///
-/// Depending on the deposition this will either be used
-/// to create a attachment or a embedded resources other
-/// resources can refer to by the resources content id.
-///
-#[derive(Debug, Clone)]
-#[cfg_attr(feature="serde", derive(Serialize, Deserialize))]
-pub struct Embedded {
-    content_id: Option<ContentId>,
-    resource: Resource,
-    disposition: DispositionKind,
-}
-
-impl Embedded {
-
-    /// Create a inline embedding from an `Resource`.
-    pub fn inline(resource: Resource) -> Self {
-        Embedded::new(resource, DispositionKind::Inline)
-    }
-
-    /// Create a attachment embedding from an `Resource`.
-    pub fn attachment(resource: Resource) -> Self {
-        Embedded::new(resource, DispositionKind::Attachment)
-    }
-
-    /// Create a new embedding from a resource using given disposition.
-    pub fn new(resource: Resource, disposition: DispositionKind) -> Self {
-        Embedded {
-            content_id: None,
-            resource,
-            disposition
-        }
-    }
-
-    /// Create a new embedding from a `Resource` using given disposition and given content id.
-    pub fn with_content_id(resource: Resource, disposition: DispositionKind, content_id: ContentId) -> Self {
-        Embedded {
-            content_id: Some(content_id),
-            resource,
-            disposition
-        }
-    }
-
-    /// Return a reference to the contained resource.
-    pub fn resource(&self) -> &Resource {
-        &self.resource
-    }
-
-    /// Return a mutable reference to the contained resource.
-    pub fn resource_mut(&mut self) -> &mut Resource {
-        &mut self.resource
-    }
-
-    /// Return a reference to the contained content id, if any.
-    pub fn content_id(&self) -> Option<&ContentId> {
-        self.content_id.as_ref()
-    }
-
-    /// Return a reference to disposition to use for the embedding.
-    pub fn disposition(&self) -> DispositionKind {
-        self.disposition
-    }
-
-    /// Generate and set a new content id if this embedding doesn't have a content id.
-    pub fn assure_content_id(&mut self, ctx: &impl Context) -> &ContentId {
-        if self.content_id.is_none() {
-            self.content_id = Some(ctx.generate_content_id());
-        }
-
-        self.content_id().unwrap()
-    }
-}
-
 
 //-------------------------------------------------------\\
 //  implementations for creating mails are from here on  ||
@@ -190,35 +126,19 @@ impl Embedded {
 
 impl MailParts {
 
-    /// Generating content ids for all contained `Embedded` instances which don't have a cid.
-    ///
-    pub fn generate_content_ids(&mut self, ctx: &impl Context) {
-        for body in self.alternative_bodies.iter_mut() {
-            for embedding in body.embeddings.iter_mut() {
-                embedding.assure_content_id(ctx);
-            }
-        }
-
-        for embedding in self.embeddings.iter_mut() {
-            embedding.assure_content_id(ctx);
-        }
-    }
-
 
     /// Create a `Mail` instance based on this `MailParts` instance.
     ///
-    /// This will first generate content ids for all contained
-    /// `Embedded` instances.
     ///
     /// If this instance contains any attachments then the
     /// returned mail will be a `multipart/mixed` mail with
     /// the first body containing the actual mail and the
     /// other bodies containing the attachments.
     ///
-    /// If the `MailParts.embeddins` is not empty then the
-    /// mail will be wrapped in `multipart/related` (inside
-    /// any potential `multipart/mixed`) containing hte
-    /// actual mail in the first body and the embeddings
+    /// If the `MailParts.inline_embeddings` is not empty then
+    /// the mail will be wrapped in `multipart/related` (inside
+    /// any potential `multipart/mixed`) containing the
+    /// actual mail in the first body and the inline embeddings
     /// in the other bodies.
     ///
     /// The mail will have a `multipart/alternative` body
@@ -231,36 +151,21 @@ impl MailParts {
     /// Each sub-body created for a `BodyPart` will be wrapped
     /// inside a `multipart/related` if it has body specific
     /// embeddings (with content disposition inline).
-    pub fn compose_mail(mut self, ctx: &impl Context)
+    pub fn compose(self)
         -> Mail
     {
-        self.generate_content_ids(ctx);
-        self.compose_without_generating_content_ids()
-    }
+        let MailParts {
+            alternative_bodies,
+            inline_embeddings,
+            attachments
+        } = self;
 
-    /// This function works like `compose_mail` but does not generate
-    /// any content ids.
-    pub fn compose_without_generating_content_ids(self)
-        -> Mail
-    {
-        let MailParts { alternative_bodies, embeddings } = self;
-
-        let mut attachments = Vec::new();
-        let mut alternatives = alternative_bodies.into_iter()
-            .map(|body| body.create_mail(&mut attachments))
+        let mut attachments = attachments.into_iter()
+            .map(|atta| atta.create_mail_with_disposition(DispositionKind::Attachment))
             .collect::<Vec<_>>();
 
-        let embeddings = embeddings.into_iter()
-            .filter_map(|emb| {
-                let disposition = emb.disposition();
-                let mail = emb.create_mail();
-                if disposition == DispositionKind::Attachment {
-                    attachments.push(mail);
-                    None
-                } else {
-                    Some(mail)
-                }
-            })
+        let mut alternatives = alternative_bodies.into_iter()
+            .map(|body| body.create_mail(&mut attachments))
             .collect::<Vec<_>>();
 
         //UNWRAP_SAFE: bodies is Vec1, i.e. we have at last one
@@ -273,10 +178,15 @@ impl MailParts {
             };
 
         let mail =
-            if embeddings.is_empty() {
+            if inline_embeddings.is_empty() {
                 mail
             } else {
-                mail.wrap_with_related(embeddings)
+                let related = inline_embeddings.into_iter()
+                    .map(|embedding| {
+                        embedding.create_mail_with_disposition(DispositionKind::Inline)
+                    })
+                    .collect::<Vec<_>>();
+                mail.wrap_with_related(related)
             };
 
         let mail =
@@ -305,55 +215,33 @@ impl BodyPart {
     /// have a `Inline` disposition that body will be
     /// wrapped into a `multipart/related` body containing
     /// them.
-    pub fn create_mail(self, attachments_out: &mut Vec<Mail>)
-        -> Mail
-    {
-        let BodyPart { resource, embeddings } = self;
-        let body = resource.create_mail();
-
-        let related = embeddings.into_iter()
-            .filter_map(|embedded| {
-                let disposition = embedded.disposition();
-                let emb_mail = embedded.create_mail();
-                if disposition == DispositionKind::Attachment {
-                    attachments_out.push(emb_mail);
-                    None
-                } else {
-                    Some(emb_mail)
-                }
-            })
-            .collect::<Vec<_>>();
-
-        if related.is_empty() {
-            body
-        } else {
-            body.wrap_with_related(related)
-        }
-    }
-}
-
-impl Embedded {
-
-    /// Create a `Mail` instance for this `Embedded` instance.
-    ///
-    /// This will create a non-multipart mail based on the contained
-    /// resource containing a `Content-Disposition` header as well as an
-    /// `Content-Id` header if it has a content id.
-    ///
-    pub fn create_mail(self) -> Mail {
-        let Embedded {
-            content_id,
+    pub fn create_mail(
+        self,
+        attachments_out: &mut Vec<Mail>,
+    ) -> Mail {
+        let BodyPart {
             resource,
-            disposition:disposition_kind
+            inline_embeddings,
+            attachments
         } = self;
 
-        let mut mail = resource.create_mail();
-        if let Some(content_id) = content_id {
-            mail.insert_header(headers::ContentId::body(content_id));
+        let body = resource.create_mail();
+
+        for attachment in attachments.into_iter() {
+            let mail = attachment.create_mail_with_disposition(DispositionKind::Attachment);
+            attachments_out.push(mail)
         }
-        let disposition = Disposition::new(disposition_kind, Default::default());
-        mail.insert_header(headers::ContentDisposition::body(disposition));
-        mail
+
+        if inline_embeddings.is_empty() {
+            body
+        } else {
+            let related = inline_embeddings.into_iter()
+                .map(|embedding| {
+                    embedding.create_mail_with_disposition(DispositionKind::Inline)
+                })
+                .collect::<Vec<_>>();
+            body.wrap_with_related(related)
+        }
     }
 }
 
@@ -368,6 +256,14 @@ impl Resource {
     /// resources and attachments.
     pub fn create_mail(self) -> Mail {
         Mail::new_singlepart_mail(self)
+    }
+
+    pub fn create_mail_with_disposition(self, disposition_kind: DispositionKind) -> Mail {
+        let mut mail = self.create_mail();
+        //TODO[1.0] grab meta from resource
+        let disposition = Disposition::new(disposition_kind, Default::default());
+        mail.insert_header(headers::ContentDisposition::body(disposition));
+        mail
     }
 }
 
@@ -399,6 +295,7 @@ impl Mail {
         -> Mail
     {
         let mut bodies = alternates;
+        //TODO[opt] accept iter and prepend instead of insert in vec
         bodies.insert(0, self);
         new_multipart(&ALTERNATIVE, bodies)
     }

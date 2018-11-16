@@ -176,7 +176,6 @@ mod test {
         };
         use headers::{
             headers::{_From, _To, Sender},
-            header_components::{MediaType },
         };
 
 
