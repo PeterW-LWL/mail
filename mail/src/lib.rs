@@ -99,7 +99,6 @@
 
 extern crate mail_internals;
 #[allow(unused_imports)]
-#[macro_use]
 extern crate mail_headers;
 pub extern crate mail_core as mail;
 //pub extern crate mail_template as template;
@@ -163,8 +162,6 @@ pub use mail_headers::{
 
 #[doc(hidden)]
 pub use mail_headers::data;
-
-pub mod macros;
 
 /// Re-export of the default_impl parts from both `mail-core` and `mail-template`.
 ///
