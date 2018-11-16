@@ -116,7 +116,7 @@ pub fn encode<C>(request: MailRequest, ctx: C)
         };
 
     let fut = mail
-        .into_encodeable_mail(ctx.clone())
+        .into_encodable_mail(ctx.clone())
         .and_then(move |enc_mail| ctx.offload_fn(move || {
             let (mail_type, requirement) =
                 if envelop_data.needs_smtputf8() {
