@@ -30,14 +30,14 @@ With regards,\r
 The Tree Movie Consortium\r
 ";
 
-fn create_text_body() -> Resource {
-    Resource::sourceless_from_string(MSG.to_owned())
+fn create_text_body(ctx: &impl Context) -> Resource {
+    Resource::plain_text(MSG, ctx)
 }
 
-fn build_mail() -> Result<Mail, MailError> {
+fn build_mail(ctx: &impl Context) -> Result<Mail, MailError> {
     use mail::headers::*;
 
-    let mut mail = Mail::new_singlepart_mail(create_text_body());
+    let mut mail = Mail::new_singlepart_mail(create_text_body(ctx));
     mail.insert_headers(headers! {
         // `From` can have more than one mailbox.
         _From: [("Tree Movie Consortium", "datmail@dat.test")],
@@ -53,7 +53,7 @@ fn build_mail() -> Result<Mail, MailError> {
 fn encode_mail_to_stdout(mail: Mail, ctx: impl Context) -> Result<(), MailError> {
     let bytes = mail
         // This loads lazy resources, e.g. attachments/embeddings.
-        .into_encodeable_mail(ctx)
+        .into_encodable_mail(ctx)
         // It's a future, but we will just block here.
         .wait()?
         // Encodes mail and returns a `Vec<u8>` representing the
@@ -78,7 +78,7 @@ fn main() {
     let unique_part = SoftAsciiString::from_string("c207n521cec").unwrap();
     let ctx = simple_context::new(msg_id_domain, unique_part).unwrap();
 
-    let mail = build_mail().unwrap();
+    let mail = build_mail(&ctx).unwrap();
     encode_mail_to_stdout(mail, ctx).unwrap();
     println!("----------------  END  ---------------- ");
 }

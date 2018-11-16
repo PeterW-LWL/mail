@@ -28,7 +28,8 @@ use mail::{
     },
     error::MailError,
     default_impl::simple_context,
-    header_components::Domain
+    header_components::Domain,
+    Context
 };
 
 mod cli;
@@ -39,7 +40,7 @@ fn main() {
     let ctx = simple_context::new(msg_id_domain, unique_part).unwrap();
     let (msa_info, mails) = read_data().unwrap();
     let connection_config = create_connection_config(msa_info);
-    let mail_requests = create_mail_requests(mails).unwrap();
+    let mail_requests = create_mail_requests(mails, &ctx).unwrap();
 
     println!("[starting sending mails]");
 
@@ -71,14 +72,16 @@ fn create_connection_config(msa_info: cli::MsaInfo) -> ConnectionConfig<AuthPlai
         .build()
 }
 
-fn create_mail_requests(mails: Vec<cli::SimpleMail>) -> Result<Vec<MailRequest>, MailError> {
+fn create_mail_requests(mails: Vec<cli::SimpleMail>, ctx: &impl Context)
+    -> Result<Vec<MailRequest>, MailError>
+{
     use mail::headers::*;
 
     let requests = mails
         .into_iter()
         .map(|simple_mail| {
             let cli::SimpleMail { from, to, subject, text_body } = simple_mail;
-            let mut mail = Mail::plain_text(text_body);
+            let mut mail = Mail::plain_text(text_body, ctx);
             mail.insert_headers(headers! {
                 _From: [from],
                 _To: [to],

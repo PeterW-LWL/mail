@@ -9,6 +9,7 @@ description = "mail, facade for a number of mail related crates for creating and
 license = "MIT OR Apache-2.0"
 readme = "./README.md"
 repository = "https://github.com/1aim/mail"
+autoexamples = false
 
 [features]
 smtp = ["mail-smtp"]
@@ -20,6 +21,16 @@ smtp = ["mail-smtp"]
 traceing = ["mail-internals/traceing", "mail-headers/traceing"]
 test-utils = ["mail-core/test-utils"]
 
+# [[example]]
+# name = "mail-from_template"
+# crate-type = ["bin"]
+# path = "examples/mail_from_template/main.rs"
+# required-feature = ["render-template-engine", "tera-engine"]
+
+[[example]]
+name = "send_mail"
+crate-type = ["bin"]
+path = "examples/send_mail/main.rs"
 
 [dependencies]
 mail-internals =  { path="../internals" }

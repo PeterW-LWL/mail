@@ -41,7 +41,7 @@
 //! let ctx = simple_context::new(Domain::from_unchecked("example.com".to_owned()), "asdkds".parse().unwrap())
 //!     .unwrap();
 //!
-//! let mut mail = Mail::plain_text("Some body");
+//! let mut mail = Mail::plain_text("Some body", &ctx);
 //! mail.insert_headers(headers! {
 //!     _From: ["bla@example.com"],
 //!     _To: ["blub@example.com"],
@@ -50,7 +50,7 @@
 //!
 //! // don't use unencrypted con for anything but testing and
 //! // simplified examples
-//! let con_config = ConnectionConfig::build_local_unencrypted().build();
+//! let con_config = ConnectionConfig::builder_local_unencrypted().build();
 //!
 //! let fut = smtp::send(mail.into(), con_config, ctx);
 //! let results = fut.wait();
