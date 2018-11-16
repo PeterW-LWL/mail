@@ -16,6 +16,10 @@ extern crate futures;
 extern crate rand;
 extern crate vec1;
 extern crate soft_ascii_string;
+extern crate checked_command;
+#[cfg_attr(test, macro_use)]
+extern crate mail_headers as headers;
+extern crate mail_internals as internals;
 
 #[cfg(feature="serde")]
 extern crate serde;
@@ -25,10 +29,7 @@ extern crate serde_test;
 #[cfg(feature="default_impl_cpupool")]
 extern crate futures_cpupool;
 
-extern crate mail_internals as common;
-#[cfg_attr(test, macro_use)]
-extern crate mail_headers as headers;
-extern crate checked_command;
+
 
 
 #[macro_use]
