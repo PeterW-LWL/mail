@@ -103,9 +103,9 @@ extern crate mail_internals;
 extern crate mail_headers;
 pub extern crate mail_core as mail;
 //pub extern crate mail_template as template;
-#[macro_use]
-#[allow(unused_imports)]
-extern crate mail_derive;
+//#[macro_use]
+//#[allow(unused_imports)]
+//extern crate mail_derive;
 #[cfg(feature="smtp")]
 pub extern crate mail_smtp as smtp;
 //#[cfg(feature="render-template-engine")]
@@ -114,7 +114,7 @@ pub extern crate mail_smtp as smtp;
 //#[cfg(feature="tera-engine")]
 //pub use render_template_engine::tera;
 
-pub use mail_derive::*;
+//pub use mail_derive::*;
 
 /// re-export of all error types
 ///

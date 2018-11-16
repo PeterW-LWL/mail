@@ -312,7 +312,7 @@ fn tenc_quoted_printable(data: &Data) -> EncData {
 }
 
 
-
+#[cfg(feature="serde")]
 mod arc_buffer_serde {
     use super::*;
 
@@ -330,6 +330,7 @@ mod arc_buffer_serde {
     }
 }
 
+#[cfg(feature="serde")]
 mod arc_serde {
     use super::*;
 
