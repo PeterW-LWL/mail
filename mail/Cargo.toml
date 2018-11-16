@@ -22,11 +22,11 @@ traceing = ["mail-internals/traceing", "mail-headers/traceing"]
 
 
 [dependencies]
-mail-internals = { git="https://github.com/1aim/mail-internals" }
-mail-headers = { git="https://github.com/1aim/mail-headers" }
-mail-core = { git="https://github.com/1aim/mail-types" }
+mail-internals =  { path="../internals" }
+mail-headers =  { path="../headers" }
+mail-core =  { path="../core" }
 #mail-template = { git="https://github.com/1aim/mail-template" }
-mail-derive = { git="https://github.com/1aim/mail-derive" }
+#mail-derive = { git="https://github.com/1aim/mail-derive" }
 mail-smtp = { git="https://github.com/1aim/mail-smtp", optional=true }
 #mail-render-template-engine = {git="https://github.com/1aim/mail-render-template-engine", optional=true }
 
