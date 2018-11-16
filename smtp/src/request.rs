@@ -172,17 +172,16 @@ mod test {
         use mail::{
             Mail,
             Resource,
-            file_buffer::FileBuffer
+            test_utils::CTX
         };
         use headers::{
             headers::{_From, _To, Sender},
-            header_components::MediaType
+            header_components::{MediaType },
         };
 
+
         fn mock_resource() -> Resource {
-            let mt = MediaType::parse("text/plain; charset=utf-8").unwrap();
-            let fb = FileBuffer::new(mt, "abcd↓efg".to_owned().into());
-            Resource::sourceless_from_buffer(fb)
+            Resource::plain_text("abcd↓efg", CTX.unwrap())
         }
 
         #[test]
