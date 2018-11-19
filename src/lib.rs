@@ -8,11 +8,10 @@ extern crate vec1;
 extern crate toml;
 
 use std::{
-
     fs,
     collections::HashMap,
     fmt::Debug,
-    path::Path,
+    path::{PathBuf},
     sync::Arc
 };
 
@@ -25,7 +24,7 @@ use failure::{Fail, Error};
 use futures::{
     Future, Poll, Async,
     try_ready,
-    future::Join
+    future::{self, Join, Either}
 };
 use vec1::Vec1;
 
@@ -55,25 +54,45 @@ pub trait TemplateEngine: Sized {
     type Id: Debug;
     type Error: Fail;
 
-    type LazyBodyTemplate: PathRebaseable + Debug + Serialize + for<'a> Deserialize<'a>;
+    type LazyBodyTemplate: PathRebaseable + Debug + Send + Serialize + for<'a> Deserialize<'a>;
 
     fn load_body_template(&mut self, tmpl: Self::LazyBodyTemplate)
         -> Result<BodyTemplate<Self>, Error>;
 
     fn load_subject_template(&mut self, template_string: String)
         -> Result<Self::Id, Error>;
+}
 
-    fn load_toml_template_from_path<P>(self, path: P, ctx: &impl Context) -> Result<Template<Self>, Error>
-        where P: AsRef<Path>
-    {
+pub fn load_toml_template_from_path<TE, C>(
+    engine: TE,
+    path: PathBuf,
+    ctx: &C
+) -> impl Future<Item=Template<TE>, Error=Error>
+    where TE: TemplateEngine + 'static, C: Context
+{
+
+    let ctx2 = ctx.clone();
+    ctx.offload_fn(move || {
         let content = fs::read_to_string(path)?;
-        self.load_toml_template_from_str(&content, ctx)
-    }
+        let base: serde_impl::TemplateBase<TE> = toml::from_str(&content)?;
+        Ok(base)
+    }).and_then(move |base| base.load(engine, &ctx2))
+}
 
-    fn load_toml_template_from_str(self, desc: &str, ctx: &impl Context) -> Result<Template<Self>, Error> {
-        let base: serde_impl::TemplateBase<Self> = toml::from_str(desc)?;
-        Ok(base.load(self)?)
-    }
+pub fn load_toml_template_from_str<TE, C>(
+    engine: TE,
+    content: &str,
+    ctx: &C
+) -> impl Future<Item=Template<TE>, Error=Error>
+    where TE: TemplateEngine, C: Context
+{
+    let base: serde_impl::TemplateBase<TE> =
+        match toml::from_str(content) {
+            Ok(base) => base,
+            Err(err) => { return Either::B(future::err(Error::from(err))); }
+        };
+
+    Either::A(base.load(engine, ctx))
 }
 
 pub struct PreparationData<'a, PD: for<'any> BoundExt<'any>> {

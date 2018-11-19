@@ -10,9 +10,10 @@ use serde::{
     },
 };
 use failure::Error;
+use futures::{Future, future::{self, Either}};
 use vec1::Vec1;
 
-use mail_core::{Resource, Source, IRI};
+use mail_core::{Resource, Source, IRI, Context};
 
 use super::{
     Template,
@@ -63,7 +64,7 @@ impl<TE> TemplateBase<TE>
 
     //TODO!! make this load all embeddings/attachments and make it a future
     /// Couples the template base with a specific engine instance.
-    pub fn load(self, mut engine: TE) -> Result<Template<TE>, Error> {
+    pub fn load(self, mut engine: TE, ctx: &impl Context) -> impl Future<Item=Template<TE>, Error=Error> {
         let TemplateBase {
             template_name,
             base_dir,
@@ -73,34 +74,52 @@ impl<TE> TemplateBase<TE>
             mut attachments
         } = self;
 
-        let subject = Subject{ template_id: engine.load_subject_template(subject.template_string)? };
+        //FIXME[rust/catch block] use catch block
+        let catch_res = (|| -> Result<_, Error> {
+            let subject = Subject{ template_id: engine.load_subject_template(subject.template_string)? };
 
-        let bodies = bodies.try_mapped(|mut lazy_body| -> Result<_, Error> {
-            lazy_body.rebase_to_include_base_dir(&base_dir)?;
-            Ok(engine.load_body_template(lazy_body)?)
-        })?;
+            let bodies = bodies.try_mapped(|mut lazy_body| -> Result<_, Error> {
+                lazy_body.rebase_to_include_base_dir(&base_dir)?;
+                Ok(engine.load_body_template(lazy_body)?)
+            })?;
 
+            for embedding in embeddings.values_mut() {
+                embedding.rebase_to_include_base_dir(&base_dir)?;
+            }
 
-        for embedding in embeddings.values_mut() {
-            embedding.rebase_to_include_base_dir(&base_dir)?;
-        }
+            for attachment in attachments.iter_mut() {
+                attachment.rebase_to_include_base_dir(&base_dir)?;
+            }
 
-        for attachment in attachments.iter_mut() {
-            attachment.rebase_to_include_base_dir(&base_dir)?;
-        }
+            Ok((subject, bodies))
+        })();
 
+        let (subject, bodies) =
+            match catch_res {
+                Ok(vals) => vals,
+                Err(err) => { return Either::B(future::err(err)); }
+            };
 
-        let inner = InnerTemplate {
-            template_name,
-            base_dir,
-            subject,
-            bodies,
-            embeddings,
-            attachments,
-            engine
-        };
+        let loading_fut = Resource::load_container(embeddings, ctx)
+            .join(Resource::load_container(attachments, ctx));
 
-        Ok(Template { inner: Arc::new(inner) })
+        let fut = loading_fut
+            .map_err(Error::from)
+            .map(|(embeddings, attachments)| {
+                let inner = InnerTemplate {
+                    template_name,
+                    base_dir,
+                    subject,
+                    bodies,
+                    embeddings,
+                    attachments,
+                    engine
+                };
+
+                Template { inner: Arc::new(inner) }
+            });
+
+        Either::A(fut)
     }
 }
 
