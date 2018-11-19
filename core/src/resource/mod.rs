@@ -114,6 +114,7 @@ Source->|    |                     |
     - Use QuotedPrintable
     - NotHint
 */
+use headers::header_components::ContentId;
 
 mod source;
 mod data;
@@ -179,5 +180,14 @@ impl Resource {
     /// The `Context` is used to generate a `ContentId`.
     pub fn plain_text(content: impl Into<String>, ctx: &impl Context) -> Resource {
         Resource::Data(Data::plain_text(content, ctx.generate_content_id()))
+    }
+
+    /// Return the content id, if there is any.
+    pub fn content_id(&self) -> Option<&ContentId> {
+        match self {
+            &Resource::Source(..) => None,
+            &Resource::Data(ref data) => Some(data.content_id()),
+            &Resource::EncData(ref enc_data) => Some(enc_data.content_id())
+        }
     }
 }
