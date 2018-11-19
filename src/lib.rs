@@ -1,56 +1,85 @@
-use std::{mem, fs};
+extern crate failure;
+extern crate serde;
+extern crate futures;
+extern crate galemu;
+extern crate mail_core;
+extern crate mail_headers;
+extern crate vec1;
+extern crate toml;
 
+use std::{
+
+    fs,
+    collections::HashMap,
+    fmt::Debug,
+    path::Path,
+    sync::Arc
+};
+
+use serde::{
+    Serialize,
+    Deserialize
+};
 use galemu::{Bound, BoundExt};
-use serde::Deserialize;
-use failure::Fail;
+use failure::{Fail, Error};
 use futures::{
     Future, Poll, Async,
     try_ready,
-    future::{
-        self,
-        JoinAll, Either, FutureResult
-    }
+    future::Join
 };
-use mail_base::Source;
+use vec1::Vec1;
 
-mod serde_impl;
+use mail_core::{
+    Resource,
+    Data, Metadata,
+    Context, ResourceContainerLoadingFuture,
+    compose::{MailParts, BodyPart},
+    Mail
+};
+use mail_headers::{
+    HeaderKind, Header,
+    header_components::MediaType,
+    headers
+};
+
+pub mod serde_impl;
 mod base_dir;
 mod path_rebase;
+mod additional_cid;
 
-pub use self::base_dir::CwdBaseDir;
-pub use self::path_rebase::PathRebaseable;
+pub use self::base_dir::*;
+pub use self::path_rebase::*;
+pub use self::additional_cid::*;
 
-pub trait TemplateEngine {
+pub trait TemplateEngine: Sized {
     type Id: Debug;
     type Error: Fail;
 
-    type LazyBodyTemplate: PathRebaseable + Debug + for<'a> Deserialize<'a>;
+    type LazyBodyTemplate: PathRebaseable + Debug + Serialize + for<'a> Deserialize<'a>;
 
     fn load_body_template(&mut self, tmpl: Self::LazyBodyTemplate)
-        -> Result<BodyTemplate<Self>, TODO>;
+        -> Result<BodyTemplate<Self>, Error>;
 
     fn load_subject_template(&mut self, template_string: String)
-        -> Result<Self::Id, TODO>;
+        -> Result<Self::Id, Error>;
 
-    pub fn load_template_from_path<P>(self, path: P) -> Result<Self, TODO>
+    fn load_toml_template_from_path<P>(self, path: P, ctx: &impl Context) -> Result<Template<Self>, Error>
         where P: AsRef<Path>
     {
         let content = fs::read_to_string(path)?;
-        //TODO choose serde serializer by file extension (toml, json)
-        // then serialize to TemplateBase
-        // then `base.with_engine(self)`
-        load_template_from_str(&content)
+        self.load_toml_template_from_str(&content, ctx)
     }
 
-    pub fn load_template_from_str(self, desc: &str) -> Result<Self, TODO> {
-        self::load_template::from_str(desc)
+    fn load_toml_template_from_str(self, desc: &str, ctx: &impl Context) -> Result<Template<Self>, Error> {
+        let base: serde_impl::TemplateBase<Self> = toml::from_str(desc)?;
+        Ok(base.load(self)?)
     }
 }
 
-pub struct PreparationData<'a, D: for<'a> BoundExt<'a>> {
+pub struct PreparationData<'a, PD: for<'any> BoundExt<'any>> {
     pub attachments: Vec<Resource>,
     pub inline_embeddings: HashMap<String, Resource>,
-    pub prepared_data: Bound<'a, D>
+    pub prepared_data: Bound<'a, PD>
 }
 
 pub trait UseTemplateEngine<D>: TemplateEngine {
@@ -60,13 +89,13 @@ pub trait UseTemplateEngine<D>: TemplateEngine {
     type PreparedData: for<'a> BoundExt<'a>;
 
     //TODO[design]: allow returning a result
-    fn prepare_data<'a>(raw: &'a D) -> PreparationData<'a, Self::PreparedData>;
+    fn prepare_data<'a>(&self, raw: &'a D) -> PreparationData<'a, Self::PreparedData>;
 
-    fn render(
-        &self,
-        id: &Self::Id,
-        data: &Bound<'a, Self::PreparedData>,
-        additional_cids: AdditionalCids
+    fn render<'r, 'a>(
+        &'r self,
+        id: &'r Self::Id,
+        data: &'r Bound<'a, Self::PreparedData>,
+        additional_cids: AdditionalCIds<'r>
     ) -> Result<String, Self::Error>;
 }
 
@@ -75,10 +104,43 @@ pub struct Template<TE: TemplateEngine> {
     inner: Arc<InnerTemplate<TE>>
 }
 
+impl<TE> Template<TE>
+    where TE: TemplateEngine
+{
+    pub fn inline_embeddings(&self) -> &HashMap<String, Resource> {
+        &self.inner.embeddings
+    }
+
+    pub fn attachments(&self) -> &[Resource] {
+        &self.inner.attachments
+    }
+
+    pub fn engine(&self) -> &TE {
+        &self.inner.engine
+    }
+
+    pub fn bodies(&self) -> &[BodyTemplate<TE>] {
+        &self.inner.bodies
+    }
+
+    pub fn subject_template_id(&self) -> &TE::Id {
+        &self.inner.subject.template_id
+    }
+}
+
+impl<TE> Clone for Template<TE>
+    where TE: TemplateEngine
+{
+    fn clone(&self) -> Self {
+        Template { inner: self.inner.clone() }
+    }
+}
+
+#[derive(Debug)]
 struct InnerTemplate<TE: TemplateEngine> {
     template_name: String,
     base_dir: CwdBaseDir,
-    subject: Subject,
+    subject: Subject<TE>,
     /// This can only be in the loaded form _iff_ this is coupled
     /// with a template engine instance, as using it with the wrong
     /// template engine will lead to potential bugs and panics.
@@ -89,45 +151,49 @@ struct InnerTemplate<TE: TemplateEngine> {
     engine: TE,
 }
 
-type Embeddings = HashMap<String, Resource>;
-type Attachments = Vec<Resource>;
 
-
-pub trait TemplateExt<D, TE> {
-    fn prepare_to_render<C>(&self, data: &D, ctx: &C) -> RenderPreparationFuture<TE, D, C>;
+pub trait TemplateExt<TE, D>
+    where TE: TemplateEngine + UseTemplateEngine<D>
+{
+    fn prepare_to_render<'s, 'r, C>(&'s self, data: &'r D, ctx: &'s C) -> RenderPreparationFuture<'r, TE, D, C>
+        where C: Context;
 }
 
 
-impl<D, TE> TemplateExt<D, TE> for Template<TE>
-    where TE: UseTemplateEngine<D>
+impl<TE, D> TemplateExt<TE, D> for Template<TE>
+    where TE: TemplateEngine + UseTemplateEngine<D>
 {
-    fn prepare_to_render<: Context>(&self, data: &D, ctx: &C) ->
-        MailPreparationFuture<D, TE, C>
+    fn prepare_to_render<'s, 'r, C>(&'s self, data: &'r D, ctx: &'s C) -> RenderPreparationFuture<'r, TE, D, C>
+        where C: Context
     {
-        let preps = self.engine.prepare_data(data);
+        let preps = self.inner.engine.prepare_data(data);
 
         let PreparationData {
             inline_embeddings,
             attachments,
-            prepare_data
-        } = self;
+            prepared_data
+        } = preps;
 
         let loading_fut = Resource::load_container(inline_embeddings, ctx)
             .join(Resource::load_container(attachments, ctx));
 
         RenderPreparationFuture {
-            template: self.clone(),
-            context: ctx.clone(),
-            prepare_data,
+            payload: Some((
+                self.clone(),
+                prepared_data,
+                ctx.clone()
+            )),
             loading_fut
         }
     }
 }
 
-pub struct RenderPreparationFuture<TE, D, C> {
+pub struct RenderPreparationFuture<'a, TE, D, C>
+    where TE: TemplateEngine + UseTemplateEngine<D>, C: Context
+{
     payload: Option<(
         Template<TE>,
-        <TE as UseTemplateEngine<D>>::PreparationData,
+        Bound<'a, <TE as UseTemplateEngine<D>>::PreparedData>,
         C
     )>,
     loading_fut: Join<
@@ -136,17 +202,17 @@ pub struct RenderPreparationFuture<TE, D, C> {
     >
 }
 
-impl<TE,D,C> Future for RenderPreparationFuture<TE, D, C>
-    TE: TemplateEngine, TE: UseTemplateEngine<D>, C: Context
+impl<'a, TE,D,C> Future for RenderPreparationFuture<'a, TE, D, C>
+    where TE: TemplateEngine, TE: UseTemplateEngine<D>, C: Context
 {
-    type Item = Preparations<TE, D, C>;
+    type Item = Preparations<'a, TE, D, C>;
     type Error = Error;
 
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
         let (
             inline_embeddings,
             attachments
-        ) = try_ready!(&mut self.loading_fut);
+        ) = try_ready!(self.loading_fut.poll());
 
         //UNWRAP_SAFE only non if polled after resolved
         let (template, prepared_data, ctx) = self.payload.take().unwrap();
@@ -161,41 +227,44 @@ impl<TE,D,C> Future for RenderPreparationFuture<TE, D, C>
     }
 }
 
-pub struct Preparations<TE, D, C> {
+pub struct Preparations<'a, TE, D, C>
+    where TE: TemplateEngine + UseTemplateEngine<D>, C: Context
+{
     template: Template<TE>,
-    prepared_data: <TE as UseTemplateEngine<D>>::PreparationData,
+    prepared_data: Bound<'a, <TE as UseTemplateEngine<D>>::PreparedData>,
     ctx: C,
     inline_embeddings: HashMap<String, Resource>,
-    attachemnts: Vec<Resource>
+    attachments: Vec<Resource>
 }
 
-impl<TE, D, C> Preparations<TE, D, C>
+impl<'a, TE, D, C> Preparations<'a, TE, D, C>
     where TE: TemplateEngine, TE: UseTemplateEngine<D>, C: Context
 {
-    pub fn render_to_mail_parts(self) -> Result<MailParts, Error> {
+    pub fn render_to_mail_parts(self) -> Result<(MailParts, Header<headers::Subject>), Error> {
         let Preparations {
             template,
             prepared_data,
             ctx,
-            //UPS thats a hash map not a Vec
-            inline_embeddings: inline_embeddings_from_data,
-            attachemnts
+            inline_embeddings,
+            mut attachments
         } = self;
 
         let subject = template.engine().render(
             template.subject_template_id(),
-            &prepare_data,
-            AdditionalCids::new(&[])
+            &prepared_data,
+            AdditionalCIds::new(&[])
         )?;
+
+        let subject = headers::Subject::auto_body(subject)?;
 
         //TODO use Vec1 try_map instead of loop
         let mut bodies = Vec::new();
         for body in template.bodies().iter() {
-            let raw = self.engine.render(
+            let raw = template.engine().render(
                 body.template_id(),
-                &prepare_data,
-                AdditionalCids::new(&[
-                    &inline_embeddings
+                &prepared_data,
+                AdditionalCIds::new(&[
+                    &inline_embeddings,
                     body.inline_embeddings(),
                     template.inline_embeddings()
                 ])
@@ -210,29 +279,43 @@ impl<TE, D, C> Preparations<TE, D, C>
                 }
             );
 
-            let inline_embeddings = body.embeddings()
+            let inline_embeddings = body.inline_embeddings()
                 .values()
                 .cloned()
                 .collect();
 
             bodies.push(BodyPart {
-                resource: Resource::Data(data)
-                inline_embeddings
+                resource: Resource::Data(data),
+                inline_embeddings,
+                attachments: Vec::new()
             });
         }
 
-        Ok(MailParts {
+        attachments.extend(template.attachments().iter().cloned());
+
+        let mut inline_embeddings_vec = Vec::new();
+        for (key, val) in template.inline_embeddings() {
+            if !inline_embeddings.contains_key(key) {
+                inline_embeddings_vec.push(val.clone())
+            }
+        }
+
+        inline_embeddings_vec.extend(inline_embeddings.into_iter().map(|(_,v)|v));
+
+        let parts = MailParts {
             //UNWRAP_SAFE (complexly mapping a Vec1 is safe)
-            alternative_bodies: Vec1::new(bodies).unwrap(),
-            inline_embeddings: template.embeddings().values().cloned().collect(),
-            attachments: template.attachments().clone()
-        })
+            alternative_bodies: Vec1::from_vec(bodies).unwrap(),
+            inline_embeddings: inline_embeddings_vec,
+            attachments
+        };
+
+        Ok((parts, subject))
     }
 
     pub fn render(self) -> Result<Mail, Error> {
-        let parts = self.render_to_mail_parts()?;
-        //PANIC_SAFE: templates load all data to at last the point where it has a content id.
-        let mail = parts.compose_without_generating_content_ids()?;
+        let (parts, subject) = self.render_to_mail_parts()?;
+        let mut mail = parts.compose();
+        mail.insert_header(subject);
         Ok(mail)
     }
 }
@@ -256,7 +339,7 @@ impl<TE> BodyTemplate<TE>
         &self.media_type
     }
 
-    pub fn embeddings(&self) -> &HashMap<String, Resource> {
+    pub fn inline_embeddings(&self) -> &HashMap<String, Resource> {
         &self.embeddings
     }
 }
@@ -273,52 +356,3 @@ impl<TE> Subject<TE>
         &self.template_id
     }
 }
-
-//--------------------
-
-pub struct AdditionalCids<'a> {
-    additional: &'a [&'a HashMap<String, Resource>]
-}
-
-
-
-
-// pub struct AdditionalCIds<'a> {
-//     additional_resources: &'a [&'a HashMap<String, EmbeddedWithCId>]
-// }
-
-// impl<'a> AdditionalCIds<'a> {
-
-//     pub fn new(additional_resources: &'a [&'a HashMap<String, EmbeddedWithCId>]) -> Self {
-//         AdditionalCIds { additional_resources }
-//     }
-
-
-//     /// returns the content id associated with the given name
-//     ///
-//     /// If multiple of the maps used to create this type contain the
-//     /// key the first match is returned and all later ones are ignored.
-//     pub fn get(&self, name: &str) -> Option<&ContentId> {
-//         for possible_source in self.additional_resources {
-//             if let Some(res) = possible_source.get(name) {
-//                 return Some(res.content_id());
-//             }
-//         }
-//         return None;
-//     }
-// }
-
-// impl<'a> Serialize for AdditionalCIds<'a> {
-//     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-//         where S: Serializer
-//     {
-//         let mut existing_keys = HashSet::new();
-//         serializer.collect_map(
-//             self.additional_resources
-//             .iter()
-//             .flat_map(|m| m.iter().map(|(k, v)| (k, v.content_id())))
-//             .filter(|key| existing_keys.insert(key.to_owned()))
-//         )
-//     }
-// }
-

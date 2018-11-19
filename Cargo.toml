@@ -15,15 +15,15 @@ default = []
 handlebars-bindings = []
 
 [dependencies]
-mail-core = { git="https://github.com/1aim/mail" }
+mail-core = { git="https://github.com/1aim/mail", features=["serde-impl"] }
 mail-internals = { git="https://github.com/1aim/mail" }
-mail-headers = { git="https://github.com/1aim/mail" }
+mail-headers = { git="https://github.com/1aim/mail", features=["serde-impl"] }
 
 failure = "0.1.1"
 futures = "0.1.14"
-vec1 = "1.0"
+vec1 = { version="1.1", features=["serde"]}
 soft-ascii-string = "1.0"
-serde = { version="1", optional=true }
+serde = { version="1", features=["derive"] }
 toml = "0.4.8"
 galemu = "0.2.2"
 
