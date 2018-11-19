@@ -1,28 +1,31 @@
 [package]
 name = "mail-template"
 version = "0.2.0"
-description = "[internal/mail-api] provides a \"composition through template\"  api for the Mail type from the mail-api crates"
+description = "[mail] provides a way to create bind string template engines to produce mails"
 authors = ["Philipp Korber <p.korber@1aim.com>"]
-keywords = ["mail-api", "internal"]
+keywords = ["mail-api", "template"]
 categories = []
 license = "MIT OR Apache-2.0"
 readme = "./README.md"
 documentation = "https://docs.rs/mail-template"
 repository = "https://github.com/1aim/mail-template"
 
+[features]
+default = []
+handlebars-bindings = []
 
 [dependencies]
-mail-types = { git="https://github.com/1aim/mail-types" }
-mail-common = { git="https://github.com/1aim/mail-common" }
-mail-headers = { git="https://github.com/1aim/mail-headers" }
-mail-derive = { git="https://github.com/1aim/mail-derive" }
+mail-core = { git="https://github.com/1aim/mail" }
+mail-internals = { git="https://github.com/1aim/mail" }
+mail-headers = { git="https://github.com/1aim/mail" }
 
 failure = "0.1.1"
 futures = "0.1.14"
 vec1 = "1.0"
 soft-ascii-string = "1.0"
-serde = { version="1.0.64", optional=true }
-
+serde = { version="1", optional=true }
+toml = "0.4.8"
+galemu = "0.2.2"
 
 
 [dependencies.mime]
@@ -30,13 +33,6 @@ git="https://github.com/1aim/mime"
 branch="parser_revamp"
 version="0.4.0"
 
-[dependencies.askama]
-version = "0.6.4"
-optional = true
 
 [dev-dependencies]
 
-[features]
-default = []
-askama-engine = ["askama"]
-serialize-to-content-id = ["serde"]
