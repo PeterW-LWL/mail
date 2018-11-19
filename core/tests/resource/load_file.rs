@@ -9,7 +9,8 @@ use mail_core::{
     UseMediaType,
     IRI,
     Source,
-    context::Context,
+    Context,
+    Resource
 };
 use mail_core::context::CompositeContext;
 use mail_core::default_impl::{FsResourceLoader, simple_cpu_pool, HashedIdGen, simple_context};
@@ -35,7 +36,7 @@ fn loaded_resource(path: &str, media_type: &str, name: Option<&str>) -> EncData 
         use_file_name: name.map(|s|s.to_owned()),
     };
 
-    ctx.load_resource(&source).wait().unwrap()
+    ctx.load_transfer_encoded_resource(&Resource::Source(source)).wait().unwrap()
 }
 
 

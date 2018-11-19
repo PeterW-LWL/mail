@@ -15,7 +15,7 @@ use headers::header_components::{
     FileMeta
 };
 
-use ::{
+use crate::{
     iri::IRI,
     utils::{
         SendBoxFuture,
@@ -27,14 +27,14 @@ use ::{
     },
     resource:: {
         Data,
-        EncData,
         Source,
         UseMediaType,
         Metadata
     },
     context::{
         Context,
-        ResourceLoaderComponent
+        ResourceLoaderComponent,
+        MaybeEncData
     }
 };
 
@@ -100,7 +100,7 @@ impl<ValidateScheme> ResourceLoaderComponent for FsResourceLoader<ValidateScheme
 {
 
     fn load_resource(&self, source: &Source, ctx: &impl Context)
-        -> SendBoxFuture<EncData, ResourceLoadingError>
+        -> SendBoxFuture<MaybeEncData, ResourceLoadingError>
     {
         if ValidateScheme::ENABLED && !self.iri_has_compatible_scheme(&source.iri) {
             let err = ResourceLoadingError
@@ -119,7 +119,7 @@ impl<ValidateScheme> ResourceLoaderComponent for FsResourceLoader<ValidateScheme
             use_media_type,
             use_file_name,
             ctx,
-            |data| Ok(data.transfer_encode(Default::default()))
+            |data| Ok(MaybeEncData::EncData(data.transfer_encode(Default::default())))
         )
     }
 }

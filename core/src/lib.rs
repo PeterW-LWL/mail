@@ -54,7 +54,7 @@ pub use self::iri::IRI;
 pub use self::resource::*;
 pub use self::mail::*;
 
-pub use ::context::Context;
+pub use ::context::{Context, MaybeEncData};
 
 
 

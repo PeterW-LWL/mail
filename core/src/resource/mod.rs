@@ -117,9 +117,11 @@ Source->|    |                     |
 
 mod source;
 mod data;
+mod loading;
 
 pub use self::source::*;
 pub use self::data::*;
+pub use self::loading::*;
 
 
 

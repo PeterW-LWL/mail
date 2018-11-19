@@ -10,10 +10,7 @@ use std::{
 
 use soft_ascii_string::SoftAsciiString;
 use futures::{
-    future::{
-        self,
-        Either
-    },
+    future,
     Future,
     Async,
     Poll
@@ -430,10 +427,7 @@ enum InnerMailFuture<C: Context> {
     New { mail: Mail, ctx: C },
     Loading {
         mail: Mail,
-        pending: future::JoinAll<Vec<Either<
-            SendBoxFuture<EncData, ResourceLoadingError>,
-            future::FutureResult<EncData, ResourceLoadingError>
-        >>>,
+        pending: future::JoinAll<Vec<SendBoxFuture<EncData, ResourceLoadingError>>>,
         ctx: C
     },
     Poison
@@ -464,18 +458,7 @@ impl<T> Future for MailFuture<T>
 
                     let mut futures = Vec::new();
                     mail.visit_mail_bodies(&mut |resource: &Resource| {
-                        let fut = match resource {
-                            &Resource::Source(ref source) => {
-                                Either::A(ctx.load_resource(source))
-                            },
-                            &Resource::Data(ref data) => {
-                                Either::A(ctx.transfer_encode_resource(data))
-                            },
-                            &Resource::EncData(ref enc_data) => {
-                                Either::B(future::ok(enc_data.clone()))
-                            }
-                        };
-
+                        let fut = ctx.load_transfer_encoded_resource(resource);
                         futures.push(fut);
                     });
 

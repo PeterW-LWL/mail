@@ -2,15 +2,46 @@
 use std::sync::Arc;
 use std::fmt::Debug;
 
-use futures::{ future, Future, IntoFuture };
+use futures::{ future::{self, Either}, Future, IntoFuture };
 use utils::SendBoxFuture;
 
 use headers::header_components::{
     MessageId, ContentId
 };
 
-use ::error::ResourceLoadingError;
-use ::resource::{Source, Data, EncData};
+use crate::{
+    resource::{Source, Data, EncData, Resource},
+    error::ResourceLoadingError
+};
+
+
+/// Represents Data which might already have been transfer encoded.
+pub enum MaybeEncData {
+    /// The data is returned normally.
+    Data(Data),
+
+    /// The data is returned in a already transfer encoded variant.
+    EncData(EncData)
+}
+
+impl MaybeEncData {
+
+    pub fn to_resource(self) -> Resource {
+        match self {
+            MaybeEncData::Data(data) => Resource::Data(data),
+            MaybeEncData::EncData(enc_data) => Resource::EncData(enc_data)
+        }
+    }
+
+    pub fn encode(self, ctx: &impl Context)
+        -> impl Future<Item=EncData,Error=ResourceLoadingError>
+    {
+        match self {
+            MaybeEncData::Data(data) => Either::A(ctx.load_transfer_encoded_resource(&Resource::Data(data))),
+            MaybeEncData::EncData(enc) => Either::B(future::ok(enc))
+        }
+    }
+}
 
 /// This library needs a context for creating/encoding mails.
 ///
@@ -57,35 +88,46 @@ pub trait Context: Debug + Clone + Send + Sync + 'static {
     /// encoded instance skipping the loading + encoding step for
     /// common resources like e.g. a logo.
     ///
+    /// If the context implementation only caches enc data instances
+    /// but not data instances it might return [`MaybeEncData::EncData`].
+    /// If it newly load the resource it _should_ return a [`MaybeEncData::Data`]
+    /// variant.
+    ///
     /// # Async Considerations
     ///
     /// This function should not block and schedule the encoding
     /// in some other place e.g. by using the contexts offload
     /// functionality.
     fn load_resource(&self, source: &Source)
-        -> SendBoxFuture<EncData, ResourceLoadingError>;
+        -> SendBoxFuture<MaybeEncData, ResourceLoadingError>;
 
-    /// Transfer encodes a `Data` instance.
+    /// Loads and Transfer encodes a `Resource` instance.
     ///
     /// This is called when a `Mail` instance is converted into
-    /// a encodable mail an a `Resource::Data` instance is found.
+    /// a encodable mail.
     ///
-    /// The default impl. of this function just calls
-    /// `data.transfer_encode(data, Default::default())` but a more
-    /// sophisticated implementation could use the `Data`s content id
-    /// for some caching scheme e.g. a LRU cache. Which can safe the
-    /// encoding step for commonly used resources like e.g. a logo.
+    /// The default impl. of this function just:
+    ///
+    /// 1. calls load_resource and chains a "offloaded" transfer encoding
+    ///    if a `Resource::Source` is found.
+    /// 2. transfer encodes the data "offloaded" if `Resource::Data` is found
+    /// 3. just returns the encoded data if `Resource::EncData` is found
+    ///
+    /// A more advances implementation could for example integrate
+    /// a LRU cache.
+    ///
+    /// The default impl is available as the `default_impl_for_load_transfer_encoded_resource`
+    /// function.
     ///
     /// # Async Considerations
     ///
     /// This function should not block and schedule the encoding
     /// in some other place e.g. by using the contexts offload
     /// functionality.
-    fn transfer_encode_resource(&self, data: &Data)
+    fn load_transfer_encoded_resource(&self, resource: &Resource)
         -> SendBoxFuture<EncData, ResourceLoadingError>
     {
-        let data = data.clone();
-        self.offload_fn(move || Ok(data.transfer_encode(Default::default())))
+        default_impl_for_load_transfer_encoded_resource(self, resource)
     }
 
     /// generate a unique content id
@@ -137,25 +179,64 @@ pub trait Context: Debug + Clone + Send + Sync + 'static {
 }
 
 
+/// Provides the default impl for the `load_transfer_encoded_resource` method of `Context`.
+///
+/// This function guarantees to only call `load_resource` and `offload`/`offload_fn` on the
+/// passed in context, to prevent infinite recursion.
+pub fn default_impl_for_load_transfer_encoded_resource(ctx: &impl Context, resource: &Resource)
+    -> SendBoxFuture<EncData, ResourceLoadingError>
+{
+    match resource {
+        Resource::Source(source) => {
+            let ctx2 = ctx.clone();
+            let fut = ctx.load_resource(&source)
+                .and_then(move |me_data| {
+                    match me_data {
+                        MaybeEncData::Data(data) => {
+                            Either::A(ctx2.offload_fn(move || Ok(data.transfer_encode(Default::default()))))
+                        },
+                        MaybeEncData::EncData(enc_data) => {
+                            Either::B(future::ok(enc_data))
+                        }
+                    }
+                });
+            Box::new(fut)
+        },
+        Resource::Data(data) => {
+            let data = data.clone();
+            ctx.offload_fn(move || Ok(data.transfer_encode(Default::default())))
+        },
+        Resource::EncData(enc_data) => {
+            Box::new(future::ok(enc_data.clone()))
+        }
+    }
+}
+
 /// Trait needed to be implemented for providing the resource loading parts to a`CompositeContext`.
 pub trait ResourceLoaderComponent: Debug + Send + Sync + 'static {
 
     /// Calls to `Context::load_resource` will be forwarded to this method.
     ///
     /// It is the same as `Context::load_resource` except that a reference
-    /// to an `OffloaderComponent` will be passed in as it's likely needed.
+    /// to the context containing this component is passed in. To prevent
+    /// infinite recursion the `Context.load_resource` method _must not_
+    /// be called. Additionally the `Context.load_transfer_encoded_resource` _must not_
+    /// be called if it uses `Context.load_resource`.
     fn load_resource(&self, source: &Source, ctx: &impl Context)
-        -> SendBoxFuture<EncData, ResourceLoadingError>;
+        -> SendBoxFuture<MaybeEncData, ResourceLoadingError>;
 
     /// Calls to `Context::transfer_encode_resource` will be forwarded to this method.
     ///
     /// It is the same as `Context::transfer_encode_resource` except that a reference
-    /// to an `OffloaderComponent` will be passed in as it's likely needed.
-    fn transfer_encode_resource(&self, data: &Data, ctx: &impl Context)
+    /// to the context containing this component is passed in to make the `offload`
+    /// and `load_resource` methods of `Context` available.
+    ///
+    /// To prevent infinite recursion the `load_transfer_encoded_resource` method
+    /// of the context _must not_ be called.
+    fn load_transfer_encoded_resource(&self, resource: &Resource, ctx: &impl Context)
         -> SendBoxFuture<EncData, ResourceLoadingError>
     {
-        let data = data.clone();
-        ctx.offload_fn(move || Ok(data.transfer_encode(Default::default())))
+        default_impl_for_load_transfer_encoded_resource(ctx, resource)
     }
 }
 
@@ -254,15 +335,15 @@ impl<R, O, M> Context for CompositeContext<R, O, M>
 {
 
     fn load_resource(&self, source: &Source)
-        -> SendBoxFuture<EncData, ResourceLoadingError>
+        -> SendBoxFuture<MaybeEncData, ResourceLoadingError>
     {
         self.resource_loader().load_resource(source, self)
     }
 
-    fn transfer_encode_resource(&self, data: &Data)
+    fn load_transfer_encoded_resource(&self, resource: &Resource)
         -> SendBoxFuture<EncData, ResourceLoadingError>
     {
-        self.resource_loader().transfer_encode_resource(data, self)
+        self.resource_loader().load_transfer_encoded_resource(resource, self)
     }
 
     fn offload<F>(&self, fut: F) -> SendBoxFuture<F::Item, F::Error>
@@ -315,14 +396,14 @@ impl<C> ResourceLoaderComponent for C
 {
 
     fn load_resource(&self, source: &Source, _: &impl Context)
-        -> SendBoxFuture<EncData, ResourceLoadingError>
+        -> SendBoxFuture<MaybeEncData, ResourceLoadingError>
     {
         <Self as Context>::load_resource(self, source)
     }
 
-    fn transfer_encode_resource(&self, data: &Data, _: &impl Context)
+    fn load_transfer_encoded_resource(&self, resource: &Resource, _: &impl Context)
         -> SendBoxFuture<EncData, ResourceLoadingError>
     {
-        <Self as Context>::transfer_encode_resource(self, data)
+        <Self as Context>::load_transfer_encoded_resource(self, resource)
     }
 }
