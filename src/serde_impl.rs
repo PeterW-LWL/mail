@@ -134,7 +134,6 @@ struct LazySubject {
 #[derive(Deserialize)]
 #[serde(untagged)]
 enum ResourceDeserializationHelper {
-    // Note: VARIANT ORDER MATTERS (serde,untagged)
     // This allows specifying resources in three ways.
     // 1. as tagged enum `Resource` (e.g. `{"Source": { "iri": ...}}}`)
     // 2. as struct `Source` (e.g. `{"iri": ...}` )
@@ -263,15 +262,130 @@ impl<'de> Deserialize<'de> for StandardLazyBodyTemplate {
 
 #[cfg(test)]
 mod test {
+    use toml;
+    use super::*;
+
+    fn test_source_iri(resource: &Resource, iri: &str) {
+        if let &Resource::Source(ref source) = resource {
+            assert_eq!(source.iri.as_str(), iri);
+        } else {
+            panic!("unexpected resource expected resource with source and iri {:?} but got {:?}", iri, resource);
+        }
+    }
+
+    mod attachment_deserialization {
+        use super::*;
+        use super::super::deserialize_attachments;
+
+        #[derive(Serialize, Deserialize)]
+        struct Wrapper {
+            #[serde(deserialize_with="deserialize_attachments")]
+            attachments: Vec<Resource>
+        }
+
+
+        #[test]
+        fn should_deserialize_from_strings() {
+            let raw_toml = r#"
+                attachments = ["notes.md", "pic.xd"]
+            "#;
+
+            let Wrapper { attachments } = toml::from_str(raw_toml).unwrap();
+
+            assert_eq!(attachments.len(), 2);
+            test_source_iri(&attachments[0], "path:notes.md");
+            test_source_iri(&attachments[1], "path:pic.xd");
+        }
+
+        #[test]
+        fn should_deserialize_from_sources() {
+            let raw_toml = r#"
+                [[attachments]]
+                Source = {iri="https://fun.example"}
+                [[attachments]]
+                iri="path:pic.xd"
+            "#;
+
+            let Wrapper { attachments } = toml::from_str(raw_toml).unwrap();
+
+            assert_eq!(attachments.len(), 2);
+            test_source_iri(&attachments[0], "https://fun.example");
+            test_source_iri(&attachments[1], "path:pic.xd");
+        }
+
+        #[test]
+        fn check_if_data_is_deserializable_like_expected() {
+            use mail_core::Data;
+
+            let raw_toml = r#"
+                media_type = "text/plain; charset=utf-8"
+                buffer = [65,65,65,66,65]
+                content_id = "c0rc3rcr0q0v32@example.example"
+            "#;
+
+            let data: Data = toml::from_str(raw_toml).unwrap();
+
+            assert_eq!(data.content_id().as_str(), "c0rc3rcr0q0v32@example.example");
+            assert_eq!(&**data.buffer(), b"AAABA" as &[u8]);
+        }
+
+        #[test]
+        fn should_deserialize_from_data() {
+            let raw_toml = r#"
+                [[attachments]]
+                [attachments.Data]
+                media_type = "text/plain; charset=utf-8"
+                buffer = [65,65,65,66,65]
+                content_id = "c0rc3rcr0q0v32@example.example"
+            "#;
+
+            let Wrapper { attachments } = toml::from_str(raw_toml).unwrap();
+
+            assert_eq!(attachments.len(), 1);
+        }
+    }
+
+    mod embedding_deserialization {
+        use super::*;
+        use super::super::deserialize_embeddings;
+
+        #[derive(Serialize, Deserialize)]
+        struct Wrapper {
+            #[serde(deserialize_with="deserialize_embeddings")]
+            embeddings: HashMap<String, Resource>
+        }
+
+        #[test]
+        fn should_deserialize_with_short_forms() {
+            let raw_toml = r#"
+                [embeddings]
+                pic = "hy-ya"
+                pic2 = { iri = "path:ay-ya" }
+                [embeddings.pic3.Data]
+                media_type = "text/plain; charset=utf-8"
+                buffer = [65,65,65,66,65]
+                content_id = "c0rc3rcr0q0v32@example.example"
+                [embeddings.pic4.Source]
+                iri = "path:nay-nay-way"
+            "#;
+
+            let Wrapper { embeddings } = toml::from_str(raw_toml).unwrap();
+
+            assert_eq!(embeddings.len(), 4);
+            assert!(embeddings.contains_key("pic"));
+            assert!(embeddings.contains_key("pic2"));
+            assert!(embeddings.contains_key("pic3"));
+            assert!(embeddings.contains_key("pic4"));
+            test_source_iri(&embeddings["pic"], "path:hy-ya");
+            test_source_iri(&embeddings["pic2"], "path:ay-ya");
+            test_source_iri(&embeddings["pic4"], "path:nay-nay-way");
+            assert_eq!(embeddings["pic3"].content_id().unwrap().as_str(), "c0rc3rcr0q0v32@example.example");
+        }
+    }
 
     #[allow(non_snake_case)]
     mod StandardLazyBodyTemplate {
-
-        use serde::{Serialize, Deserialize};
-        use toml;
-
-        use mail_core::Resource;
-
+        use super::*;
         use super::super::StandardLazyBodyTemplate;
 
         #[derive(Serialize, Deserialize)]
@@ -325,9 +439,7 @@ mod test {
             let (key, resource) = body.embeddings.iter().next().unwrap();
             assert_eq!(key, "pic1");
 
-            if let &Resource::Source(ref source) = resource {
-                assert_eq!(source.iri.as_str(), "path:the_embeddings");
-            } else { panic!("unexpected resource: {:?}", resource)}
+            test_source_iri(resource, "path:the_embeddings");
         }
     }
 }
