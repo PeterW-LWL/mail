@@ -41,6 +41,7 @@ use headers::header_components::{
 #[cfg_attr(feature="serde", derive(Serialize, Deserialize))]
 pub struct Metadata {
     /// File meta like file name or file read time.
+    #[cfg_attr(feature="serde", serde(flatten))]
     pub file_meta: FileMeta,
 
     /// The media type of the data.

@@ -24,6 +24,7 @@ pub struct Source {
     pub iri: IRI,
 
     /// Allows specifying how the media type detection is done.
+    #[cfg_attr(feature="serde", serde(default))]
     pub use_media_type: UseMediaType,
 
     /// Allows providing a explicit name overriding any inferred name.
@@ -37,6 +38,7 @@ pub struct Source {
     /// Note that file names are optional and don't need to be provided at all.
     /// But it is strongly recommended to provide them for anything used as
     /// attachment but normally irrelevant for anything else.
+    #[cfg_attr(feature="serde", serde(default))]
     pub use_file_name: Option<String>
 }
 
