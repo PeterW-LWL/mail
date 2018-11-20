@@ -139,7 +139,7 @@ mod tests {
         let expected = cwd.join("./the/dog");
 
         let base_dir = CwdBaseDir::from_path("./the/dog").unwrap();
-        assert_eq!(&*base_dir, expected);
+        assert_eq!(&*base_dir, &expected);
     }
 
     #[test]

@@ -144,6 +144,7 @@ impl PathRebaseable for Resource {
 #[cfg(test)]
 mod test {
     use super::*;
+    use mail_core::Source;
 
     #[test]
     fn rebase_on_path() {
@@ -159,10 +160,10 @@ mod test {
 
     #[test]
     fn rebase_on_iri() {
-        let mut iri = "path:/prefix/suffix.yup".parse().unwrap();
+        let mut iri: IRI = "path:/prefix/suffix.yup".parse().unwrap();
         iri.rebase_to_exclude_base_dir("/prefix").unwrap();
         assert_eq!(iri.as_str(), "path:suffix.yup");
-        iri.rebase_to_include_base_dir("./nfix").unwrap();
+        iri.rebase_to_include_base_dir("nfix").unwrap();
         iri.rebase_to_include_base_dir("/mfix").unwrap();
         assert_eq!(iri.as_str(), "path:/mfix/nfix/suffix.yup");
         iri.rebase_to_exclude_base_dir("/wrong").unwrap();
@@ -172,7 +173,7 @@ mod test {
     #[test]
     fn rebase_on_resource() {
         let mut resource = Resource::Source(Source {
-            iri: "path:./abc/def".parse().unwrap(),
+            iri: "path:abc/def".parse().unwrap(),
             use_media_type: Default::default(),
             use_file_name: Default::default()
         });
@@ -180,9 +181,11 @@ mod test {
         resource.rebase_to_include_base_dir("./abc").unwrap();
         resource.rebase_to_include_base_dir("/pre").unwrap();
         resource.rebase_to_exclude_base_dir("/pre").unwrap();
+        resource.rebase_to_exclude_base_dir("abc").unwrap();
+        resource.rebase_to_include_base_dir("abc").unwrap();
 
         if let Resource::Source(Source { iri, ..}) = resource {
-            assert_eq!(iri.as_str(), "path:./abc/abc/def");
+            assert_eq!(iri.as_str(), "path:abc/abc/def");
         } else { unreachable!() }
     }
 }
