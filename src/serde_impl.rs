@@ -1,6 +1,7 @@
 use std::{
     collections::HashMap,
-    sync::Arc
+    sync::Arc,
+    path::Path
 };
 
 use serde::{
@@ -22,6 +23,7 @@ use super::{
     PathRebaseable,
     InnerTemplate,
     Subject,
+    UnsupportedPathError
 };
 
 /// Type used when deserializing a template using serde.
@@ -163,7 +165,7 @@ impl Into<Resource> for ResourceDeserializationHelper {
     }
 }
 
-fn deserialize_embeddings<'de, D>(deserializer: D)
+pub fn deserialize_embeddings<'de, D>(deserializer: D)
     -> Result<HashMap<String, Resource>, D::Error>
     where D: Deserializer<'de>
 {
@@ -178,7 +180,7 @@ fn deserialize_embeddings<'de, D>(deserializer: D)
     Ok(map)
 }
 
-fn deserialize_attachments<'de, D>(deserializer: D)
+pub fn deserialize_attachments<'de, D>(deserializer: D)
     -> Result<Vec<Resource>, D::Error>
     where D: Deserializer<'de>
 {
@@ -191,4 +193,141 @@ fn deserialize_attachments<'de, D>(deserializer: D)
         .collect();
 
     Ok(vec)
+}
+
+//TODO make base dir default to the dir the template file is in if it's parsed from a template file.
+
+/// Common implementation for a type for [`TemplateEngine::LazyBodyTemplate`].
+///
+/// This impl. gives bodies a field `embeddings` which is a mapping of embedding
+/// names to embeddings (using `deserialize_embeddings`) a `iri` field which
+/// allows specifying the template (e.g. `"path:body.html"`) and can be relative
+/// to the base dir. It also allows just specifying a string as template which defaults
+/// to using `iri = "path:<thestring>"` and no embeddings.
+#[derive(Debug, Serialize)]
+pub struct StandardLazyBodyTemplate {
+    pub iri: IRI,
+    pub embeddings: HashMap<String, Resource>
+}
+
+
+impl PathRebaseable for StandardLazyBodyTemplate {
+    fn rebase_to_include_base_dir(&mut self, base_dir: impl AsRef<Path>)
+        -> Result<(), UnsupportedPathError>
+    {
+        self.iri.rebase_to_include_base_dir(base_dir)
+    }
+
+    fn rebase_to_exclude_base_dir(&mut self, base_dir: impl AsRef<Path>)
+        -> Result<(), UnsupportedPathError>
+    {
+        self.iri.rebase_to_exclude_base_dir(base_dir)
+    }
+}
+
+
+#[derive(Deserialize)]
+#[serde(untagged)]
+enum StandardLazyBodyTemplateDeserializationHelper {
+    ShortForm(String),
+    LongForm {
+        iri: IRI,
+        #[serde(default)]
+        #[serde(deserialize_with="deserialize_embeddings")]
+        embeddings: HashMap<String, Resource>
+    }
+}
+
+impl<'de> Deserialize<'de> for StandardLazyBodyTemplate {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where D: Deserializer<'de>
+    {
+        use self::StandardLazyBodyTemplateDeserializationHelper::*;
+        let helper = StandardLazyBodyTemplateDeserializationHelper::deserialize(deserializer)?;
+        let ok_val =
+            match helper {
+                ShortForm(string) => {
+                    //UNWRAP_SAFE: only scheme can fail but is known to be ok
+                    let iri = IRI::from_parts("path", &string).unwrap();
+                    StandardLazyBodyTemplate {
+                        iri,
+                        embeddings: Default::default()
+                    }
+                },
+                LongForm {iri, embeddings} => StandardLazyBodyTemplate { iri, embeddings }
+            };
+        Ok(ok_val)
+    }
+}
+
+
+#[cfg(test)]
+mod test {
+
+    #[allow(non_snake_case)]
+    mod StandardLazyBodyTemplate {
+
+        use serde::{Serialize, Deserialize};
+        use toml;
+
+        use mail_core::Resource;
+
+        use super::super::StandardLazyBodyTemplate;
+
+        #[derive(Serialize, Deserialize)]
+        struct Wrapper {
+            body: StandardLazyBodyTemplate
+        }
+
+        #[test]
+        fn should_deserialize_from_string() {
+            let toml_str = r#"
+                body = "template.html.hbs"
+            "#;
+
+            let Wrapper { body } = toml::from_str(toml_str).unwrap();
+            assert_eq!(body.iri.as_str(), "path:template.html.hbs");
+            assert_eq!(body.embeddings.len(), 0);
+        }
+
+        #[test]
+        fn should_deserialize_from_object_without_embeddings() {
+            let toml_str = r#"
+                body = { iri="path:t.d" }
+            "#;
+
+            let Wrapper { body }= toml::from_str(toml_str).unwrap();
+            assert_eq!(body.iri.as_str(), "path:t.d");
+            assert_eq!(body.embeddings.len(), 0);
+        }
+
+        #[test]
+        fn should_deserialize_from_object_with_empty_embeddings() {
+            let toml_str = r#"
+                body = { iri="path:t.d", embeddings={} }
+            "#;
+
+            let Wrapper { body } = toml::from_str(toml_str).unwrap();
+            assert_eq!(body.iri.as_str(), "path:t.d");
+            assert_eq!(body.embeddings.len(), 0);
+        }
+
+        #[test]
+        fn should_deserialize_from_object_with_short_from_embeddings() {
+            let toml_str = r#"
+                body = { iri="path:t.d", embeddings={ pic1="the_embeddings" } }
+            "#;
+
+            let Wrapper { body } = toml::from_str(toml_str).unwrap();
+            assert_eq!(body.iri.as_str(), "path:t.d");
+            assert_eq!(body.embeddings.len(), 1);
+
+            let (key, resource) = body.embeddings.iter().next().unwrap();
+            assert_eq!(key, "pic1");
+
+            if let &Resource::Source(ref source) = resource {
+                assert_eq!(source.iri.as_str(), "path:the_embeddings");
+            } else { panic!("unexpected resource: {:?}", resource)}
+        }
+    }
 }
