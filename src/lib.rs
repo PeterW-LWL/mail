@@ -46,13 +46,15 @@ mod base_dir;
 mod path_rebase;
 mod additional_cid;
 
+// #[cfg(feature="handlebars")]
+// pub mod handlebars;
+
 pub use self::base_dir::*;
 pub use self::path_rebase::*;
 pub use self::additional_cid::*;
 
 pub trait TemplateEngine: Sized {
     type Id: Debug;
-    type Error: Fail;
 
     type LazyBodyTemplate: PathRebaseable + Debug + Send + Serialize + for<'a> Deserialize<'a>;
 
@@ -115,7 +117,7 @@ pub trait UseTemplateEngine<D>: TemplateEngine {
         id: &'r Self::Id,
         data: &'r Bound<'a, Self::PreparedData>,
         additional_cids: AdditionalCIds<'r>
-    ) -> Result<String, Self::Error>;
+    ) -> Result<String, Error>;
 }
 
 #[derive(Debug)]
