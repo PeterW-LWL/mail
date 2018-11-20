@@ -6,12 +6,14 @@ extern crate mail_core;
 extern crate mail_headers;
 extern crate vec1;
 extern crate toml;
+#[cfg(feature="handlebars")]
+extern crate handlebars as hbs;
 
 use std::{
     fs,
     collections::HashMap,
     fmt::Debug,
-    path::{PathBuf},
+    path::{Path, PathBuf},
     sync::Arc
 };
 
@@ -98,10 +100,12 @@ pub fn load_toml_template_from_path<TE, C>(
 
     let ctx2 = ctx.clone();
     ctx.offload_fn(move || {
-        let content = fs::read_to_string(path)?;
+        let content = fs::read_to_string(&path)?;
         let base: serde_impl::TemplateBase<TE> = toml::from_str(&content)?;
-        Ok(base)
-    }).and_then(move |base| base.load(engine, &ctx2))
+        let base_dir = path.parent().unwrap_or_else(||Path::new("."));
+        let base_dir = CwdBaseDir::from_path(base_dir)?;
+        Ok((base, base_dir))
+    }).and_then(move |(base, base_dir)| base.load(engine, base_dir, &ctx2))
 }
 
 /// Load a template as described in a toml string;
@@ -118,7 +122,13 @@ pub fn load_toml_template_from_str<TE, C>(
             Err(err) => { return Either::B(future::err(Error::from(err))); }
         };
 
-    Either::A(base.load(engine, ctx))
+    let base_dir =
+        match CwdBaseDir::from_path(Path::new(".")) {
+            Ok(base_dir) => base_dir,
+            Err(err) => { return Either::B(future::err(Error::from(err))) }
+        };
+
+    Either::A(base.load(engine, base_dir, ctx))
 }
 
 /// Compound POD for returning data needed for preparing for rendering a template.

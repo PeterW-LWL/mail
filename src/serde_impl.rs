@@ -23,7 +23,7 @@ use super::{
     PathRebaseable,
     InnerTemplate,
     Subject,
-    UnsupportedPathError
+    UnsupportedPathError,
 };
 
 /// Type used when deserializing a template using serde.
@@ -49,7 +49,8 @@ use super::{
 pub struct TemplateBase<TE: TemplateEngine> {
     #[serde(rename="name")]
     template_name: String,
-    base_dir: CwdBaseDir,
+    #[serde(default)]
+    base_dir: Option<CwdBaseDir>,
     subject: LazySubject,
     bodies: Vec1<TE::LazyBodyTemplate>,
     //TODO impl. deserialize where
@@ -66,7 +67,7 @@ impl<TE> TemplateBase<TE>
 
     //TODO!! make this load all embeddings/attachments and make it a future
     /// Couples the template base with a specific engine instance.
-    pub fn load(self, mut engine: TE, ctx: &impl Context) -> impl Future<Item=Template<TE>, Error=Error> {
+    pub fn load(self, mut engine: TE, default_base_dir: CwdBaseDir, ctx: &impl Context) -> impl Future<Item=Template<TE>, Error=Error> {
         let TemplateBase {
             template_name,
             base_dir,
@@ -75,6 +76,8 @@ impl<TE> TemplateBase<TE>
             mut embeddings,
             mut attachments
         } = self;
+
+        let base_dir = base_dir.unwrap_or(default_base_dir);
 
         //FIXME[rust/catch block] use catch block
         let catch_res = (|| -> Result<_, Error> {
