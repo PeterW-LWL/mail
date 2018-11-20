@@ -53,6 +53,7 @@ pub use self::base_dir::*;
 pub use self::path_rebase::*;
 pub use self::additional_cid::*;
 
+/// Trait used to bind/implement template engines.
 pub trait TemplateEngine: Sized {
     type Id: Debug;
 
@@ -65,44 +66,10 @@ pub trait TemplateEngine: Sized {
         -> Result<Self::Id, Error>;
 }
 
-pub fn load_toml_template_from_path<TE, C>(
-    engine: TE,
-    path: PathBuf,
-    ctx: &C
-) -> impl Future<Item=Template<TE>, Error=Error>
-    where TE: TemplateEngine + 'static, C: Context
-{
-
-    let ctx2 = ctx.clone();
-    ctx.offload_fn(move || {
-        let content = fs::read_to_string(path)?;
-        let base: serde_impl::TemplateBase<TE> = toml::from_str(&content)?;
-        Ok(base)
-    }).and_then(move |base| base.load(engine, &ctx2))
-}
-
-pub fn load_toml_template_from_str<TE, C>(
-    engine: TE,
-    content: &str,
-    ctx: &C
-) -> impl Future<Item=Template<TE>, Error=Error>
-    where TE: TemplateEngine, C: Context
-{
-    let base: serde_impl::TemplateBase<TE> =
-        match toml::from_str(content) {
-            Ok(base) => base,
-            Err(err) => { return Either::B(future::err(Error::from(err))); }
-        };
-
-    Either::A(base.load(engine, ctx))
-}
-
-pub struct PreparationData<'a, PD: for<'any> BoundExt<'any>> {
-    pub attachments: Vec<Resource>,
-    pub inline_embeddings: HashMap<String, Resource>,
-    pub prepared_data: Bound<'a, PD>
-}
-
+/// Additional trait a template engine needs to implement for the types it can process as input.
+///
+/// This could for example be implemented in a wild card impl for the template engine for
+/// any data `D` which implements `Serialize`.
 pub trait TemplateEngineCanHandleData<D>: TemplateEngine {
 
     //TODO[doc]: this is needed for all template engines which use to json serialization
@@ -120,6 +87,49 @@ pub trait TemplateEngineCanHandleData<D>: TemplateEngine {
     ) -> Result<String, Error>;
 }
 
+/// Load a template as described in a toml file.
+pub fn load_toml_template_from_path<TE, C>(
+    engine: TE,
+    path: PathBuf,
+    ctx: &C
+) -> impl Future<Item=Template<TE>, Error=Error>
+    where TE: TemplateEngine + 'static, C: Context
+{
+
+    let ctx2 = ctx.clone();
+    ctx.offload_fn(move || {
+        let content = fs::read_to_string(path)?;
+        let base: serde_impl::TemplateBase<TE> = toml::from_str(&content)?;
+        Ok(base)
+    }).and_then(move |base| base.load(engine, &ctx2))
+}
+
+/// Load a template as described in a toml string;
+pub fn load_toml_template_from_str<TE, C>(
+    engine: TE,
+    content: &str,
+    ctx: &C
+) -> impl Future<Item=Template<TE>, Error=Error>
+    where TE: TemplateEngine, C: Context
+{
+    let base: serde_impl::TemplateBase<TE> =
+        match toml::from_str(content) {
+            Ok(base) => base,
+            Err(err) => { return Either::B(future::err(Error::from(err))); }
+        };
+
+    Either::A(base.load(engine, ctx))
+}
+
+/// Compound POD for returning data needed for preparing for rendering a template.
+pub struct PreparationData<'a, PD: for<'any> BoundExt<'any>> {
+    pub attachments: Vec<Resource>,
+    pub inline_embeddings: HashMap<String, Resource>,
+    pub prepared_data: Bound<'a, PD>
+}
+
+
+/// A Mail template.
 #[derive(Debug)]
 pub struct Template<TE: TemplateEngine> {
     inner: Arc<InnerTemplate<TE>>
@@ -215,6 +225,7 @@ impl<TE, D> TemplateExt<TE, D> for Template<TE>
     }
 }
 
+/// Future returned when preparing a template for rendering.
 pub struct RenderPreparationFuture<'a, TE, D, C>
     where TE: TemplateEngine + TemplateEngineCanHandleData<D>, C: Context
 {
@@ -254,6 +265,7 @@ impl<'a, TE,D,C> Future for RenderPreparationFuture<'a, TE, D, C>
     }
 }
 
+/// Type containing the preparations done before rendering a template as Mail struct.
 pub struct Preparations<'a, TE, D, C>
     where TE: TemplateEngine + TemplateEngineCanHandleData<D>, C: Context
 {
@@ -347,6 +359,7 @@ impl<'a, TE, D, C> Preparations<'a, TE, D, C>
     }
 }
 
+/// Represents one of potentially many alternate bodies in a template.
 #[derive(Debug)]
 pub struct BodyTemplate<TE: TemplateEngine> {
     template_id: TE::Id,
@@ -371,6 +384,7 @@ impl<TE> BodyTemplate<TE>
     }
 }
 
+/// Represents a template used for generating the subject of a mail.
 #[derive(Debug)]
 pub struct Subject<TE: TemplateEngine> {
     template_id: TE::Id
