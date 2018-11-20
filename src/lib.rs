@@ -103,7 +103,7 @@ pub struct PreparationData<'a, PD: for<'any> BoundExt<'any>> {
     pub prepared_data: Bound<'a, PD>
 }
 
-pub trait UseTemplateEngine<D>: TemplateEngine {
+pub trait TemplateEngineCanHandleData<D>: TemplateEngine {
 
     //TODO[doc]: this is needed for all template engines which use to json serialization
     // (we have more then one template so there would be a lot of overhead)
@@ -173,8 +173,14 @@ struct InnerTemplate<TE: TemplateEngine> {
 }
 
 
+/// Automatically provides the `prepare_to_render` method for all `Templates`
+///
+/// This trait is implemented for all `Templates`/`D`(data) combinations where
+/// the templates template engine can handle the given data (impl. `TemplateEngineCanHandleData<D>`)
+///
+/// This trait should not be implemented by hand.
 pub trait TemplateExt<TE, D>
-    where TE: TemplateEngine + UseTemplateEngine<D>
+    where TE: TemplateEngine + TemplateEngineCanHandleData<D>
 {
     fn prepare_to_render<'s, 'r, C>(&'s self, data: &'r D, ctx: &'s C) -> RenderPreparationFuture<'r, TE, D, C>
         where C: Context;
@@ -182,7 +188,7 @@ pub trait TemplateExt<TE, D>
 
 
 impl<TE, D> TemplateExt<TE, D> for Template<TE>
-    where TE: TemplateEngine + UseTemplateEngine<D>
+    where TE: TemplateEngine + TemplateEngineCanHandleData<D>
 {
     fn prepare_to_render<'s, 'r, C>(&'s self, data: &'r D, ctx: &'s C) -> RenderPreparationFuture<'r, TE, D, C>
         where C: Context
@@ -210,11 +216,11 @@ impl<TE, D> TemplateExt<TE, D> for Template<TE>
 }
 
 pub struct RenderPreparationFuture<'a, TE, D, C>
-    where TE: TemplateEngine + UseTemplateEngine<D>, C: Context
+    where TE: TemplateEngine + TemplateEngineCanHandleData<D>, C: Context
 {
     payload: Option<(
         Template<TE>,
-        Bound<'a, <TE as UseTemplateEngine<D>>::PreparedData>,
+        Bound<'a, <TE as TemplateEngineCanHandleData<D>>::PreparedData>,
         C
     )>,
     loading_fut: Join<
@@ -224,7 +230,7 @@ pub struct RenderPreparationFuture<'a, TE, D, C>
 }
 
 impl<'a, TE,D,C> Future for RenderPreparationFuture<'a, TE, D, C>
-    where TE: TemplateEngine, TE: UseTemplateEngine<D>, C: Context
+    where TE: TemplateEngine, TE: TemplateEngineCanHandleData<D>, C: Context
 {
     type Item = Preparations<'a, TE, D, C>;
     type Error = Error;
@@ -249,17 +255,17 @@ impl<'a, TE,D,C> Future for RenderPreparationFuture<'a, TE, D, C>
 }
 
 pub struct Preparations<'a, TE, D, C>
-    where TE: TemplateEngine + UseTemplateEngine<D>, C: Context
+    where TE: TemplateEngine + TemplateEngineCanHandleData<D>, C: Context
 {
     template: Template<TE>,
-    prepared_data: Bound<'a, <TE as UseTemplateEngine<D>>::PreparedData>,
+    prepared_data: Bound<'a, <TE as TemplateEngineCanHandleData<D>>::PreparedData>,
     ctx: C,
     inline_embeddings: HashMap<String, Resource>,
     attachments: Vec<Resource>
 }
 
 impl<'a, TE, D, C> Preparations<'a, TE, D, C>
-    where TE: TemplateEngine, TE: UseTemplateEngine<D>, C: Context
+    where TE: TemplateEngine, TE: TemplateEngineCanHandleData<D>, C: Context
 {
     pub fn render_to_mail_parts(self) -> Result<(MailParts, Header<headers::Subject>), Error> {
         let Preparations {
