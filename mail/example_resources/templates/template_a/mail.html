@@ -2,9 +2,10 @@
 <html>
 <head>
     <!-- NOTE THAT THIS IS JUST AN EXAMPLE FOR THE TEMPLATE ENGINE NOT FOR MAIL ON ITSELF -->
-    {% block head %}{% endblock head %}
+    <meta charset="utf-8">
 </head>
 <body>
-    {% block body %}{% endblock body %}
+    <img src="cid:{{cids.logo}}"> <br>
+    <h1> Hy {{data.name}},</h1>
 </body>
 </html>

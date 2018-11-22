@@ -1,0 +1,16 @@
+name = "template_a"
+subject = "Hy dear {{name}}"
+
+[[bodies]]
+path = "mail.txt"
+
+[[bodies]]
+path = "mail.html"
+
+  [bodies.embeddings]
+  logo = "logo.png"
+
+[[attachments]]
+iri = "path:./portfolio.pdf"
+media_type = "application/pdf"
+
