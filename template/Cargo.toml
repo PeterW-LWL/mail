@@ -15,9 +15,9 @@ default = []
 handlebars-bindings = ["handlebars"]
 
 [dependencies]
-mail-core = { git="https://github.com/1aim/mail", features=["serde-impl"] }
-mail-internals = { git="https://github.com/1aim/mail" }
-mail-headers = { git="https://github.com/1aim/mail", features=["serde-impl"] }
+mail-core = { path="../core", features=["serde-impl"] }
+mail-internals = { path="../internals" }
+mail-headers = { path="../headers", features=["serde-impl"] }
 
 failure = "0.1.1"
 futures = "0.1.14"
