@@ -11,6 +11,6 @@ path = "mail.html"
   logo = "logo.png"
 
 [[attachments]]
-iri = "path:./portfolio.pdf"
+iri = "path:portfolio.pdf"
 media_type = "application/pdf"
 

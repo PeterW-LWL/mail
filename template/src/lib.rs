@@ -87,6 +87,9 @@ pub trait TemplateEngineCanHandleData<D>: TemplateEngine {
 }
 
 /// Load a template as described in a toml file.
+///
+/// This will set the default of the base_dir to the
+/// dir the template file loaded is in.
 pub fn load_toml_template_from_path<TE, C>(
     engine: TE,
     path: PathBuf,

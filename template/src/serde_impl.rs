@@ -1,13 +1,12 @@
 use std::{
     collections::HashMap,
-    path::{Path, PathBuf}
+    path::{Path, PathBuf},
+    mem
 };
 
 use serde::{
     Serialize, Deserialize,
-    de::{
-        Deserializer,
-    },
+    Serializer, Deserializer
 };
 use failure::Error;
 use futures::{Future, future::{self, Either}};
@@ -52,10 +51,10 @@ pub struct TemplateBase<TE: TemplateEngine> {
     base_dir: Option<CwdBaseDir>,
     subject: LazySubject,
     bodies: Vec1<TE::LazyBodyTemplate>,
-    //TODO impl. deserialize where
-    // resource:String -> IRI::new("path", resource) -> Resource::Source
+    #[serde(default)]
     #[serde(deserialize_with="deserialize_embeddings")]
     embeddings: HashMap<String, Resource>,
+    #[serde(default)]
     #[serde(deserialize_with="deserialize_attachments")]
     attachments: Vec<Resource>,
 }
@@ -65,7 +64,7 @@ impl<TE> TemplateBase<TE>
 {
 
     //TODO!! make this load all embeddings/attachments and make it a future
-    /// Couples the template base with a specific engine instance.
+    /// Couples the template base with a specific engine instance.``
     pub fn load(self, mut engine: TE, default_base_dir: CwdBaseDir, ctx: &impl Context) -> impl Future<Item=Template<TE>, Error=Error> {
         let TemplateBase {
             template_name,
@@ -98,18 +97,31 @@ impl<TE> TemplateBase<TE>
             Ok((subject, bodies))
         })();
 
-        let (subject, bodies) =
+        let (subject, mut bodies) =
             match catch_res {
                 Ok(vals) => vals,
                 Err(err) => { return Either::B(future::err(err)); }
             };
 
-        let loading_fut = Resource::load_container(embeddings, ctx)
-            .join(Resource::load_container(attachments, ctx));
+        let loading_embeddings = Resource::load_container(embeddings, ctx);
+        let loading_attachments = Resource::load_container(attachments, ctx);
+        let loading_body_embeddings = bodies.iter_mut()
+            .map(|body| {
+                //Note: empty HashMap does not alloc!
+                let body_embeddings = mem::replace(&mut body.inline_embeddings, HashMap::new());
+                Resource::load_container(body_embeddings, ctx)
+            })
+            .collect::<Vec<_>>();
+        let loading_body_embeddings = future::join_all(loading_body_embeddings);
 
-        let fut = loading_fut
+
+        let fut = loading_embeddings
+            .join3(loading_attachments, loading_body_embeddings)
             .map_err(Error::from)
-            .map(|(embeddings, attachments)| {
+            .map(|(embeddings, attachments, body_embeddings)| {
+                for (body, loaded_embeddings) in bodies.iter_mut().zip(body_embeddings) {
+                    mem::replace(&mut body.inline_embeddings, loaded_embeddings);
+                }
                 Template {
                     template_name,
                     base_dir,
@@ -125,10 +137,28 @@ impl<TE> TemplateBase<TE>
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug)]
 struct LazySubject {
-    #[serde(flatten)]
     template_string: String
+}
+
+impl Serialize for LazySubject {
+
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where S: Serializer
+    {
+        serializer.serialize_str(&self.template_string)
+    }
+}
+
+impl<'de> Deserialize<'de> for LazySubject {
+
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where D: Deserializer<'de>
+    {
+        let template_string = String::deserialize(deserializer)?;
+        Ok(LazySubject { template_string })
+    }
 }
 
 #[derive(Deserialize)]
@@ -214,13 +244,23 @@ impl PathRebaseable for StandardLazyBodyTemplate {
     fn rebase_to_include_base_dir(&mut self, base_dir: impl AsRef<Path>)
         -> Result<(), UnsupportedPathError>
     {
-        self.path.rebase_to_include_base_dir(base_dir)
+        let base_dir = base_dir.as_ref();
+        self.path.rebase_to_include_base_dir(base_dir)?;
+        for embedding in self.embeddings.values_mut() {
+            embedding.rebase_to_include_base_dir(base_dir)?;
+        }
+        Ok(())
     }
 
     fn rebase_to_exclude_base_dir(&mut self, base_dir: impl AsRef<Path>)
         -> Result<(), UnsupportedPathError>
     {
-        self.path.rebase_to_exclude_base_dir(base_dir)
+        let base_dir = base_dir.as_ref();
+        self.path.rebase_to_exclude_base_dir(base_dir)?;
+        for embedding in self.embeddings.values_mut() {
+            embedding.rebase_to_exclude_base_dir(base_dir)?;
+        }
+        Ok(())
     }
 }
 

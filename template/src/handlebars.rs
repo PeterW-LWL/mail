@@ -11,6 +11,14 @@ use super::{
     serde_impl
 };
 
+//TODO[FEAT] add custom engine config section to loading
+// e.g. something like:
+// ```
+// [engine]
+// load_partial = "../partials/baseh.html"
+// ```
+//
+// Just specific to each engine.
 
 
 pub struct Handlebars {
@@ -19,6 +27,25 @@ pub struct Handlebars {
 }
 
 impl Handlebars {
+
+    pub fn new() -> Self {
+        Handlebars {
+            inner: hbs::Handlebars::new(),
+            name_counter: 0
+        }
+    }
+
+    pub fn inner(&self) -> &hbs::Handlebars {
+        &self.inner
+    }
+
+    /// Provides mutable access to the underling handlebars instance.
+    ///
+    /// This can be used to e.g. add partials (in the future the template
+    /// file will have a custom config section but currently it doesn't).
+    pub fn inner_mut(&mut self) -> &mut hbs::Handlebars {
+        &mut self.inner
+    }
 
     fn next_body_template_name(&mut self) -> String {
         let name = format!("body_{}", self.name_counter);

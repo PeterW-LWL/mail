@@ -20,18 +20,15 @@ test-utils = ["mail-core/test-utils"]
 
 [[example]]
 name = "mail_by_hand"
-crate-type = ["bin"]
 path = "examples/mail_by_hand.rs"
 
 [[example]]
 name = "mail_from_template"
-crate-type = ["bin"]
 path = "examples/mail_from_template/main.rs"
 required-features = ["handlebars"]
 
 [[example]]
 name = "send_mail"
-create-type = ["bind"]
 path = "examples/send_mail/main.rs"
 required-features = ["smtp"]
 

@@ -98,7 +98,7 @@
 //! which normally doesn't need to be accessed directly.
 
 #[doc(hidden)]
-pub extern crate mail_internals;
+pub extern crate mail_internals as internals;
 extern crate mail_headers;
 extern crate mail_core;
 pub extern crate mail_template as template;
@@ -120,7 +120,7 @@ pub use mail_core::*;
 /// - `mail-template`
 /// - `mail-smtp` (feature: `smtp`)
 pub mod error {
-    pub use mail_internals::error::*;
+    pub use crate::internals::error::*;
     pub use mail_headers::error::*;
     pub use mail_headers::InvalidHeaderName;
     pub use mail_core::error::*;
@@ -129,7 +129,7 @@ pub mod error {
     pub use smtp::error::*;
 }
 
-pub use mail_internals::MailType;
+pub use self::internals::MailType;
 
 /// Re-export of headers from `mail-headers`.
 pub use mail_headers::{
@@ -154,6 +154,9 @@ pub use mail_headers::{
     def_headers,
 };
 
+#[doc(hidden)]
+pub use mail_headers::data;
+
 pub use self::header_components::{
     MediaType,
     Mailbox,
@@ -162,8 +165,8 @@ pub use self::header_components::{
 };
 
 
-#[doc(hidden)]
-pub use mail_headers::data;
+// Re-export some parts of mail-internals useful for writing custom header.
+pub use crate::internals::{encoder as  header_encoding};
 
 /// Re-export of the default_impl parts from `mail-core`.
 ///
