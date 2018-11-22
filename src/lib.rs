@@ -169,10 +169,9 @@ impl<TE> Template<TE>
 /// Represents one of potentially many alternate bodies in a template.
 #[derive(Debug)]
 pub struct BodyTemplate<TE: TemplateEngine> {
-    template_id: TE::Id,
-    media_type: MediaType,
-    embeddings: HashMap<String, Resource>
-    //TODO potential additional fields like file_name maybe attachments
+    pub template_id: TE::Id,
+    pub media_type: MediaType,
+    pub inline_embeddings: HashMap<String, Resource>
 }
 
 impl<TE> BodyTemplate<TE>
@@ -187,7 +186,7 @@ impl<TE> BodyTemplate<TE>
     }
 
     pub fn inline_embeddings(&self) -> &HashMap<String, Resource> {
-        &self.embeddings
+        &self.inline_embeddings
     }
 }
 

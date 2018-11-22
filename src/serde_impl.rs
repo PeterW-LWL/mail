@@ -14,6 +14,7 @@ use futures::{Future, future::{self, Either}};
 use vec1::Vec1;
 
 use mail_core::{Resource, Source, IRI, Context};
+use mail_headers::header_components::MediaType;
 
 use super::{
     Template,
@@ -204,7 +205,8 @@ pub fn deserialize_attachments<'de, D>(deserializer: D)
 #[derive(Debug, Serialize)]
 pub struct StandardLazyBodyTemplate {
     pub path: PathBuf,
-    pub embeddings: HashMap<String, Resource>
+    pub embeddings: HashMap<String, Resource>,
+    pub media_type: Option<MediaType>
 }
 
 
@@ -231,7 +233,9 @@ enum StandardLazyBodyTemplateDeserializationHelper {
         path: PathBuf,
         #[serde(default)]
         #[serde(deserialize_with="deserialize_embeddings")]
-        embeddings: HashMap<String, Resource>
+        embeddings: HashMap<String, Resource>,
+        #[serde(default)]
+        media_type: Option<MediaType>
     }
 }
 
@@ -246,10 +250,12 @@ impl<'de> Deserialize<'de> for StandardLazyBodyTemplate {
                 ShortForm(string) => {
                     StandardLazyBodyTemplate {
                         path: string.into(),
-                        embeddings: Default::default()
+                        embeddings: Default::default(),
+                        media_type: Default::default()
                     }
                 },
-                LongForm {path, embeddings} => StandardLazyBodyTemplate { path, embeddings }
+                LongForm {path, embeddings, media_type} =>
+                    StandardLazyBodyTemplate { path, embeddings, media_type }
             };
         Ok(ok_val)
     }
