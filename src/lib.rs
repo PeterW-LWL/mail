@@ -9,6 +9,9 @@ extern crate maybe_owned;
 #[cfg(feature="handlebars")]
 extern crate handlebars as hbs;
 
+#[cfg(all(feature="handlebars", not(feature="handlebars-bindings")))]
+compile_error!("use feature `handlebars-bindings` instead of opt-dep-auto-feature `handlebars`");
+
 use std::{
     fs,
     collections::HashMap,
