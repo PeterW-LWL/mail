@@ -97,23 +97,19 @@
 //! re-exported as it can be seen as an internal part of the implementation
 //! which normally doesn't need to be accessed directly.
 
-extern crate mail_internals;
-#[allow(unused_imports)]
+#[doc(hidden)]
+pub extern crate mail_internals;
 extern crate mail_headers;
-pub extern crate mail_core as mail;
-//pub extern crate mail_template as template;
-//#[macro_use]
-//#[allow(unused_imports)]
-//extern crate mail_derive;
+extern crate mail_core;
+pub extern crate mail_template as template;
+use self::template as mail_template;
 #[cfg(feature="smtp")]
 pub extern crate mail_smtp as smtp;
-//#[cfg(feature="render-template-engine")]
-//pub extern crate mail_render_template_engine as render_template_engine;
 
-//#[cfg(feature="tera-engine")]
-//pub use render_template_engine::tera;
-
-//pub use mail_derive::*;
+/// Re-export of all parts of the `mail_core` crate.
+///
+/// Some parts like `error`/`default_impl` will get overridden.
+pub use mail_core::*;
 
 /// re-export of all error types
 ///
@@ -127,17 +123,13 @@ pub mod error {
     pub use mail_internals::error::*;
     pub use mail_headers::error::*;
     pub use mail_headers::InvalidHeaderName;
-    pub use mail::error::*;
-    //pub use template::error::*;
+    pub use mail_core::error::*;
+    pub use mail_template::error::*;
     #[cfg(feature="smtp")]
     pub use smtp::error::*;
 }
 
-/// re-export of the context module
-pub use mail::context;
-
-//#[cfg(feature="askama-engine")]
-//pub use template::askama_engine as askama;
+pub use mail_internals::MailType;
 
 /// Re-export of headers from `mail-headers`.
 pub use mail_headers::{
@@ -157,26 +149,10 @@ pub use mail_headers::{
 
     Header,
     HeaderName,
-    HeaderMap
+    HeaderMap,
+
+    def_headers,
 };
-
-#[doc(hidden)]
-pub use mail_headers::data;
-
-/// Re-export of the default_impl parts from both `mail-core` and `mail-template`.
-///
-/// This provides default implementations for a number of traits which might be needed
-/// for using some parts of the crates, e.g. a simple implementation of `BuilderContext`.
-pub mod default_impl {
-    pub use mail::default_impl::*;
-}
-
-#[cfg(feature="test-utils")]
-pub mod test_utils {
-    pub use mail::test_utils::*;
-}
-
-pub use mail_internals::MailType;
 
 pub use self::header_components::{
     MediaType,
@@ -185,10 +161,19 @@ pub use self::header_components::{
     Domain
 };
 
-pub use mail::{
-    Mail,
-    Resource,
-    IRI,
-    Source,
-    Context
-};
+
+#[doc(hidden)]
+pub use mail_headers::data;
+
+/// Re-export of the default_impl parts from `mail-core`.
+///
+/// This provides default implementations for a number of traits which might be needed
+/// for using some parts of the crates, e.g. a simple implementation of `BuilderContext`.
+pub mod default_impl {
+    pub use mail_core::default_impl::*;
+}
+
+#[cfg(feature="test-utils")]
+pub mod test_utils {
+    pub use mail_core::test_utils::*;
+}

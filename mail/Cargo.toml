@@ -13,33 +13,35 @@ autoexamples = false
 
 [features]
 smtp = ["mail-smtp"]
-#askama-engine = ["mail-template/askama-engine"]
-#tera-engine = ["render-template-engine", "mail-render-template-engine/tera-engine"]
-#handlebars-engine = ["render-template-engine", "mail-render-template-engine/handlebars-engine"]
-#render-template-engine = ["mail-render-template-engine"]
+handlebars = ["mail-template/handlebars-bindings"]
 
 traceing = ["mail-internals/traceing", "mail-headers/traceing"]
 test-utils = ["mail-core/test-utils"]
 
-# [[example]]
-# name = "mail-from_template"
-# crate-type = ["bin"]
-# path = "examples/mail_from_template/main.rs"
-# required-feature = ["render-template-engine", "tera-engine"]
+[[example]]
+name = "mail_by_hand"
+crate-type = ["bin"]
+path = "examples/mail_by_hand.rs"
+
+[[example]]
+name = "mail_from_template"
+crate-type = ["bin"]
+path = "examples/mail_from_template/main.rs"
+required-features = ["handlebars"]
 
 [[example]]
 name = "send_mail"
-crate-type = ["bin"]
+create-type = ["bind"]
 path = "examples/send_mail/main.rs"
+required-features = ["smtp"]
+
 
 [dependencies]
 mail-internals =  { path="../internals" }
 mail-headers =  { path="../headers" }
 mail-core =  { path="../core" }
-#mail-template = { git="https://github.com/1aim/mail-template" }
-#mail-derive = { git="https://github.com/1aim/mail-derive" }
+mail-template = { path="../template" }
 mail-smtp =  { path="../smtp", optional=true }
-#mail-render-template-engine = {git="https://github.com/1aim/mail-render-template-engine", optional=true }
 
 [dev-dependencies]
 rpassword = "2.0.0"
