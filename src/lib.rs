@@ -179,78 +179,46 @@ struct InnerTemplate<TE: TemplateEngine> {
     engine: TE,
 }
 
-pub struct TemplateData<'a, D: 'a> {
-    pub data:  MaybeOwned<'a, D>,
-    pub attachments: Vec<Resource>,
-    pub inline_embeddings: HashMap<String, Resource>
+
+/// Represents one of potentially many alternate bodies in a template.
+#[derive(Debug)]
+pub struct BodyTemplate<TE: TemplateEngine> {
+    template_id: TE::Id,
+    media_type: MediaType,
+    embeddings: HashMap<String, Resource>
+    //TODO potential additional fields like file_name maybe attachments
 }
 
-impl<'a, D> TemplateData<'a, D> {
-
-    pub fn load(self, ctx: &impl Context) -> DataLoadingFuture<'a, D> {
-        let TemplateData {
-            data,
-            attachments,
-            inline_embeddings
-        } = self;
-
-        let loading_fut = Resource::load_container(inline_embeddings, ctx)
-            .join(Resource::load_container(attachments, ctx));
-
-        DataLoadingFuture {
-            payload: Some(data),
-            loading_fut
-        }
+impl<TE> BodyTemplate<TE>
+    where TE: TemplateEngine
+{
+    pub fn template_id(&self) -> &TE::Id {
+        &self.template_id
     }
-}
-impl<D> From<D> for TemplateData<'static, D> {
-    fn from(data: D) -> Self {
-        TemplateData {
-            data: data.into(),
-            attachments: Default::default(),
-            inline_embeddings: Default::default()
-        }
+
+    pub fn media_type(&self) -> &MediaType {
+        &self.media_type
+    }
+
+    pub fn inline_embeddings(&self) -> &HashMap<String, Resource> {
+        &self.embeddings
     }
 }
 
-impl<'a, D> From<&'a D> for TemplateData<'a, D> {
-    fn from(data: &'a D) -> Self {
-        TemplateData {
-            data: data.into(),
-            attachments: Default::default(),
-            inline_embeddings: Default::default()
-        }
+/// Represents a template used for generating the subject of a mail.
+#[derive(Debug)]
+pub struct Subject<TE: TemplateEngine> {
+    template_id: TE::Id
+}
+
+impl<TE> Subject<TE>
+    where TE: TemplateEngine
+{
+    pub fn template_id(&self) -> &TE::Id {
+        &self.template_id
     }
 }
 
-pub struct LoadedTemplateData<'a, D: 'a>(TemplateData<'a, D>);
-
-impl<'a, D> From<&'a D> for LoadedTemplateData<'a, D> {
-    fn from(data: &'a D) -> Self {
-        LoadedTemplateData(TemplateData::from(data))
-    }
-}
-
-impl<D> From<D> for LoadedTemplateData<'static, D> {
-    fn from(data: D) -> Self {
-        LoadedTemplateData(TemplateData::from(data))
-    }
-}
-
-impl<'a, D> Deref for LoadedTemplateData<'a, D> {
-    type Target = TemplateData<'a, D>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl<'a, D> Into<TemplateData<'a, D>> for LoadedTemplateData<'a, D> {
-    fn into(self) -> TemplateData<'a, D> {
-        let LoadedTemplateData(data) = self;
-        data
-    }
-}
 /// Automatically provides the `prepare_to_render` method for all `Templates`
 ///
 /// This trait is implemented for all `Templates`/`D`(data) combinations where
@@ -349,6 +317,79 @@ impl<TE, D> TemplateExt<TE, D> for Template<TE>
     }
 }
 
+pub struct TemplateData<'a, D: 'a> {
+    pub data:  MaybeOwned<'a, D>,
+    pub attachments: Vec<Resource>,
+    pub inline_embeddings: HashMap<String, Resource>
+}
+
+impl<'a, D> TemplateData<'a, D> {
+
+    pub fn load(self, ctx: &impl Context) -> DataLoadingFuture<'a, D> {
+        let TemplateData {
+            data,
+            attachments,
+            inline_embeddings
+        } = self;
+
+        let loading_fut = Resource::load_container(inline_embeddings, ctx)
+            .join(Resource::load_container(attachments, ctx));
+
+        DataLoadingFuture {
+            payload: Some(data),
+            loading_fut
+        }
+    }
+}
+impl<D> From<D> for TemplateData<'static, D> {
+    fn from(data: D) -> Self {
+        TemplateData {
+            data: data.into(),
+            attachments: Default::default(),
+            inline_embeddings: Default::default()
+        }
+    }
+}
+
+impl<'a, D> From<&'a D> for TemplateData<'a, D> {
+    fn from(data: &'a D) -> Self {
+        TemplateData {
+            data: data.into(),
+            attachments: Default::default(),
+            inline_embeddings: Default::default()
+        }
+    }
+}
+
+pub struct LoadedTemplateData<'a, D: 'a>(TemplateData<'a, D>);
+
+impl<'a, D> From<&'a D> for LoadedTemplateData<'a, D> {
+    fn from(data: &'a D) -> Self {
+        LoadedTemplateData(TemplateData::from(data))
+    }
+}
+
+impl<D> From<D> for LoadedTemplateData<'static, D> {
+    fn from(data: D) -> Self {
+        LoadedTemplateData(TemplateData::from(data))
+    }
+}
+
+impl<'a, D> Deref for LoadedTemplateData<'a, D> {
+    type Target = TemplateData<'a, D>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl<'a, D> Into<TemplateData<'a, D>> for LoadedTemplateData<'a, D> {
+    fn into(self) -> TemplateData<'a, D> {
+        let LoadedTemplateData(data) = self;
+        data
+    }
+}
+
 /// Future returned when preparing a template for rendering.
 pub struct DataLoadingFuture<'a, D: 'a> {
     payload: Option<MaybeOwned<'a, D>>,
@@ -378,44 +419,5 @@ impl<'a, D> Future for DataLoadingFuture<'a, D> {
         };
 
         Ok(Async::Ready(LoadedTemplateData(inner)))
-    }
-}
-
-/// Represents one of potentially many alternate bodies in a template.
-#[derive(Debug)]
-pub struct BodyTemplate<TE: TemplateEngine> {
-    template_id: TE::Id,
-    media_type: MediaType,
-    embeddings: HashMap<String, Resource>
-    //TODO potential additional fields like file_name maybe attachments
-}
-
-impl<TE> BodyTemplate<TE>
-    where TE: TemplateEngine
-{
-    pub fn template_id(&self) -> &TE::Id {
-        &self.template_id
-    }
-
-    pub fn media_type(&self) -> &MediaType {
-        &self.media_type
-    }
-
-    pub fn inline_embeddings(&self) -> &HashMap<String, Resource> {
-        &self.embeddings
-    }
-}
-
-/// Represents a template used for generating the subject of a mail.
-#[derive(Debug)]
-pub struct Subject<TE: TemplateEngine> {
-    template_id: TE::Id
-}
-
-impl<TE> Subject<TE>
-    where TE: TemplateEngine
-{
-    pub fn template_id(&self) -> &TE::Id {
-        &self.template_id
     }
 }
