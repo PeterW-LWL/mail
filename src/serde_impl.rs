@@ -1,6 +1,5 @@
 use std::{
     collections::HashMap,
-    sync::Arc,
     path::Path
 };
 
@@ -21,7 +20,6 @@ use super::{
     TemplateEngine,
     CwdBaseDir,
     PathRebaseable,
-    InnerTemplate,
     Subject,
     UnsupportedPathError,
 };
@@ -111,7 +109,7 @@ impl<TE> TemplateBase<TE>
         let fut = loading_fut
             .map_err(Error::from)
             .map(|(embeddings, attachments)| {
-                let inner = InnerTemplate {
+                Template {
                     template_name,
                     base_dir,
                     subject,
@@ -119,9 +117,7 @@ impl<TE> TemplateBase<TE>
                     embeddings,
                     attachments,
                     engine
-                };
-
-                Template { inner: Arc::new(inner) }
+                }
             });
 
         Either::A(fut)

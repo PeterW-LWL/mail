@@ -14,7 +14,6 @@ use std::{
     collections::HashMap,
     fmt::Debug,
     path::{Path, PathBuf},
-    sync::Arc,
     ops::Deref
 };
 
@@ -129,43 +128,6 @@ pub fn load_toml_template_from_str<TE, C>(
 /// A Mail template.
 #[derive(Debug)]
 pub struct Template<TE: TemplateEngine> {
-    inner: Arc<InnerTemplate<TE>>
-}
-
-impl<TE> Template<TE>
-    where TE: TemplateEngine
-{
-    pub fn inline_embeddings(&self) -> &HashMap<String, Resource> {
-        &self.inner.embeddings
-    }
-
-    pub fn attachments(&self) -> &[Resource] {
-        &self.inner.attachments
-    }
-
-    pub fn engine(&self) -> &TE {
-        &self.inner.engine
-    }
-
-    pub fn bodies(&self) -> &[BodyTemplate<TE>] {
-        &self.inner.bodies
-    }
-
-    pub fn subject_template_id(&self) -> &TE::Id {
-        &self.inner.subject.template_id
-    }
-}
-
-impl<TE> Clone for Template<TE>
-    where TE: TemplateEngine
-{
-    fn clone(&self) -> Self {
-        Template { inner: self.inner.clone() }
-    }
-}
-
-#[derive(Debug)]
-struct InnerTemplate<TE: TemplateEngine> {
     template_name: String,
     base_dir: CwdBaseDir,
     subject: Subject<TE>,
@@ -177,6 +139,30 @@ struct InnerTemplate<TE: TemplateEngine> {
     embeddings: HashMap<String, Resource>,
     attachments: Vec<Resource>,
     engine: TE,
+}
+
+impl<TE> Template<TE>
+    where TE: TemplateEngine
+{
+    pub fn inline_embeddings(&self) -> &HashMap<String, Resource> {
+        &self.embeddings
+    }
+
+    pub fn attachments(&self) -> &[Resource] {
+        &self.attachments
+    }
+
+    pub fn engine(&self) -> &TE {
+        &self.engine
+    }
+
+    pub fn bodies(&self) -> &[BodyTemplate<TE>] {
+        &self.bodies
+    }
+
+    pub fn subject_template_id(&self) -> &TE::Id {
+        &self.subject.template_id
+    }
 }
 
 
