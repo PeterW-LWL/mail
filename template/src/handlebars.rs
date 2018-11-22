@@ -1,6 +1,5 @@
 use hbs;
-use serde::{Serialize, Deserialize};
-use galemu::{Bound, BoundExt, create_gal_wrapper_type, Ref};
+use serde::Serialize;
 use failure::Error;
 
 
@@ -8,10 +7,7 @@ use super::{
     TemplateEngine,
     TemplateEngineCanHandleData,
     BodyTemplate,
-    PreparationData,
     AdditionalCIds,
-    PathRebaseable,
-    UnsupportedPathError,
     serde_impl
 };
 
@@ -38,38 +34,42 @@ impl TemplateEngine for Handlebars {
     fn load_body_template(&mut self, tmpl: Self::LazyBodyTemplate)
         -> Result<BodyTemplate<Self>, Error>
     {
-        let StandardLazyBodyTemplate {
+        let serde_impl::StandardLazyBodyTemplate {
             path, embeddings, media_type
         } = tmpl;
 
         let name = self.next_body_template_name();
-        self.inner.register_template_file(name, path)?;
+        self.inner.register_template_file(&name, &path)?;
+
+        const ERR_BAD_MEDIA_TYPE_DETECTION: &str =
+            "handlebars requires html/txt file extension or media type given in template spec";
 
         let media_type =
             if let Some(media_type) = media_type {
                 media_type
-            } else if let Some(extension) = path.extension().and_then(|osstr| osstr.as_str()) {
+            } else if let Some(extension) = path.extension().and_then(|osstr| osstr.to_str()) {
                 match extension {
                     "html" => "text/html; charset=utf-8".parse().unwrap(),
-                    "txt" => "text/plain; charset=utf-8".parse().unwrap()
+                    "txt" => "text/plain; charset=utf-8".parse().unwrap(),
+                    _ => { return Err(failure::err_msg(ERR_BAD_MEDIA_TYPE_DETECTION)); }
                 }
             } else {
-                return Err(failure::err_msg(
-                    "handlebars requires html/txt file extension or media type given in template spec"
-                ));
+                return Err(failure::err_msg(ERR_BAD_MEDIA_TYPE_DETECTION));
             };
 
         Ok(BodyTemplate {
             template_id: name,
-            media_type: TODO,
-            inline_embeddings: Default::default(),
+            media_type,
+            inline_embeddings: embeddings,
         })
     }
 
     fn load_subject_template(&mut self, template_string: String)
         -> Result<Self::Id, Error>
     {
-        Ok(self.inner.register_template_string("subject".to_owned(), template_string)?)
+        let id = "subject".to_owned();
+        self.inner.register_template_string(&id, template_string)?;
+        Ok(id)
     }
 }
 
@@ -86,11 +86,12 @@ impl<D> TemplateEngineCanHandleData<D> for Handlebars
         data: &'r D,
         additional_cids: AdditionalCIds<'r>
     ) -> Result<String, Error> {
-        Ok(self.inner.render(id, SerHelper { data, cids: additional_cid })?)
+        Ok(self.inner.render(id, &SerHelper { data, cids: additional_cids })?)
     }
 }
 
-struct SerHelper<'r, D> {
+#[derive(Serialize)]
+struct SerHelper<'r, D: 'r> {
     data: &'r D,
     cids: AdditionalCIds<'r>
 }

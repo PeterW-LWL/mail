@@ -46,13 +46,14 @@ use mail_headers::{
     headers
 };
 
-pub mod serde_impl;
 mod base_dir;
 mod path_rebase;
 mod additional_cid;
+pub mod serde_impl;
+pub mod error;
 
-// #[cfg(feature="handlebars")]
-// pub mod handlebars;
+#[cfg(feature="handlebars")]
+pub mod handlebars;
 
 pub use self::base_dir::*;
 pub use self::path_rebase::*;
