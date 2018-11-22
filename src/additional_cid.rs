@@ -17,7 +17,7 @@ impl<'a> AdditionalCIds<'a> {
     ///
     /// All resources in the all hash maps have to be loaded to the
     /// `Data` or `EncData` variants or using `get` can panic.
-    pub fn new(additional_resources: &'a [&'a HashMap<String, Resource>]) -> Self {
+    pub(crate) fn new(additional_resources: &'a [&'a HashMap<String, Resource>]) -> Self {
         AdditionalCIds { additional_resources }
     }
 
