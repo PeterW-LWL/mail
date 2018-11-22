@@ -1,11 +1,11 @@
 extern crate failure;
 extern crate serde;
 extern crate futures;
-extern crate galemu;
 extern crate mail_core;
 extern crate mail_headers;
 extern crate vec1;
 extern crate toml;
+extern crate maybe_owned;
 #[cfg(feature="handlebars")]
 extern crate handlebars as hbs;
 
@@ -14,14 +14,14 @@ use std::{
     collections::HashMap,
     fmt::Debug,
     path::{Path, PathBuf},
-    sync::Arc
+    sync::Arc,
+    ops::Deref
 };
 
 use serde::{
     Serialize,
     Deserialize
 };
-use galemu::{Bound, BoundExt};
 use failure::{Fail, Error};
 use futures::{
     Future, Poll, Async,
@@ -29,6 +29,7 @@ use futures::{
     future::{self, Join, Either}
 };
 use vec1::Vec1;
+use maybe_owned::MaybeOwned;
 
 use mail_core::{
     Resource,
@@ -74,17 +75,10 @@ pub trait TemplateEngine: Sized {
 /// any data `D` which implements `Serialize`.
 pub trait TemplateEngineCanHandleData<D>: TemplateEngine {
 
-    //TODO[doc]: this is needed for all template engines which use to json serialization
-    // (we have more then one template so there would be a lot of overhead)
-    type PreparedData: for<'a> BoundExt<'a>;
-
-    //TODO[design]: allow returning a result
-    fn prepare_data<'a>(&self, raw: &'a D) -> PreparationData<'a, Self::PreparedData>;
-
     fn render<'r, 'a>(
         &'r self,
         id: &'r Self::Id,
-        data: &'r Bound<'a, Self::PreparedData>,
+        data: &'r D,
         additional_cids: AdditionalCIds<'r>
     ) -> Result<String, Error>;
 }
@@ -129,13 +123,6 @@ pub fn load_toml_template_from_str<TE, C>(
         };
 
     Either::A(base.load(engine, base_dir, ctx))
-}
-
-/// Compound POD for returning data needed for preparing for rendering a template.
-pub struct PreparationData<'a, PD: for<'any> BoundExt<'any>> {
-    pub attachments: Vec<Resource>,
-    pub inline_embeddings: HashMap<String, Resource>,
-    pub prepared_data: Bound<'a, PD>
 }
 
 
@@ -192,7 +179,78 @@ struct InnerTemplate<TE: TemplateEngine> {
     engine: TE,
 }
 
+pub struct TemplateData<'a, D: 'a> {
+    pub data:  MaybeOwned<'a, D>,
+    pub attachments: Vec<Resource>,
+    pub inline_embeddings: HashMap<String, Resource>
+}
 
+impl<'a, D> TemplateData<'a, D> {
+
+    pub fn load(self, ctx: &impl Context) -> DataLoadingFuture<'a, D> {
+        let TemplateData {
+            data,
+            attachments,
+            inline_embeddings
+        } = self;
+
+        let loading_fut = Resource::load_container(inline_embeddings, ctx)
+            .join(Resource::load_container(attachments, ctx));
+
+        DataLoadingFuture {
+            payload: Some(data),
+            loading_fut
+        }
+    }
+}
+impl<D> From<D> for TemplateData<'static, D> {
+    fn from(data: D) -> Self {
+        TemplateData {
+            data: data.into(),
+            attachments: Default::default(),
+            inline_embeddings: Default::default()
+        }
+    }
+}
+
+impl<'a, D> From<&'a D> for TemplateData<'a, D> {
+    fn from(data: &'a D) -> Self {
+        TemplateData {
+            data: data.into(),
+            attachments: Default::default(),
+            inline_embeddings: Default::default()
+        }
+    }
+}
+
+pub struct LoadedTemplateData<'a, D: 'a>(TemplateData<'a, D>);
+
+impl<'a, D> From<&'a D> for LoadedTemplateData<'a, D> {
+    fn from(data: &'a D) -> Self {
+        LoadedTemplateData(TemplateData::from(data))
+    }
+}
+
+impl<D> From<D> for LoadedTemplateData<'static, D> {
+    fn from(data: D) -> Self {
+        LoadedTemplateData(TemplateData::from(data))
+    }
+}
+
+impl<'a, D> Deref for LoadedTemplateData<'a, D> {
+    type Target = TemplateData<'a, D>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl<'a, D> Into<TemplateData<'a, D>> for LoadedTemplateData<'a, D> {
+    fn into(self) -> TemplateData<'a, D> {
+        let LoadedTemplateData(data) = self;
+        data
+    }
+}
 /// Automatically provides the `prepare_to_render` method for all `Templates`
 ///
 /// This trait is implemented for all `Templates`/`D`(data) combinations where
@@ -202,105 +260,34 @@ struct InnerTemplate<TE: TemplateEngine> {
 pub trait TemplateExt<TE, D>
     where TE: TemplateEngine + TemplateEngineCanHandleData<D>
 {
-    fn prepare_to_render<'s, 'r, C>(&'s self, data: &'r D, ctx: &'s C) -> RenderPreparationFuture<'r, TE, D, C>
-        where C: Context;
+
+    fn render_to_mail_parts<'r>(&self, data: LoadedTemplateData<'r, D>, ctx: &impl Context)
+        -> Result<(MailParts, Header<headers::Subject>), Error>;
+
+    fn render<'r>(&self, data: LoadedTemplateData<'r, D>, ctx: &impl Context) -> Result<Mail, Error> {
+        let (parts, subject) = self.render_to_mail_parts(data, ctx)?;
+        let mut mail = parts.compose();
+        mail.insert_header(subject);
+        Ok(mail)
+    }
 }
 
 
 impl<TE, D> TemplateExt<TE, D> for Template<TE>
     where TE: TemplateEngine + TemplateEngineCanHandleData<D>
 {
-    fn prepare_to_render<'s, 'r, C>(&'s self, data: &'r D, ctx: &'s C) -> RenderPreparationFuture<'r, TE, D, C>
-        where C: Context
+    fn render_to_mail_parts<'r>(&self, data: LoadedTemplateData<'r, D>, ctx: &impl Context)
+        -> Result<(MailParts, Header<headers::Subject>), Error>
     {
-        let preps = self.inner.engine.prepare_data(data);
-
-        let PreparationData {
-            inline_embeddings,
-            attachments,
-            prepared_data
-        } = preps;
-
-        let loading_fut = Resource::load_container(inline_embeddings, ctx)
-            .join(Resource::load_container(attachments, ctx));
-
-        RenderPreparationFuture {
-            payload: Some((
-                self.clone(),
-                prepared_data,
-                ctx.clone()
-            )),
-            loading_fut
-        }
-    }
-}
-
-/// Future returned when preparing a template for rendering.
-pub struct RenderPreparationFuture<'a, TE, D, C>
-    where TE: TemplateEngine + TemplateEngineCanHandleData<D>, C: Context
-{
-    payload: Option<(
-        Template<TE>,
-        Bound<'a, <TE as TemplateEngineCanHandleData<D>>::PreparedData>,
-        C
-    )>,
-    loading_fut: Join<
-        ResourceContainerLoadingFuture<HashMap<String, Resource>>,
-        ResourceContainerLoadingFuture<Vec<Resource>>
-    >
-}
-
-impl<'a, TE,D,C> Future for RenderPreparationFuture<'a, TE, D, C>
-    where TE: TemplateEngine, TE: TemplateEngineCanHandleData<D>, C: Context
-{
-    type Item = Preparations<'a, TE, D, C>;
-    type Error = Error;
-
-    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-        let (
-            inline_embeddings,
-            attachments
-        ) = try_ready!(self.loading_fut.poll());
-
-        //UNWRAP_SAFE only non if polled after resolved
-        let (template, prepared_data, ctx) = self.payload.take().unwrap();
-
-        Ok(Async::Ready(Preparations {
-            template,
-            prepared_data,
-            ctx,
-            inline_embeddings,
-            attachments
-        }))
-    }
-}
-
-/// Type containing the preparations done before rendering a template as Mail struct.
-pub struct Preparations<'a, TE, D, C>
-    where TE: TemplateEngine + TemplateEngineCanHandleData<D>, C: Context
-{
-    template: Template<TE>,
-    prepared_data: Bound<'a, <TE as TemplateEngineCanHandleData<D>>::PreparedData>,
-    ctx: C,
-    inline_embeddings: HashMap<String, Resource>,
-    attachments: Vec<Resource>
-}
-
-impl<'a, TE, D, C> Preparations<'a, TE, D, C>
-    where TE: TemplateEngine, TE: TemplateEngineCanHandleData<D>, C: Context
-{
-    pub fn render_to_mail_parts(self) -> Result<(MailParts, Header<headers::Subject>), Error> {
-        let Preparations {
-            template,
-            prepared_data,
-            ctx,
+        let TemplateData {
+            data,
             inline_embeddings,
             mut attachments
-        } = self;
+        } = data.into();
 
-        let subject = template.engine().render(
-            template.subject_template_id(),
-            &prepared_data,
+        let subject = self.engine().render(
+            self.subject_template_id(),
+            &data,
             AdditionalCIds::new(&[])
         )?;
 
@@ -308,14 +295,14 @@ impl<'a, TE, D, C> Preparations<'a, TE, D, C>
 
         //TODO use Vec1 try_map instead of loop
         let mut bodies = Vec::new();
-        for body in template.bodies().iter() {
-            let raw = template.engine().render(
+        for body in self.bodies().iter() {
+            let raw = self.engine().render(
                 body.template_id(),
-                &prepared_data,
+                &data,
                 AdditionalCIds::new(&[
                     &inline_embeddings,
                     body.inline_embeddings(),
-                    template.inline_embeddings()
+                    self.inline_embeddings()
                 ])
             )?;
 
@@ -340,10 +327,10 @@ impl<'a, TE, D, C> Preparations<'a, TE, D, C>
             });
         }
 
-        attachments.extend(template.attachments().iter().cloned());
+        attachments.extend(self.attachments().iter().cloned());
 
         let mut inline_embeddings_vec = Vec::new();
-        for (key, val) in template.inline_embeddings() {
+        for (key, val) in self.inline_embeddings() {
             if !inline_embeddings.contains_key(key) {
                 inline_embeddings_vec.push(val.clone())
             }
@@ -360,12 +347,37 @@ impl<'a, TE, D, C> Preparations<'a, TE, D, C>
 
         Ok((parts, subject))
     }
+}
 
-    pub fn render(self) -> Result<Mail, Error> {
-        let (parts, subject) = self.render_to_mail_parts()?;
-        let mut mail = parts.compose();
-        mail.insert_header(subject);
-        Ok(mail)
+/// Future returned when preparing a template for rendering.
+pub struct DataLoadingFuture<'a, D: 'a> {
+    payload: Option<MaybeOwned<'a, D>>,
+    loading_fut: Join<
+        ResourceContainerLoadingFuture<HashMap<String, Resource>>,
+        ResourceContainerLoadingFuture<Vec<Resource>>
+    >
+}
+
+impl<'a, D> Future for DataLoadingFuture<'a, D> {
+    type Item = LoadedTemplateData<'a, D>;
+    type Error = Error;
+
+    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
+        let (
+            inline_embeddings,
+            attachments
+        ) = try_ready!(self.loading_fut.poll());
+
+        //UNWRAP_SAFE only non if polled after resolved
+        let data = self.payload.take().unwrap();
+
+        let inner = TemplateData {
+            data,
+            inline_embeddings,
+            attachments
+        };
+
+        Ok(Async::Ready(LoadedTemplateData(inner)))
     }
 }
 

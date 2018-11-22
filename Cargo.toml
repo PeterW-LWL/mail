@@ -25,7 +25,7 @@ vec1 = { version="1.1", features=["serde"]}
 soft-ascii-string = "1.0"
 serde = { version="1", features=["derive"] }
 toml = "0.4.8"
-galemu = "0.2.2"
+maybe-owned = "0.3.2"
 
 
 [dependencies.mime]
