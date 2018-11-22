@@ -1,6 +1,6 @@
 use std::{
     collections::HashMap,
-    path::Path
+    path::{Path, PathBuf}
 };
 
 use serde::{
@@ -198,13 +198,12 @@ pub fn deserialize_attachments<'de, D>(deserializer: D)
 /// Common implementation for a type for [`TemplateEngine::LazyBodyTemplate`].
 ///
 /// This impl. gives bodies a field `embeddings` which is a mapping of embedding
-/// names to embeddings (using `deserialize_embeddings`) a `iri` field which
-/// allows specifying the template (e.g. `"path:body.html"`) and can be relative
-/// to the base dir. It also allows just specifying a string as template which defaults
-/// to using `iri = "path:<thestring>"` and no embeddings.
+/// names to embeddings (using `deserialize_embeddings`) a `path` field which
+/// allows specifying the template file (e.g. `"body.html"`) and can be relative
+/// to the base dir.
 #[derive(Debug, Serialize)]
 pub struct StandardLazyBodyTemplate {
-    pub iri: IRI,
+    pub path: PathBuf,
     pub embeddings: HashMap<String, Resource>
 }
 
@@ -213,13 +212,13 @@ impl PathRebaseable for StandardLazyBodyTemplate {
     fn rebase_to_include_base_dir(&mut self, base_dir: impl AsRef<Path>)
         -> Result<(), UnsupportedPathError>
     {
-        self.iri.rebase_to_include_base_dir(base_dir)
+        self.path.rebase_to_include_base_dir(base_dir)
     }
 
     fn rebase_to_exclude_base_dir(&mut self, base_dir: impl AsRef<Path>)
         -> Result<(), UnsupportedPathError>
     {
-        self.iri.rebase_to_exclude_base_dir(base_dir)
+        self.path.rebase_to_exclude_base_dir(base_dir)
     }
 }
 
@@ -229,7 +228,7 @@ impl PathRebaseable for StandardLazyBodyTemplate {
 enum StandardLazyBodyTemplateDeserializationHelper {
     ShortForm(String),
     LongForm {
-        iri: IRI,
+        path: PathBuf,
         #[serde(default)]
         #[serde(deserialize_with="deserialize_embeddings")]
         embeddings: HashMap<String, Resource>
@@ -245,14 +244,12 @@ impl<'de> Deserialize<'de> for StandardLazyBodyTemplate {
         let ok_val =
             match helper {
                 ShortForm(string) => {
-                    //UNWRAP_SAFE: only scheme can fail but is known to be ok
-                    let iri = IRI::from_parts("path", &string).unwrap();
                     StandardLazyBodyTemplate {
-                        iri,
+                        path: string.into(),
                         embeddings: Default::default()
                     }
                 },
-                LongForm {iri, embeddings} => StandardLazyBodyTemplate { iri, embeddings }
+                LongForm {path, embeddings} => StandardLazyBodyTemplate { path, embeddings }
             };
         Ok(ok_val)
     }
@@ -399,40 +396,40 @@ mod test {
             "#;
 
             let Wrapper { body } = toml::from_str(toml_str).unwrap();
-            assert_eq!(body.iri.as_str(), "path:template.html.hbs");
+            assert_eq!(body.path.to_str().unwrap(), "template.html.hbs");
             assert_eq!(body.embeddings.len(), 0);
         }
 
         #[test]
         fn should_deserialize_from_object_without_embeddings() {
             let toml_str = r#"
-                body = { iri="path:t.d" }
+                body = { path="t.d" }
             "#;
 
             let Wrapper { body }= toml::from_str(toml_str).unwrap();
-            assert_eq!(body.iri.as_str(), "path:t.d");
+            assert_eq!(body.path.to_str().unwrap(), "t.d");
             assert_eq!(body.embeddings.len(), 0);
         }
 
         #[test]
         fn should_deserialize_from_object_with_empty_embeddings() {
             let toml_str = r#"
-                body = { iri="path:t.d", embeddings={} }
+                body = { path="t.d", embeddings={} }
             "#;
 
             let Wrapper { body } = toml::from_str(toml_str).unwrap();
-            assert_eq!(body.iri.as_str(), "path:t.d");
+            assert_eq!(body.path.to_str().unwrap(), "t.d");
             assert_eq!(body.embeddings.len(), 0);
         }
 
         #[test]
         fn should_deserialize_from_object_with_short_from_embeddings() {
             let toml_str = r#"
-                body = { iri="path:t.d", embeddings={ pic1="the_embeddings" } }
+                body = { path="t.d", embeddings={ pic1="the_embeddings" } }
             "#;
 
             let Wrapper { body } = toml::from_str(toml_str).unwrap();
-            assert_eq!(body.iri.as_str(), "path:t.d");
+            assert_eq!(body.path.to_str().unwrap(), "t.d");
             assert_eq!(body.embeddings.len(), 1);
 
             let (key, resource) = body.embeddings.iter().next().unwrap();
