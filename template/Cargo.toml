@@ -1,9 +1,9 @@
 [package]
 name = "mail-template"
-version = "0.2.0"
+version = "0.6.0"
 description = "[mail] provides a way to create bind string template engines to produce mails"
 authors = ["Philipp Korber <p.korber@1aim.com>"]
-keywords = ["mail-api", "template"]
+keywords = ["mail", "template", "handlebars"]
 categories = []
 license = "MIT OR Apache-2.0"
 readme = "./README.md"
@@ -15,9 +15,9 @@ default = []
 handlebars-bindings = ["handlebars"]
 
 [dependencies]
-mail-core = { path="../core", features=["serde-impl"] }
-mail-internals = { path="../internals" }
-mail-headers = { path="../headers", features=["serde-impl"] }
+mail-core = { version="0.6.0", features=["serde-impl"] }
+mail-internals = "0.2.0"
+mail-headers = { version="0.6.0", features=["serde-impl"] }
 
 failure = "0.1.1"
 futures = "0.1.14"
@@ -29,10 +29,7 @@ maybe-owned = "0.3.2"
 
 handlebars = { version="1.1.0", optional=true }
 
-[dependencies.mime]
-git="https://github.com/1aim/mime"
-branch="parser_revamp"
-version="0.4.0"
+
 
 
 [dev-dependencies]
