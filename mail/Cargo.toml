@@ -16,6 +16,7 @@ smtp = ["mail-smtp"]
 handlebars = ["mail-template/handlebars-bindings"]
 traceing = ["mail-internals/traceing", "mail-headers/traceing"]
 test-utils = ["mail-core/test-utils"]
+serde-impl = ["mail-core/serde-impl", "mail-headers/serde-impl"]
 
 [[example]]
 name = "mail_by_hand"

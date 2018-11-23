@@ -97,6 +97,9 @@ use self::template as mail_template;
 #[cfg(feature="smtp")]
 pub extern crate mail_smtp as smtp;
 
+#[cfg(all(feature="serde", not(feature="serde-impl")))]
+compile_error! {"use feature `serde-impl` instead of pseudo-feature `serde`"}
+
 /// Re-export of all parts of the `mail_core` crate.
 ///
 /// Some parts like `error`/`default_impl` will get overridden.
