@@ -114,7 +114,7 @@
 //! }
 //! ```
 
-extern crate mime;
+extern crate media_type;
 #[doc(hidden)]
 pub extern crate soft_ascii_string;
 extern crate quoted_string;
