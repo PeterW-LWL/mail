@@ -3,8 +3,7 @@ name = "mail"
 version = "0.6.0"
 authors = ["Philipp Korber <p.korber@1aim.com>"]
 categories = []
-#TODO go through the keywords
-keywords = ["mail", "rfc5322", "email", "mime", "smtp", "template"]
+keywords = ["mail", "rfc5322", "mime", "smtp", "template"]
 description = "mail, facade for a number of mail related crates for creating and sending mails"
 license = "MIT OR Apache-2.0"
 readme = "./README.md"
