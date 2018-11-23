@@ -19,15 +19,10 @@ quoted_printable = "0.4.0"
 idna = "0.1.4"
 percent-encoding = "1.0.0"
 quoted-string = "0.6"
-media-type-impl-utils = { git="https://github.com/1aim/media-type-impl-utils" }
+media-type-impl-utils = "0.3.0-unstable"
 soft-ascii-string = "1.0"
 vec1 = "1.0"
-
-[dependencies.mime]
-git="https://github.com/1aim/mime"
-branch="parser_revamp"
-features=["expose-param-utils"]
-version="0.4.0"
+media-type = { version="0.4.0-unstable", features=["expose-param-utils"] }
 
 
 [features]

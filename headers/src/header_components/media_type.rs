@@ -9,7 +9,7 @@ use std::fmt;
 use serde::{Serialize, Serializer, Deserialize, Deserializer, de::{self, Visitor}};
 use soft_ascii_string::{SoftAsciiStr,SoftAsciiChar};
 
-use mime::{
+use media_type::{
     MediaType as _MediaType,
     Name, AnyMediaType,
     spec::{MimeSpec, Ascii, Internationalized, Modern}

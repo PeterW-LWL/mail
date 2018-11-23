@@ -4,8 +4,8 @@ use std::fmt;
 
 use failure::Fail;
 use soft_ascii_string::SoftAsciiStr;
-use mime::push_params_to_buffer;
-use mime::spec::{MimeSpec, Ascii, Modern, Internationalized};
+use media_type::push_params_to_buffer;
+use media_type::spec::{MimeSpec, Ascii, Modern, Internationalized};
 
 #[cfg(feature="serde")]
 use serde::{

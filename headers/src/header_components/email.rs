@@ -4,7 +4,7 @@ use std::borrow::Cow;
 use failure::Fail;
 use soft_ascii_string::{SoftAsciiStr, SoftAsciiString, SoftAsciiChar};
 
-use mime::spec::{MimeSpec, Ascii, Internationalized, Modern};
+use media_type::spec::{MimeSpec, Ascii, Internationalized, Modern};
 use quoted_string::quote_if_needed;
 
 use internals::error::{EncodingError, EncodingErrorKind};

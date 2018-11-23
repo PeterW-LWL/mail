@@ -5,7 +5,7 @@ extern crate failure;
 #[macro_use]
 extern crate nom;
 extern crate chrono;
-extern crate mime;
+extern crate media_type;
 extern crate soft_ascii_string;
 extern crate base64;
 extern crate quoted_printable;
