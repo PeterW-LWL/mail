@@ -1,6 +1,6 @@
 [package]
 name = "mail"
-version = "0.6.0"
+version = "0.6.2"
 authors = ["Philipp Korber <p.korber@1aim.com>"]
 categories = []
 keywords = ["mail", "rfc5322", "mime", "smtp", "template"]

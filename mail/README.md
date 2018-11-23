@@ -1,38 +1,35 @@
 # mail / mail-api &emsp;
 
-Documentation can be [viewed on docs.rs](https://docs.rs/mail-api). (at least once it's published ;=) )
+Documentation can be [viewed on docs.rs](https://docs.rs/mail-api).
 
 Facade which re-exports functionality from a number of mail related crates.
 
-The crates include:
+The facade should re-export enough functionality for using the mail carate
+to create/modify/encode mail, send them over smtp (feature) or use a handlebars
+based template engine to create them from a template (feature).
 
-- `mail-internals` some parts used by more or less all other `mail-*` crates like
-  `MailType`, some grammar parts or the `EncodingBuffer`. As `mail-internals` is
-  mainly used internally it's not directly exposed.
-- `mail-headers` functionality wrt. mail (mime) header, including a HeaderMap
-  containing the header fields (keeping insertion order) a number of components
-  used in header field bodies like e.g. `Mailbox` or `Phrase` and default
-  implementations for many headers, including From, To, Sender, Data, Subject,
-  Date, MessageId, Cc, Bcc, etc.
-- `mail-core` provides the type `Mail` which represents a (possible)
-  multi-part mime Mail and includes functionality for encoding it. It also
-  contains an abstraction for the content of multi-part mails called
-  `Resource`, which includes support for embeddings, attachments etc.
-- `mail-template` provides functionality to create a `Mail` from a template,
-  including multi-part mails containing embeddings and attachments. It's not
-  bound to a specific template engine. Currently bindings for the tera template
-  engine are provided behind feature flag.
-- `mail-smtp` (feature: `smtp`) provides bindings between `mail-core` and
-  `new-tokio-smtp` allowing the simple sending of mails to a specific server.
-  It's mainly focused on the use-case where mails are sent to an Mail
-  Submission Agent (MSA) which then distributes them
-- `mail-render-template-engine` (feature `render-template-engine`) provides a
-  partial implementation for the `TemplateEngine` trait from `mail-template`
-  only missing a "render engine" to render the template. The implementation
-  includes functionality for automatically generating multiple alternate bodies
-  (e.g. text, html) embedding, and attachments based on a spec, which can be
-  derived and loaded from a folder/file layout making it easy to create and
-  maintain complex mail templates.
+Functionality steming from following crates is re-exported:
+- `mail-core` provides a `Mail` type and the core functionality
+  around creating/modifing/encoding mails.
+- `mail-headers` provides implementations for the headers of the mail.
+  This also includes a number of header components which appear in mail
+  header bodies but are also re-used in other placed (e.g. `MediaType`
+  stemming from the `Content-Type header or `Domain`).
+- `mail-smtp` bindings to `new-tokio-smtp` to  make it easier to send
+  mails over smtp. This also includes functionality to automatically
+  derive the _smtp_ sender/receiver from the mail if no sender/receiver
+  is explicitly given (Smtp by it's standard does not use the `From`/`To`
+  headers of a mail. Instead it treats the mail, including it's headers
+  mostly as a opaque block of data. But in practice the addresses in
+  `From`/`To`/`Sender` tend to match the smtp sender/recipient).
+- `mail-template` provides a simple way to bind template engine to
+  generate mails. It has a feature which if enable directly includes
+  bindings to `handlebars`. This feature is re-exported in the crate
+  as the `handlebars` feature.
+- `mail-internals` provides some shared mostly internal parts the other
+   crates use. This is normally only needed if you write your own mail
+   header implementations. But even then the does this crate re-expost
+   the parts most likely needed (in the `header_encoding` module).
 
 ## Examples
 
@@ -43,7 +40,7 @@ similar.
 
 ### [`mail_from_template`](./examples/mail_from_template/main.rs)
 
-Uses the bindings for the `tera` template engine to create a mail, including
+Uses the bindings for the `handlebars` template engine to create a mail, including
 alternate bodies and an attachment.
 
 ### [`send_mail`](./examples/send_mail/main.rs)
@@ -69,7 +66,9 @@ Lastly the examples uses the same unique seed every time, which means that
 Message-ID's, and Content-ID's are not guaranteed to be world unique even
 through they should (again a limitation of the example not the mail crate).
 Nevertheless given that it also doesn't use its "own" domain but a `.test`
-domain it can't guarantee world uniqueness anyway.
+domain it can't guarantee world uniqueness anyway and would fail many spam filters,
+so if you use it make sure to change this to the right values for your use
+case.
 
 ## Features
 
@@ -78,19 +77,11 @@ domain it can't guarantee world uniqueness anyway.
 Provides bindings to `new-tokio-smtp` under `mail::smtp` by reexporting the
 `mail-smtp` crate
 
-### `render-template-engine`
+### `handlebars`
 
-Provides the render template engine under `mail::render_template_engine`.
+Provides a `mail-template` engine implementation using the `handlebars`
+crate. It can be found under `mail::template::handlebars::Handlebars`;
 
-### `askama-engine`
-
-Provides bindings to the `askama` crate (a template engine) under
-`mail::askama`
-
-### `tera-engine`
-
-Provides bindings to the `tera` crate (a template engine) under `mail::tera`.
-This feature uses the `render-template-engine` feature.
 
 ### `traceing`
 

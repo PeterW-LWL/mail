@@ -36,7 +36,7 @@
 //!
 //! ### [`mail_from_template`](./examples/mail_from_template/main.rs)
 //!
-//! Uses the bindings for the `tera` template engine to create a mail, including
+//! Uses the bindings for the `handlebars` template engine to create a mail, including
 //! alternate bodies and an attachment.
 //!
 //! ### [`send_mail`](./examples/send_mail/main.rs)
