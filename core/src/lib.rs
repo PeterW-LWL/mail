@@ -10,7 +10,7 @@
 extern crate log;
 #[macro_use]
 extern crate failure;
-extern crate mime as media_type;
+extern crate media_type;
 extern crate chrono;
 extern crate futures;
 extern crate rand;
