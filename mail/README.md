@@ -1,6 +1,6 @@
-# mail / mail-api &emsp;
+# mail &emsp;
 
-Documentation can be [viewed on docs.rs](https://docs.rs/mail-api).
+Documentation can be [viewed on docs.rs](https://docs.rs/mail).
 
 Facade which re-exports functionality from a number of mail related crates.
 

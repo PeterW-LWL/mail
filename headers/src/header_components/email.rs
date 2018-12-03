@@ -1,5 +1,6 @@
 use std::ops::Deref;
 use std::borrow::Cow;
+use std::str::FromStr;
 
 use failure::Fail;
 use soft_ascii_string::{SoftAsciiStr, SoftAsciiString, SoftAsciiChar};
@@ -163,19 +164,28 @@ impl Deref for LocalPart {
 impl<T> HeaderTryFrom<T> for Domain
     where T: HeaderTryInto<Input>
 {
-    fn try_from( input: T ) -> Result<Self, ComponentCreationError> {
+    fn try_from(input: T) -> Result<Self, ComponentCreationError> {
         let input = input.try_into()?;
         let item =
-            match Domain::check_domain( input.as_str() )? {
+            match Domain::check_domain(input.as_str())? {
                 MailType::Ascii | MailType::Mime8BitEnabled => {
-                    SimpleItem::Ascii( input.into_ascii_item_unchecked() )
+                    SimpleItem::Ascii(input.into_ascii_item_unchecked())
                 },
                 MailType::Internationalized => {
-                    SimpleItem::from_utf8_input( input )
+                    SimpleItem::from_utf8_input(input)
                 }
             };
 
-        Ok( Domain( item ) )
+        Ok(Domain(item))
+    }
+}
+
+impl FromStr for Domain {
+    type Err = ComponentCreationError;
+
+    fn from_str(domain: &str) -> Result<Self, Self::Err> {
+        let input = Input::from(domain);
+        Self::try_from(input)
     }
 }
 
@@ -400,5 +410,14 @@ mod test {
         let domain = Domain::try_from("hö.test").unwrap();
         let stringified = domain.into_ascii_string().unwrap();
         assert_eq!(&*stringified, "xn--h-1ga.test")
+    }
+
+    #[test]
+    fn domain_from_str() {
+        let domain: Domain = "1aim.com".parse().unwrap();
+        assert_eq!(domain.as_str(), "1aim.com");
+
+        let res: Result<Domain, _> = "...".parse();
+        assert!(res.is_err());
     }
 }
