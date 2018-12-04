@@ -624,8 +624,7 @@ impl<'a, H> Debug for TypedBodiesMut<'a, H>
 macro_rules! headers {
     ($($header:ty : $val:expr),*) => ({
         //FIXME[rust/catch block] use catch block once available
-        (|| -> Result<$crate::HeaderMap, $crate::error::ComponentCreationError>
-        {
+        (|| -> ::std::result::Result<$crate::HeaderMap, $crate::error::ComponentCreationError> {
             let mut map = $crate::HeaderMap::new();
             $(
                 map.insert(<$header as $crate::HeaderKind>::auto_body($val)?);
@@ -1038,5 +1037,16 @@ mod test {
         }?;
 
         assert_eq!(3, map.len());
+    });
+
+    test!(does_not_conflic_with_custom_result_type {
+        #[allow(unused)]
+        type Result<T> = ::std::result::Result<T, ()>;
+
+        let map = headers! {
+            Subject: "yay"
+        }?;
+
+        assert_eq!(1, map.len());
     });
 }
