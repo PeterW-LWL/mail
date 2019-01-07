@@ -1,6 +1,5 @@
 //! Provides some internal functionality for the `mail` crate.
 #![recursion_limit="256"]
-#[macro_use]
 extern crate failure;
 #[macro_use]
 extern crate nom;

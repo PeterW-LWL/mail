@@ -28,7 +28,8 @@ use headers::{
         ContentType, _From,
         ContentTransferEncoding,
         Date, MessageId,
-        ContentDisposition
+        ContentDisposition,
+        ContentId
     },
     header_components::{
         DateTime,
@@ -529,9 +530,7 @@ fn top_level_validation(mail: &Mail) -> Result<(), HeaderValidationError> {
     }
 }
 
-/// inserts ContentType and ContentTransferEncoding into
-/// the headers of any contained `MailBody::SingleBody`,
-/// based on the `Resource` representing the body
+/// insert auto-generated headers like `Date`, `Message-Id` and `Content-Id`
 fn auto_gen_headers<C: Context>(
     mail: &mut Mail,
     encoded_resources: Vec<EncData>,
@@ -557,6 +556,9 @@ fn auto_gen_headers<C: Context>(
 
     let mut boundary_count = 0;
     recursive_auto_gen_headers(mail, &mut boundary_count, ctx);
+
+    // Make sure no **top-level** body has a content-id field, as it already has a Message-Id
+    mail.headers_mut().remove(ContentId);
 }
 
 /// returns the `EncData` from a resource
@@ -571,15 +573,28 @@ pub(crate) fn assume_encoded(resource: &Resource) -> &EncData {
     }
 }
 
+/// Auto-generates some headers for any body including non top-level mail bodies.
+///
+/// For mails which are not multipart mails this does:
+/// - set metadata for the `Content-Disposition` header (e.g. `file-name`, `read-date`, ...)
+/// - insert a `Content-Id` header
+///   - this overwrites any already contained content-id header
+///
+/// For multipart mails this does:
+/// - create/overwrite the boundary for the `Content-Type` header
+/// - call this method for all bodies in the multipart body
 fn recursive_auto_gen_headers<C: Context>(mail: &mut Mail, boundary_count: &mut usize, ctx: &C) {
     let &mut Mail { ref mut headers, ref mut body } = mail;
     match body {
         &mut MailBody::SingleBody { ref mut body } => {
+            let data = assume_encoded(body);
+
             if let Some(Ok(disposition)) = headers.get_single_mut(ContentDisposition) {
                 let current_file_meta_mut = disposition.file_meta_mut();
-                let data = assume_encoded(body);
                 current_file_meta_mut.replace_empty_fields_with(data.file_meta())
             }
+
+            headers.insert(ContentId::body(data.content_id().clone()));
         },
         &mut MailBody::MultipleBodies { ref mut bodies, .. } => {
             let mut headers: &mut HeaderMap = headers;

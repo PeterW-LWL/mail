@@ -24,7 +24,7 @@ use serde::{
     Serialize,
     Deserialize
 };
-use failure::{Fail, Error};
+use failure::Error;
 use futures::{
     Future, Poll, Async,
     try_ready,
