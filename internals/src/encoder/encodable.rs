@@ -18,7 +18,7 @@ pub trait EncodableInHeader: Send + Sync + Any + Debug {
     fn boxed_clone(&self) -> Box<EncodableInHeader>;
 
     #[doc(hidden)]
-    fn type_id( &self ) -> TypeId {
+    fn type_id(&self) -> TypeId {
         TypeId::of::<Self>()
     }
 }
@@ -28,7 +28,7 @@ impl EncodableInHeader {
 
     #[inline(always)]
     pub fn is<T: EncodableInHeader>(&self) -> bool {
-        self.type_id() == TypeId::of::<T>()
+        EncodableInHeader::type_id(self) == TypeId::of::<T>()
     }
 
 

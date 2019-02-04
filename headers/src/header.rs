@@ -197,7 +197,7 @@ impl HeaderObj {
     pub fn is<H>(&self) -> bool
         where H: HeaderKind
     {
-        self.type_id() == TypeId::of::<Header<H>>()
+        HeaderObjTrait::type_id(self) == TypeId::of::<Header<H>>()
     }
 
     pub fn downcast_ref<H>(&self) -> Option<&Header<H>>
