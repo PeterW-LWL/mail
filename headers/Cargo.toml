@@ -1,7 +1,7 @@
 [package]
 name = "mail-headers"
 description = "[mail/headers] header parts for the mail crate (inkl. header map and standard header impl)"
-version = "0.6.3"
+version = "0.6.4"
 authors = ["Philipp Korber <philippkorber@gmail.com>"]
 documentation = "https://docs.rs/mail-headers"
 keywords = []
@@ -14,7 +14,7 @@ serde-impl = [ "serde", "vec1/serde" ]
 traceing = [ "mail-internals/traceing" ]
 
 [dependencies]
-mail-internals = "0.2.0"
+mail-internals = "0.2.2"
 failure = "0.1"
 owning_ref = "0.4"
 nom = "3.1.0"
