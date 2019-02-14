@@ -191,4 +191,16 @@ mod test {
         MarkFWS,
         Text " \t "
     ]}
+
+    ec_test!{ long_mixed_input, {
+        Unstructured::try_from("Subject: …. AAAAAAAAAAAAAAAAAAA….. AA…")?
+    } => ascii => [
+        Text "Subject:",
+        MarkFWS,
+        Text " =?utf8?Q?=E2=80=A6=2E?=",
+        MarkFWS,
+        Text " =?utf8?Q?AAAAAAAAAAAAAAAAAAA=E2=80=A6=2E=2E?=",
+        MarkFWS,
+        Text " =?utf8?Q?AA=E2=80=A6?="
+    ]}
 }

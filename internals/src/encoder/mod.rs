@@ -47,6 +47,9 @@ pub const LINE_LEN_SOFT_LIMIT: usize = 78;
 /// as specified in RFC 5322 (mail) + RFC 5321 (smtp) not including CRLF
 pub const LINE_LEN_HARD_LIMIT: usize = 998;
 
+pub const NEWLINE: &str = "\r\n";
+pub const NEWLINE_WITH_SPACE: &str = "\r\n ";
+
 
 /// EncodingBuffer for a Mail providing a buffer for encodable traits.
 pub struct EncodingBuffer {
@@ -113,7 +116,7 @@ impl EncodingBuffer {
 
     pub fn write_blank_line(&mut self) {
         //TODO/BENCH push_str vs. extends(&[u8])
-        self.buffer.extend("\r\n".as_bytes());
+        self.buffer.extend(NEWLINE.as_bytes());
         #[cfg(feature="traceing")]
         { self.trace.push(TraceToken::BlankLine); }
     }
@@ -122,8 +125,8 @@ impl EncodingBuffer {
     pub fn write_body_unchecked(&mut self, body: &impl AsRef<[u8]>) {
         let slice = body.as_ref();
         self.buffer.extend(slice);
-        if !slice.ends_with(b"\r\n") {
-            self.buffer.extend(b"\r\n");
+        if !slice.ends_with(NEWLINE.as_bytes()) {
+            self.buffer.extend(NEWLINE.as_bytes());
         }
     }
 
@@ -648,20 +651,17 @@ impl<'inner> EncodingWriter<'inner> {
 
     fn break_line_on_fws(&mut self) -> bool {
         if self.content_before_fws && self.last_fws_idx > self.line_start_idx {
-            //INDEX_SAFE: self.content_before_fws is only true if there is at last one char
-            // if so self.last_ws_idx does not point at the end of the buffer but inside
-            let newline = match self.buffer[self.last_fws_idx] {
-                b' ' | b'\t' => "\r\n",
-                _ => "\r\n "
-            };
+
+            let newline = self.buffer.get(self.last_fws_idx)
+                .map(|bch| match bch {
+                    b' ' | b'\t' => NEWLINE,
+                    _ => NEWLINE_WITH_SPACE
+                })
+                .unwrap_or(NEWLINE_WITH_SPACE);
 
             vec_insert_bytes(&mut self.buffer, self.last_fws_idx, newline.as_bytes());
             self.line_start_idx = self.last_fws_idx + 2;
-            // no need last_fws can be < line_start but
-            //self.last_fws_idx = self.line_start_idx;
             self.content_before_fws = false;
-            // stays the same:
-            //self.content_since_fws = self.content_since_fws
             true
         } else {
             false
