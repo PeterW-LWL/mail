@@ -225,6 +225,8 @@ pub struct EncodingWriter<'a> {
     /// on the current line (false if there was no FWS yet on the current
     /// line).
     content_before_fws: bool,
+    /// represents if if a FWS was just marked (opt-FWS) or was written out
+    last_fws_has_char: bool,
     header_start_idx: usize,
     #[cfg(feature="traceing")]
     trace_start_idx: usize
@@ -259,7 +261,8 @@ impl<'inner> EncodingWriter<'inner> {
             skipped_cr: false,
             content_since_fws: false,
             content_before_fws: false,
-            header_start_idx: start_idx
+            header_start_idx: start_idx,
+            last_fws_has_char: false,
         }
     }
 
@@ -281,6 +284,7 @@ impl<'inner> EncodingWriter<'inner> {
             content_since_fws: false,
             content_before_fws: false,
             header_start_idx: start_idx,
+            last_fws_has_char: false,
             trace_start_idx
         }
     }
@@ -331,7 +335,8 @@ impl<'inner> EncodingWriter<'inner> {
         { self.trace.push(TraceToken::MarkFWS) }
         self.content_before_fws |= self.content_since_fws;
         self.content_since_fws = false;
-        self.last_fws_idx = self.buffer.len()
+        self.last_fws_idx = self.buffer.len();
+        self.last_fws_has_char = false;
     }
 
     /// writes a ascii char to the underlying buffer
@@ -584,6 +589,8 @@ impl<'inner> EncodingWriter<'inner> {
     /// had been there before).
     pub fn write_fws(&mut self) {
         self.mark_fws_pos();
+        self.last_fws_has_char = true;
+        // OK: Can not error as we just marked a fws pos.
         let _ = self.write_char(SoftAsciiChar::from_unchecked(' '));
     }
 
@@ -651,13 +658,13 @@ impl<'inner> EncodingWriter<'inner> {
 
     fn break_line_on_fws(&mut self) -> bool {
         if self.content_before_fws && self.last_fws_idx > self.line_start_idx {
-
-            let newline = self.buffer.get(self.last_fws_idx)
-                .map(|bch| match bch {
-                    b' ' | b'\t' => NEWLINE,
-                    _ => NEWLINE_WITH_SPACE
-                })
-                .unwrap_or(NEWLINE_WITH_SPACE);
+            let newline =
+                if self.last_fws_has_char {
+                    debug_assert!([b' ', b'\t'].contains(&self.buffer[self.last_fws_idx]));
+                    NEWLINE
+                } else {
+                    NEWLINE_WITH_SPACE
+                };
 
             vec_insert_bytes(&mut self.buffer, self.last_fws_idx, newline.as_bytes());
             self.line_start_idx = self.last_fws_idx + 2;
@@ -949,6 +956,7 @@ mod test {
     mod EncodingWriter {
         #![allow(non_snake_case)]
         use std::mem;
+        use std::str;
 
         use super::*;
         use super::{ _Encoder as EncodingBuffer };
@@ -1128,9 +1136,9 @@ mod test {
             {
                 let mut handle = encoder.writer();
                 assert_ok!(handle.write_str(SoftAsciiStr::from_str("A23456789:").unwrap()));
-                handle.mark_fws_pos();
+                handle.write_fws();
                 assert_ok!(handle.write_str(SoftAsciiStr::from_str(concat!(
-                    "\t20_3456789",
+                    "20_3456789",
                     "30_3456789",
                     "40_3456789",
                     "50_3456789",
@@ -1144,7 +1152,7 @@ mod test {
             assert_eq!(
                 encoder.as_str().unwrap(),
                 concat!(
-                    "A23456789:\r\n\t",
+                    "A23456789:\r\n ",
                     "20_3456789",
                     "30_3456789",
                     "40_3456789",
@@ -1601,6 +1609,47 @@ mod test {
                 End
             ]);
             assert_eq!(encoder.as_slice(), format!("  {}\r\n", long_line).as_bytes())
+        }
+
+        #[test]
+        fn semantic_ws_are_not_eaten_with_line_breaking() {
+            let long_line_1 = concat!(
+                "Header:789",
+                "20_3456789",
+                "30_3456789",
+                "40_3456789",
+                "50_3456789",
+                "60_3456789",
+            );
+            let long_line_2 = concat!(
+                " xxxxxxxxx",
+                "80_3456789"
+            );
+
+            let expected_res = concat!(
+                "Header:789",
+                "20_3456789",
+                "30_3456789",
+                "40_3456789",
+                "50_3456789",
+                "60_3456789",
+                "\r\n ",
+                " xxxxxxxxx",
+                "80_3456789",
+                "\r\n"
+            );
+
+            let mut encoder = EncodingBuffer::new(MailType::Internationalized);
+            encoder.write_header_line(|hdl| {
+                hdl.write_utf8(long_line_1).unwrap();
+                hdl.mark_fws_pos();
+                hdl.write_utf8(long_line_2).unwrap();
+                hdl.finish_header();
+                Ok(())
+            }).unwrap();
+
+            let got = str::from_utf8(encoder.as_slice()).unwrap();
+            assert_eq!(expected_res, got);
         }
     }
 
