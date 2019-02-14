@@ -117,22 +117,102 @@ pub fn is_utf8_continuation_byte(b: u8) -> bool {
 pub fn vec_insert_bytes(target: &mut Vec<u8>, idx: usize, source: &[u8]) {
     use std::ptr::copy;
 
+    if idx > target.len() {
+        panic!("index out of bounds: the len is {} but the index is {}",
+            target.len(), idx);
+    }
+
     let old_len = target.len();
     let insertion_len = source.len();
     let source_ptr = source.as_ptr();
-    let insertion_point = unsafe { target.as_mut_ptr().offset(idx as isize) };
+    let insertion_point = unsafe {
+        // SAFE: we panic if idx > target.len(), through idx == target.len() is fine
+        target.as_mut_ptr().offset(idx as isize)
+    };
     let moved_data_len = old_len - idx;
 
     target.reserve(insertion_len);
 
     unsafe {
+        // SAFE 1: we reserved insertion_len and insertion_point is at most old_len
+        //         so offset is fine
+        // SAFE 2: insertion_point + insertion_len + moved_data_len needs to be
+        //         <= target + target.capacity(). By replacing variables:
+        //         - insertion_point + insertion_len + moved_data_len <= target + capacity
+        //         - target + idx + insertion_len + old_len - idx <= target + capacity
+        //         - target + idx + insertion_len + old_len - idx <= target + old_len + insertion_len
+        //         - idx + insertion_len + old_len - idx <= old_len + insertion_len
+        //         - idx - idx <= 0
+        //         - 0 <= 0  [Q.E.D]
         copy(/*src*/insertion_point,
              /*dest*/insertion_point.offset(insertion_len as isize),
              /*count*/moved_data_len);
 
+        // SAFE: insertion_point + insertion_len needs to be <= target.capacity()
+        //   which is guaranteed as we reserve insertion len and insertion_point is
+        //   at most old len.
         copy(source_ptr, insertion_point, insertion_len);
 
-        //3. set the new len for the vec
+        // SAFE: we reserved insertion_len bytes
         target.set_len(old_len + insertion_len)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::vec_insert_bytes;
+
+    #[test]
+    fn inserting_slices_at_beginning() {
+        let mut base = vec![0u8, 1u8, 2u8, 3u8];
+        let new = &[10u8, 11];
+
+        vec_insert_bytes(&mut base, 0, new);
+
+        assert_eq!(&*base, &[10u8, 11, 0, 1, 2, 3]);
+        assert!(base.capacity() >= 6);
+    }
+
+    #[test]
+    fn inserting_slices_at_end() {
+        let mut base = vec![0u8, 1u8, 2u8, 3u8];
+        let new = &[10u8, 11];
+
+        let end = base.len();
+        vec_insert_bytes(&mut base, end, new);
+
+        assert_eq!(&*base, &[0u8, 1, 2, 3, 10, 11]);
+        assert!(base.capacity() >= 6);
+    }
+
+    #[test]
+    fn inserting_slices_in_the_middle() {
+        let mut base = vec![0u8, 1u8, 2u8, 3u8];
+        let new = &[10u8, 11];
+
+        vec_insert_bytes(&mut base, 1, new);
+
+        assert_eq!(&*base, &[0u8, 10, 11, 1, 2, 3]);
+        assert!(base.capacity() >= 6);
+    }
+
+    #[test]
+    fn inserting_slices_large_in_the_middle() {
+        let mut base = vec![0u8, 1u8, 2u8, 3u8];
+        let new = &[10u8, 11, 12, 13, 14, 15, 16];
+
+        vec_insert_bytes(&mut base, 1, new);
+
+        assert_eq!(&*base, &[0u8, 10, 11, 12, 13, 14, 15, 16, 1, 2, 3]);
+        assert!(base.capacity() >= 11);
+    }
+
+    #[should_panic]
+    #[test]
+    fn insert_out_of_bound() {
+        let mut base = vec![0u8, 1u8, 2u8, 3u8];
+        let new = &[10u8];
+
+        vec_insert_bytes(&mut base, 10, new);
     }
 }
