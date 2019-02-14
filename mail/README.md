@@ -33,17 +33,17 @@ Functionality steming from following crates is re-exported:
 
 ## Examples
 
-### [`mail_by_hand`](./examples/mail_by_hand.rs)
+### [`mail_by_hand`](https://github.com/1aim/mail/tree/master/mail/examples/mail_by_hand.rs)
 
 Creates and encodes a simple mail without using any fancy helpers, templates or
 similar.
 
-### [`mail_from_template`](./examples/mail_from_template/main.rs)
+### [`mail_from_template`](https://github.com/1aim/mail/tree/master/mail/examples/mail_from_template/main.rs)
 
 Uses the bindings for the `handlebars` template engine to create a mail, including
 alternate bodies and an attachment.
 
-### [`send_mail`](./examples/send_mail/main.rs)
+### [`send_mail`](https://github.com/1aim/mail/tree/master/mail/examples/send_mail/main.rs)
 
 A simple program which queries the user for information and then sends a
 (simple) mail to an MSA (Mail Submission Agent).  While it is currently limited
