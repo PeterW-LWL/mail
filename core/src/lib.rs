@@ -1,5 +1,5 @@
 //! Provides the core mail type `Mail` for the `mail` crate.
-//! This crate provides the type called `mail` as well as ways
+//! This crate provides the type called `Mail` as well as ways
 //! to create it. It also provides the builder context interface
 //! and the `Resource` type, which is used to represent mail bodies.
 //! Especially such which are attachments or embedded images.
