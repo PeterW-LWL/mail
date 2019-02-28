@@ -14,6 +14,9 @@ repository = "https://github.com/1aim/mail-template"
 default = []
 handlebars-bindings = ["handlebars"]
 
+[package.metadata.docs.rs]
+features = [ "handlebars-bindings" ]
+
 [dependencies]
 mail-core = { version="0.6.0", features=["serde-impl"] }
 mail-internals = "0.2.0"

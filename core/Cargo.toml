@@ -16,6 +16,9 @@ default = ["default_impl_cpupool"]
 default_impl_cpupool = ["futures-cpupool"]
 test-utils = ["default", "lazy_static"]
 
+[package.metadata.docs.rs]
+features = [ "serde-impl", "default" ]
+
 [dependencies]
 mail-internals = "0.2.0"
 mail-headers = "0.6.0"

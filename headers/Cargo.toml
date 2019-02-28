@@ -13,6 +13,9 @@ repository = "https://github.com/1aim/mail-headers"
 serde-impl = [ "serde", "vec1/serde" ]
 traceing = [ "mail-internals/traceing" ]
 
+[package.metadata.docs.rs]
+features = [ "serde-impl" ]
+
 [dependencies]
 mail-internals = "0.2.2"
 failure = "0.1"

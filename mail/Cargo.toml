@@ -31,6 +31,8 @@ name = "send_mail"
 path = "examples/send_mail/main.rs"
 required-features = ["smtp"]
 
+[package.metadata.docs.rs]
+features = [ "handlebars", "smtp", "serde-impl" ]
 
 [dependencies]
 mail-internals = "0.2.2"
