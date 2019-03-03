@@ -104,6 +104,7 @@ pub mod misc {
         Domain,
         AddressLiteral,
         SetupTls,
-        DefaultTlsSetup
+        DefaultTlsSetup,
+        Cmd
     };
 }
