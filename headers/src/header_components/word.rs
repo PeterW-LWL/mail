@@ -14,7 +14,9 @@ use ::data::Input;
 use super::CFWS;
 
 
-
+/// A ward as in the mail grammar (RFC 5322).
+///
+/// **Warning: This is likely to change in the future before the 1.0 release**.
 #[derive( Debug, Clone, Eq, PartialEq, Hash )]
 pub struct Word {
     pub left_padding: Option<CFWS>,
