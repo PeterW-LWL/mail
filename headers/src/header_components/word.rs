@@ -74,7 +74,7 @@ pub fn do_encode_word<'a,'b: 'a>(
     let input: &str = &*word.input;
     let mail_type = handle.mail_type();
     handle.write_if(input, |input| {
-        (!input.starts_with("=?"))
+        (!input.contains("=?"))
             && input.chars().all( |ch| is_atext( ch, mail_type ) )
 
     }).handle_condition_failure(|handle| {
