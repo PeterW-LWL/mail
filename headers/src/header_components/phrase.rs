@@ -16,6 +16,11 @@ use super::{ CFWS, FWS };
 ///
 /// It is recommended to use the [`Phrase.new()`] constructor, which creates the right phrase
 /// for your input.
+///
+/// **Warning: Details of this type, expect `Phrase::new` and `Phrase::try_from`, are likely to
+///   change with some of the coming braking changes.** If you just create it using `try_from`
+///   or `new` changes should not affect you, but if you create it from a vec of `Word`'s things
+///   might be different.
 #[derive( Debug, Clone, Eq, PartialEq, Hash )]
 pub struct Phrase(
     //FIXME hide this away or at last turn it into a struct field, with next braking change.
