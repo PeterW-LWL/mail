@@ -12,12 +12,37 @@ use super::utils::text_partition::{ Partition, partition };
 use super::word::{ Word, do_encode_word };
 use super::{ CFWS, FWS };
 
-
+/// Represent a "phrase" as it for example is used in the `Mailbox` type for the display name.
+///
+/// It is recommended to use the [`Phrase.new()`] constructor, which creates the right phrase
+/// for your input.
 #[derive( Debug, Clone, Eq, PartialEq, Hash )]
-pub struct Phrase( pub Vec1<Word> );
+pub struct Phrase(
+    //FIXME hide this away or at last turn it into a struct field, with next braking change.
+    /// The "words" the phrase consist of. Be aware that this are words in the sense of the
+    /// mail grammar so it can be a complete quoted string. Also be aware that in the mail
+    /// grammar "words" _contain the whitespace around them_ (to some degree). So if you
+    /// just have a sequence of "human words"  turned into word instances there will be
+    /// no whitespace between the words. (From the point of the mail grammar a words do not
+    /// have to have any boundaries between each other even if this leads to ambiguity)
+    pub Vec1<Word> );
 
 impl Phrase {
 
+    /// Creates a `Phrase` instance from some arbitrary input.
+    ///
+    /// This method can be used with both `&str` and `String`.
+    ///
+    /// # Error
+    ///
+    /// There are only two cases in which this can fail:
+    ///
+    /// 1. If the input is empty (a phrase can not be empty).
+    /// 2. If the input contained a illegal us-ascii character (any char which is
+    ///    not "visible" and not `' '` or `\t` like e.g. CTRL chars `'\0'` but also
+    ///    `'\r'` and `'\n'`). While we could encode them with encoded words, it's
+    ///    not really meant to be used this way and this chars will likely either be
+    ///    stripped out by a mail client or might cause display bugs.
     pub fn new<T: HeaderTryInto<Input>>(input: T) -> Result<Self, ComponentCreationError> {
         //TODO it would make much more sense if Input::shared could be taken advantage of
         let input = input.try_into()?;
@@ -41,7 +66,7 @@ impl Phrase {
                     words.push( word );
                 },
                 Partition::SPACE( _gap ) => {
-                    //FIMXE currently collapses WS
+                    //FIMXE currently collapses WS (This will leave at last one WS!)
                     last_gap = Some( CFWS::SingleFws( FWS ) )
                 }
             }
