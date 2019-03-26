@@ -1,6 +1,6 @@
 [package]
 name = "mail"
-version = "0.6.9"
+version = "0.6.10"
 authors = ["Philipp Korber <p.korber@1aim.com>"]
 categories = []
 keywords = ["mail", "rfc5322", "mime", "smtp", "template"]
@@ -36,10 +36,10 @@ features = [ "handlebars", "smtp", "serde-impl" ]
 
 [dependencies]
 mail-internals = "0.2.3"
-mail-headers =  "0.6.4"
-mail-core =  "0.6.1"
-mail-template = "0.6.0"
-mail-smtp =  { version="0.2.0", optional=true }
+mail-headers =  "0.6.6"
+mail-core =  "0.6.2"
+mail-template = "0.6.1"
+mail-smtp =  { version="0.2.2", optional=true }
 
 [dev-dependencies]
 rpassword = "2.0.0"

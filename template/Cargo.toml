@@ -1,6 +1,6 @@
 [package]
 name = "mail-template"
-version = "0.6.0"
+version = "0.6.1"
 description = "[mail] provides a way to create bind string template engines to produce mails"
 authors = ["Philipp Korber <p.korber@1aim.com>"]
 keywords = ["mail", "template", "handlebars"]
@@ -18,9 +18,9 @@ handlebars-bindings = ["handlebars"]
 features = [ "handlebars-bindings" ]
 
 [dependencies]
-mail-core = { version="0.6.1", features=["serde-impl"] }
+mail-core = { version="0.6.2", features=["serde-impl"] }
 mail-internals = "0.2.3"
-mail-headers = { version="0.6.4", features=["serde-impl"] }
+mail-headers = { version="0.6.6", features=["serde-impl"] }
 
 failure = "0.1.1"
 futures = "0.1.14"
