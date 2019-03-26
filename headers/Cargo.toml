@@ -1,7 +1,7 @@
 [package]
 name = "mail-headers"
 description = "[mail/headers] header parts for the mail crate (inkl. header map and standard header impl)"
-version = "0.6.4"
+version = "0.6.5"
 authors = ["Philipp Korber <philippkorber@gmail.com>"]
 documentation = "https://docs.rs/mail-headers"
 keywords = []
@@ -17,13 +17,13 @@ traceing = [ "mail-internals/traceing" ]
 features = [ "serde-impl" ]
 
 [dependencies]
-mail-internals = "0.2.2"
+mail-internals = "0.2.3"
 failure = "0.1"
 owning_ref = "0.4"
 nom = "3.1.0"
 soft-ascii-string = "1"
 quoted-string = "0.6"
-vec1 = "1"
+vec1 = "1.3.0"
 chrono = "0.4"
 total-order-multi-map = "0.4.5"
 serde = { version="1.0", optional=true, features=["derive"] }

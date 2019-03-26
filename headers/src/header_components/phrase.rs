@@ -77,7 +77,7 @@ impl Phrase {
             }
         }
 
-        let mut words = Vec1::from_vec(words)
+        let mut words = Vec1::try_from_vec(words)
             .map_err( |_| ComponentCreationError
                 ::from_parent(Size0Error, "Phrase")
                 .with_str_context(input.as_str())

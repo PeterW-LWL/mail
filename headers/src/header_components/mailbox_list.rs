@@ -147,7 +147,7 @@ macro_rules! impl_header_try_from_tuple {
                 )*
                 Ok( MailboxList(
                     //UNWRAP_SAFE: len 0 is not implemented with the macro
-                    $crate::vec1::Vec1::from_vec(out).unwrap()
+                    $crate::vec1::Vec1::try_from_vec(out).unwrap()
                 ) )
             }
         }
