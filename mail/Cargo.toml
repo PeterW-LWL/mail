@@ -35,7 +35,7 @@ required-features = ["smtp"]
 features = [ "handlebars", "smtp", "serde-impl" ]
 
 [dependencies]
-mail-internals = "0.2.2"
+mail-internals = "0.2.3"
 mail-headers =  "0.6.4"
 mail-core =  "0.6.1"
 mail-template = "0.6.0"

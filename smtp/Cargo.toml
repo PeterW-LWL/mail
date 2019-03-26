@@ -12,10 +12,10 @@ repository = "https://github.com/1aim/mail-smtp"
 
 [dependencies]
 futures = "0.1"
-failure = "0.1.1"
-mail-core = "0.6.0"
-mail-headers = "0.6.0"
-mail-internals = "0.2.0"
+failure = "0.1.5"
+mail-core = "0.6.1"
+mail-headers = "0.6.4"
+mail-internals = "0.2.3"
 new-tokio-smtp = "0.8.1"
 
 [features]

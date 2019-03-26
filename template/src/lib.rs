@@ -300,7 +300,7 @@ impl<TE, D> TemplateExt<TE, D> for Template<TE>
 
         let parts = MailParts {
             //UNWRAP_SAFE (complexly mapping a Vec1 is safe)
-            alternative_bodies: Vec1::from_vec(bodies).unwrap(),
+            alternative_bodies: Vec1::try_from_vec(bodies).unwrap(),
             inline_embeddings: inline_embeddings_vec,
             attachments
         };
