@@ -721,13 +721,13 @@ impl<'inner> EncodingWriter<'inner> {
         }
 
         if self.current_line_byte_length() >= LINE_LEN_SOFT_LIMIT {
-            if !self.break_line_on_fws() {
-                if self.buffer.len() == LINE_LEN_HARD_LIMIT {
-                    ec_bail!(
-                        mail_type: self.mail_type(),
-                        kind: HardLineLengthLimitBreached
-                    );
-                }
+            self.break_line_on_fws();
+
+            if self.current_line_byte_length() >= LINE_LEN_HARD_LIMIT {
+                ec_bail!(
+                    mail_type: self.mail_type(),
+                    kind: HardLineLengthLimitBreached
+                );
             }
         }
 
@@ -1095,6 +1095,32 @@ mod test {
                 handle.finish_header();
             }
             assert_eq!(encoder.as_slice(), b"H: a\r\n");
+        }
+
+         #[test]
+        fn soft_line_limit_can_be_breached() {
+            let mut encoder = EncodingBuffer::new(MailType::Ascii);
+            {
+                let mut handle = encoder.writer();
+                for _ in 0u32..500 {
+                    assert_ok!(handle.internal_write_char("a"));
+                }
+                handle.finish_header();
+            }
+        }
+
+        #[test]
+        fn hard_line_limit_can_not_be_breached() {
+            let mut encoder = EncodingBuffer::new(MailType::Ascii);
+            {
+                let mut handle = encoder.writer();
+                for _ in 0u32..998 {
+                    assert_ok!(handle.internal_write_char("a"));
+                }
+
+                assert_err!(handle.internal_write_char("b"));
+                handle.finish_header();
+            }
         }
 
         #[test]
