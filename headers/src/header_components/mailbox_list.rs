@@ -246,9 +246,9 @@ mod test {
             },
         ] )
     } => ascii => [
-        Text "hy",
+        Text "\"hy",
         MarkFWS,
-        Text " ho",
+        Text " ho\"",
         MarkFWS,
         Text " <",
         MarkFWS,
@@ -273,9 +273,9 @@ mod test {
             }
         ] )
     } => ascii => [
-        Text "hy",
+        Text "\"hy",
         MarkFWS,
-        Text " ho",
+        Text " ho\"",
         MarkFWS,
         Text " <",
         MarkFWS,

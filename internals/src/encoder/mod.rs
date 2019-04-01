@@ -20,7 +20,7 @@ use std::str;
 use failure::Fail;
 use soft_ascii_string::{SoftAsciiStr, SoftAsciiChar};
 
-use grammar::is_atext;
+use grammar::{is_atext, is_qtext, is_quotable, is_ws};
 use ::utils::{
     is_utf8_continuation_byte,
     vec_insert_bytes
@@ -357,6 +357,15 @@ impl<'inner> EncodingWriter<'inner> {
         self.internal_write_char(slice)
     }
 
+    pub fn write_char_unchecked(&mut self, ch: char) -> Result<(), EncodingError> {
+        #[cfg(feature="traceing")]
+        { self.trace.push(TraceToken::NowUnchecked) }
+        let mut buffer = [0xff_u8; 4];
+        let ch: char = ch.into();
+        let slice = ch.encode_utf8(&mut buffer);
+        self.internal_write_char(slice)
+    }
+
     /// writes a ascii str to the underlying buffer
     ///
     /// # Error
@@ -467,6 +476,39 @@ impl<'inner> EncodingWriter<'inner> {
         }
     }
 
+    pub fn try_write_quoted_string<'short>(&'short mut self, input: &str)
+        -> ConditionalWriteResult<'short, 'inner>
+    {
+        //FIXME currently we can't (easily) reset the state, so we need to scan ahead
+        let mail_type = self.mail_type();
+        if input.chars().all(|ch|is_qtext(ch, mail_type) || is_quotable(ch, mail_type)) {
+            self.__try_write_quoted_string(input).into()
+        } else {
+            ConditionalWriteResult::ConditionFailure(self)
+        }
+    }
+
+    fn __try_write_quoted_string<'short>(&'short mut self, input: &str)
+        -> Result<(), EncodingError>
+    {
+        #[cfg(feature="traceing")]
+        { self.trace.push(TraceToken::NowQuotedString) }
+        self.write_char_unchecked('"')?;
+        let mail_type = self.mail_type();
+        for ch in input.chars() {
+            // you can not use is_quotable as many chars in qtext are quotable
+            if is_ws(ch) {
+                self.mark_fws_pos()
+            } else if !is_qtext(ch, mail_type) {
+                debug_assert!(is_quotable(ch, mail_type));
+                self.write_char_unchecked('\\')?;
+            }
+            self.write_char_unchecked(ch)?;
+        }
+        self.write_char_unchecked('"')?;
+        Ok(())
+    }
+
     /// passes the input `s` to the condition evaluation function `cond` and
     /// then writes it _without additional checks_ to the buffer if `cond` returned
     /// true
@@ -509,7 +551,7 @@ impl<'inner> EncodingWriter<'inner> {
     ///
     /// through is gives a different tracing its roughly equivalent.
     ///
-    pub fn write_str_unchecked( &mut self, s: &str) -> Result<(), EncodingError> {
+    pub fn write_str_unchecked(&mut self, s: &str) -> Result<(), EncodingError> {
         #[cfg(feature="traceing")]
         { self.trace.push(TraceToken::NowUnchecked) }
         self.internal_write_str(s)
@@ -571,9 +613,6 @@ impl<'inner> EncodingWriter<'inner> {
     }
 
 
-
-    //---------------------------------------------------------------------------------------------/
-    //-/////////////////////////// methods only using the public iface   /////////////////////////-/
 
     /// calls mark_fws_pos and then writes a space
     ///

@@ -17,6 +17,7 @@ pub enum TraceToken {
     NowAText,
     NowUtf8,
     NowCondText,
+    NowQuotedString,
     NowUnchecked,
     NewSection,
     End,
@@ -41,7 +42,8 @@ pub fn simplify_trace_tokens<I: IntoIterator<Item=TraceToken>>(inp: I) -> Vec<Tr
                 NowAText |
                 NowUtf8 |
                 NowUnchecked |
-                NowCondText => false,
+                NowCondText |
+                NowQuotedString => false,
                 _ => true
             }
         });

@@ -45,7 +45,7 @@ pub fn encoded_word_encode_utf8<'a,  O>(word: &str, writer: &mut O )
     let iter = word.char_indices().map( |(idx, ch)| {
         &word.as_bytes()[idx..idx+ch.len_utf8()]
     });
-    encoded_word_encode(iter, writer );
+    encoded_word_encode(iter, writer);
 }
 
 ///

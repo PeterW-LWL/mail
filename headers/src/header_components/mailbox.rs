@@ -138,9 +138,9 @@ mod test {
             email: Email::try_from( "affen@haus" ).unwrap(),
         }
     } => ascii => [
-        Text "ay",
+        Text "\"ay",
         MarkFWS,
-        Text " ya",
+        Text " ya\"",
         MarkFWS,
         Text " <",
         MarkFWS,

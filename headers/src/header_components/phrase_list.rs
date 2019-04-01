@@ -29,18 +29,11 @@ impl EncodableInHeader for  PhraseList {
     fn encode(&self, handle: &mut EncodingWriter) -> Result<(), EncodingError> {
         sep_for!{ word in self.0.iter();
             sep {
-                //TODO handle this better by collapsing FWS
-                // <= isn't that allready fixed by FWS+ has content on line in EncodingBuffer
-                //Note that we do not want to write FWS as the following word might contains
-                // a left_padding with a MarkFWS, NowChar, Text " " but a space if fine
                 handle.write_char( SoftAsciiChar::from_unchecked(',') )?;
-                handle.write_char( SoftAsciiChar::from_unchecked(' ') )?;
             };
             word.encode( handle )?;
-
         }
-
-        Ok( () )
+        Ok(())
     }
 
     fn boxed_clone(&self) -> Box<EncodableInHeader> {
@@ -96,7 +89,7 @@ macro_rules! impl_header_try_from_array {
                 //due to only supporting arrays halfheartedly for now
                 let heapified: Box<[T]> = Box::new(vec);
                 let vecified: Vec<_> = heapified.into();
-                try_from_into_iter( vecified )
+                try_from_into_iter(vecified)
             }
         }
     );
@@ -122,13 +115,11 @@ mod test {
             Phrase::try_from( "magic man" )?
         ])
     } => ascii => [
-        Text "hy",
+        Text "\"hy",
         MarkFWS,
-        //TODO really no FWS by the seperator??
-        // (currently it's this way as word can start with a FWS making it a double FWS)
-        Text " there, magic",
+        Text " there\",\"magic",
         MarkFWS,
-        Text " man"
+        Text " man\""
     ]}
 
     ec_test!{ some_simple_phrases_try_from, {
@@ -136,9 +127,9 @@ mod test {
             "hy there"
         )?
     } => ascii => [
-        Text "hy",
+        Text "\"hy",
         MarkFWS,
-        Text " there"
+        Text " there\""
     ]}
 
     ec_test!{ some_phrases_try_from, {
@@ -147,11 +138,11 @@ mod test {
             "magic man"
         ] )?
     } => ascii => [
-        Text "hy",
+        Text "\"hy",
         MarkFWS,
-        Text " there, magic",
+        Text " there\",\"magic",
         MarkFWS,
-        Text " man"
+        Text " man\""
     ]}
 }
 
