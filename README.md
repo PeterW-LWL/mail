@@ -1,3 +1,6 @@
+**Work on this crate has been suspended, it might be continued in the future.**
+(If you are interested in forking and like to have some questions/tipps/opinons about
+ how it can make sense to continue this crate feel free to contact me.)
 
 # mail
 
