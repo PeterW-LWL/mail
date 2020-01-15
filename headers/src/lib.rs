@@ -113,6 +113,7 @@
 //!     }.unwrap();
 //! }
 //! ```
+#![allow(clippy::derive_hash_xor_eq)]
 
 extern crate media_type;
 extern crate quoted_string;

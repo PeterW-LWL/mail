@@ -72,7 +72,7 @@ impl HeaderName {
     /// for header names
     fn validate_name(name: &SoftAsciiStr) -> Result<(), InvalidHeaderName> {
         let mut begin_of_word = true;
-        if name.len() < 1 {
+        if name.is_empty() {
             return Err(InvalidHeaderName {
                 invalid_name: name.to_owned().into(),
             });

@@ -1,3 +1,5 @@
+#![allow(clippy::match_wild_err_arm)]
+
 #[cfg(feature = "serde")]
 use std::fmt;
 use std::{ops::Deref, str::FromStr};
@@ -123,7 +125,7 @@ impl From<AsciiMediaType> for MediaType {
 impl From<InternationalizedMediaType> for MediaType {
     fn from(media_type: InternationalizedMediaType) -> Self {
         MediaType {
-            media_type: media_type,
+            media_type,
             might_need_utf8: true,
         }
     }
@@ -225,7 +227,7 @@ impl<'de> Deserialize<'de> for MediaType {
             where
                 E: de::Error,
             {
-                let mt = s.parse().map_err(|err| E::custom(err))?;
+                let mt = s.parse().map_err(E::custom)?;
 
                 Ok(mt)
             }

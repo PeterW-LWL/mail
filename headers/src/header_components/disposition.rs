@@ -82,9 +82,9 @@ impl Serialize for DispositionKind {
     where
         S: Serializer,
     {
-        match self {
-            &DispositionKind::Inline => serializer.serialize_str("inline"),
-            &DispositionKind::Attachment => serializer.serialize_str("attachment"),
+        match *self {
+            DispositionKind::Inline => serializer.serialize_str("inline"),
+            DispositionKind::Attachment => serializer.serialize_str("attachment"),
         }
     }
 }
@@ -134,7 +134,7 @@ impl<'a> HeaderTryFrom<&'a str> for Disposition {
         } else {
             let mut err = ComponentCreationError::new("Disposition");
             err.set_str_context(text);
-            return Err(err);
+            Err(err)
         }
     }
 }

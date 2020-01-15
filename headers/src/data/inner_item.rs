@@ -157,8 +157,8 @@ impl<'de> Deserialize<'de> for InnerAscii {
     where
         D: Deserializer<'de>,
     {
-        let content = String::deserialize(deserializer).map_err(|err| D::Error::custom(err))?;
-        let content = SoftAsciiString::from_string(content).map_err(|err| D::Error::custom(err))?;
+        let content = String::deserialize(deserializer).map_err(D::Error::custom)?;
+        let content = SoftAsciiString::from_string(content).map_err(D::Error::custom)?;
         Ok(InnerAscii::from(content))
     }
 }
@@ -178,7 +178,7 @@ impl<'de> Deserialize<'de> for InnerUtf8 {
     where
         D: Deserializer<'de>,
     {
-        let content = String::deserialize(deserializer).map_err(|err| D::Error::custom(err))?;
+        let content = String::deserialize(deserializer).map_err(D::Error::custom)?;
         Ok(InnerUtf8::from(content))
     }
 }

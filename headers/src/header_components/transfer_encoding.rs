@@ -42,7 +42,7 @@ impl EncodableInHeader for TransferEncoding {
     }
 
     fn boxed_clone(&self) -> Box<dyn EncodableInHeader> {
-        Box::new(self.clone())
+        Box::new(*self)
     }
 }
 

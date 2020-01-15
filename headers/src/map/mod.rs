@@ -159,6 +159,11 @@ impl HeaderMap {
         self.inner_map.len()
     }
 
+    /// returns whether this map is empty or has at least one entry
+    pub fn is_empty(&self) -> bool {
+        self.inner_map.is_empty()
+    }
+
     /// clears the header map
     ///
     /// This removes all headers _and_ all validators
@@ -652,7 +657,7 @@ macro_rules! headers {
 struct ValidatorHashWrapper(HeaderMapValidator);
 
 impl ValidatorHashWrapper {
-    fn identity_repr(&self) -> usize {
+    fn identity_repr(self) -> usize {
         self.0 as usize
     }
 }
@@ -695,6 +700,8 @@ pub fn check_header_count_max_one(
 
 #[cfg(test)]
 mod test {
+    #![allow(clippy::suspicious_map, clippy::type_complexity)]
+
     use failure::Context;
     use soft_ascii_string::SoftAsciiStr;
 

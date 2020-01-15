@@ -222,9 +222,8 @@ mod test {
                 display_name: None,
                 email: Email::try_from("ab@cd").unwrap(),
             };
-            let result = mailbox
-                .clone()
-                .with_default_name(|_| Err(ComponentCreationError::new("DisplayName")));
+            let result =
+                mailbox.with_default_name(|_| Err(ComponentCreationError::new("DisplayName")));
             let err = assert_err!(result);
             assert_eq!(err.to_string(), "creating component DisplayName failed");
         }

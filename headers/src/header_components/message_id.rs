@@ -96,7 +96,7 @@ impl<'de> Deserialize<'de> for MessageId {
         let as_ascii = SoftAsciiStr::from_str(&as_string)
             .map_err(|err| D::Error::custom(format!("message id is not ascii: {}", err)))?;
 
-        let split_point = if as_ascii.as_str().ends_with("]") {
+        let split_point = if as_ascii.as_str().ends_with(']') {
             as_ascii
                 .as_str()
                 .bytes()

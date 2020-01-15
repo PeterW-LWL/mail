@@ -46,7 +46,7 @@ impl Email {
             Input(InnerUtf8::Shared(shared)) => {
                 //1. ownify Input
                 //2. get 2 sub shares split befor/after @
-                let index = shared.find("@").ok_or_else(|| {
+                let index = shared.find('@').ok_or_else(|| {
                     ComponentCreationError::new_with_str("Email", shared.to_string())
                 })?;
 
@@ -185,7 +185,7 @@ impl Domain {
     //  the function is only allowed to return MailType::Ascii
     //  if the domain is actually ascii
     fn check_domain(domain: &str) -> Result<MailType, ComponentCreationError> {
-        if domain.starts_with("[") && domain.ends_with("]") {
+        if domain.starts_with('[') && domain.ends_with(']') {
             //TODO improved support for domain literals, e.g. internationalized ones? CRLF? etc.
             for ch in domain.chars() {
                 if !(is_dtext(ch, MailType::Ascii) || is_ws(ch)) {

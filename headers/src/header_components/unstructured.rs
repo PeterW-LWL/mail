@@ -53,7 +53,7 @@ where
 impl EncodableInHeader for Unstructured {
     fn encode(&self, handle: &mut EncodingWriter) -> Result<(), EncodingError> {
         let text: &str = &*self.text;
-        if text.len() == 0 {
+        if text.is_empty() {
             return Ok(());
         }
 

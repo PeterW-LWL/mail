@@ -21,7 +21,7 @@ enum Type {
 pub fn partition<'a>(text: &'a str) -> Result<Vec<Partition<'a>>, PartitionError> {
     use self::Type::*;
 
-    if text.len() == 0 {
+    if text.is_empty() {
         return Ok(Vec::new());
     }
 
