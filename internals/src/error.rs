@@ -150,7 +150,7 @@ impl From<(Context<EncodingErrorKind>, MailType)> for EncodingError {
 }
 
 impl Fail for EncodingError {
-    fn cause(&self) -> Option<&Fail> {
+    fn cause(&self) -> Option<&dyn Fail> {
         self.inner.cause()
     }
 

@@ -15,7 +15,7 @@ use error::EncodingError;
 pub trait EncodableInHeader: Send + Sync + Any + Debug {
     fn encode(&self, encoder: &mut EncodingWriter) -> Result<(), EncodingError>;
 
-    fn boxed_clone(&self) -> Box<EncodableInHeader>;
+    fn boxed_clone(&self) -> Box<dyn EncodableInHeader>;
 
     #[doc(hidden)]
     fn type_id(&self) -> TypeId {
@@ -24,7 +24,7 @@ pub trait EncodableInHeader: Send + Sync + Any + Debug {
 }
 
 //TODO we now could use MOPA or similar crates
-impl EncodableInHeader {
+impl dyn EncodableInHeader {
     #[inline(always)]
     pub fn is<T: EncodableInHeader>(&self) -> bool {
         EncodableInHeader::type_id(self) == TypeId::of::<T>()
@@ -33,7 +33,7 @@ impl EncodableInHeader {
     #[inline]
     pub fn downcast_ref<T: EncodableInHeader>(&self) -> Option<&T> {
         if self.is::<T>() {
-            Some(unsafe { &*(self as *const EncodableInHeader as *const T) })
+            Some(unsafe { &*(self as *const dyn EncodableInHeader as *const T) })
         } else {
             None
         }
@@ -42,14 +42,14 @@ impl EncodableInHeader {
     #[inline]
     pub fn downcast_mut<T: EncodableInHeader>(&mut self) -> Option<&mut T> {
         if self.is::<T>() {
-            Some(unsafe { &mut *(self as *mut EncodableInHeader as *mut T) })
+            Some(unsafe { &mut *(self as *mut dyn EncodableInHeader as *mut T) })
         } else {
             None
         }
     }
 }
 
-impl Clone for Box<EncodableInHeader> {
+impl Clone for Box<dyn EncodableInHeader> {
     fn clone(&self) -> Self {
         self.boxed_clone()
     }
@@ -59,10 +59,10 @@ pub trait EncodableInHeaderBoxExt: Sized {
     fn downcast<T: EncodableInHeader>(self) -> StdResult<Box<T>, Self>;
 }
 
-impl EncodableInHeaderBoxExt for Box<EncodableInHeader> {
+impl EncodableInHeaderBoxExt for Box<dyn EncodableInHeader> {
     fn downcast<T: EncodableInHeader>(self) -> StdResult<Box<T>, Self> {
         if EncodableInHeader::is::<T>(&*self) {
-            let ptr: *mut EncodableInHeader = Box::into_raw(self);
+            let ptr: *mut dyn EncodableInHeader = Box::into_raw(self);
             Ok(unsafe { Box::from_raw(ptr as *mut T) })
         } else {
             Err(self)
@@ -70,10 +70,10 @@ impl EncodableInHeaderBoxExt for Box<EncodableInHeader> {
     }
 }
 
-impl EncodableInHeaderBoxExt for Box<EncodableInHeader + Send> {
+impl EncodableInHeaderBoxExt for Box<dyn EncodableInHeader + Send> {
     fn downcast<T: EncodableInHeader>(self) -> StdResult<Box<T>, Self> {
         if EncodableInHeader::is::<T>(&*self) {
-            let ptr: *mut EncodableInHeader = Box::into_raw(self);
+            let ptr: *mut dyn EncodableInHeader = Box::into_raw(self);
             Ok(unsafe { Box::from_raw(ptr as *mut T) })
         } else {
             Err(self)
@@ -113,7 +113,7 @@ impl EncodableInHeader for EncodeFn {
         (self.0)(encoder)
     }
 
-    fn boxed_clone(&self) -> Box<EncodableInHeader> {
+    fn boxed_clone(&self) -> Box<dyn EncodableInHeader> {
         Box::new(*self)
     }
 }
@@ -156,7 +156,7 @@ where
         (self.0)(encoder)
     }
 
-    fn boxed_clone(&self) -> Box<EncodableInHeader> {
+    fn boxed_clone(&self) -> Box<dyn EncodableInHeader> {
         Box::new(self.clone())
     }
 }

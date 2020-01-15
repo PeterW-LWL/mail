@@ -77,7 +77,7 @@ pub fn is_any_whitespace(ch: char) -> bool {
 /// ctext as defined by RFC 5322
 pub fn is_ctext(ch: char, mt: MailType) -> bool {
     match ch {
-        '!'...'\'' | '*'...'[' | ']'...'~' => true,
+        '!'..='\'' | '*'..='[' | ']'..='~' => true,
         // obs-ctext
         _ => mt == MailType::Internationalized && !is_ascii(ch),
     }
@@ -112,7 +112,7 @@ pub fn is_atext(ch: char, tp: MailType) -> bool {
 #[inline(always)]
 pub fn is_dtext(ch: char, mt: MailType) -> bool {
     match ch as u32 {
-        33...90 | 94...126 => true,
+        33..=90 | 94..=126 => true,
         _ => mt == MailType::Internationalized && !is_ascii(ch),
     }
 }
@@ -123,9 +123,9 @@ pub fn is_qtext(ch: char, mt: MailType) -> bool {
         //not ' ' [d:32]
         '!' |
         //not '"' [d:34]
-        '#'...'[' |
+        '#'..='[' |
         //not '\\' [d:92]
-        ']'...'~' => true,
+        ']'..='~' => true,
         _ => mt == MailType::Internationalized && !is_ascii(ch)
     }
 }
@@ -303,7 +303,7 @@ pub mod encoded_word {
     /// True if the char is valid in an encode word appearing in a phrase.
     fn valid_char_in_ec_in_phrase(ch: char) -> bool {
         match ch {
-            '0'...'9' | 'a'...'z' | 'A'...'Z' | '!' | '*' | '+' | '-' | '/' | '=' | '_' => true,
+            '0'..='9' | 'a'..='z' | 'A'..='Z' | '!' | '*' | '+' | '-' | '/' | '=' | '_' => true,
             _ => false,
         }
     }

@@ -96,7 +96,7 @@ macro_rules! ec_test {
                 //REFACTOR(catch): use catch block once stable
                 let component = (|| -> Result<_, $crate::__FError> {
                     let component = $inp;
-                    Ok(Box::new(component) as Box<$crate::encoder::EncodableInHeader>)
+                    Ok(Box::new(component) as Box<dyn $crate::encoder::EncodableInHeader>)
                 })().unwrap();
 
                 let mut handle = encoder.writer();

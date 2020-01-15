@@ -121,9 +121,9 @@ where
                 | b'-'
                 | b'/'
                 | b'_'
-                | b'0'...b'9'
-                | b'A'...b'Z'
-                | b'a'...b'z' => {
+                | b'0'..=b'9'
+                | b'A'..=b'Z'
+                | b'a'..=b'z' => {
                     buf[buf_idx] = SoftAsciiChar::from_unchecked(byte as char);
                     buf_idx += 1;
                 }

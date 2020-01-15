@@ -1762,7 +1762,7 @@ mod test {
                 encoder.write_utf8(self.0)
             }
 
-            fn boxed_clone(&self) -> Box<EncodableInHeader> {
+            fn boxed_clone(&self) -> Box<dyn EncodableInHeader> {
                 Box::new(self.clone())
             }
         }
@@ -1775,7 +1775,7 @@ mod test {
                 encoder.write_utf8(self.0)
             }
 
-            fn boxed_clone(&self) -> Box<EncodableInHeader> {
+            fn boxed_clone(&self) -> Box<dyn EncodableInHeader> {
                 Box::new(self.clone())
             }
         }
@@ -1783,7 +1783,7 @@ mod test {
         #[test]
         fn is() {
             let tt = TestType::default();
-            let erased: &EncodableInHeader = &tt;
+            let erased: &dyn EncodableInHeader = &tt;
             assert_eq!(true, erased.is::<TestType>());
             assert_eq!(false, erased.is::<AnotherType>());
         }
@@ -1791,7 +1791,7 @@ mod test {
         #[test]
         fn downcast_ref() {
             let tt = TestType::default();
-            let erased: &EncodableInHeader = &tt;
+            let erased: &dyn EncodableInHeader = &tt;
             let res: Option<&TestType> = erased.downcast_ref::<TestType>();
             assert_eq!(Some(&tt), res);
             assert_eq!(None, erased.downcast_ref::<AnotherType>());
@@ -1801,7 +1801,7 @@ mod test {
         fn downcast_mut() {
             let mut tt_nr2 = TestType::default();
             let mut tt = TestType::default();
-            let erased: &mut EncodableInHeader = &mut tt;
+            let erased: &mut dyn EncodableInHeader = &mut tt;
             {
                 let res: Option<&mut TestType> = erased.downcast_mut::<TestType>();
                 assert_eq!(Some(&mut tt_nr2), res);
@@ -1812,7 +1812,7 @@ mod test {
         #[test]
         fn downcast() {
             let tt = Box::new(TestType::default());
-            let erased: Box<EncodableInHeader> = tt;
+            let erased: Box<dyn EncodableInHeader> = tt;
             let erased = assert_err!(erased.downcast::<AnotherType>());
             let _: Box<TestType> = assert_ok!(erased.downcast::<TestType>());
         }
