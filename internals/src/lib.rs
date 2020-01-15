@@ -1,5 +1,7 @@
 //! Provides some internal functionality for the `mail` crate.
 #![recursion_limit = "256"]
+#![allow(clippy::cognitive_complexity)]
+
 extern crate failure;
 #[macro_use]
 extern crate nom;

@@ -60,6 +60,7 @@ where
     _encoded_word_encode(input.as_ref(), out)
 }
 
+#[allow(clippy::assertions_on_constants)]
 fn _encoded_word_encode<O>(input: &str, out: &mut O)
 where
     O: EncodedWordWriter,
@@ -68,7 +69,7 @@ where
         extern_base64::Config::new(CHARSET, USE_PADDING, ECW_STRIP_WHITESPACE, NO_LINE_WRAP);
 
     debug_assert!(
-        USE_PADDING == true,
+        USE_PADDING,
         "size calculation is tailored for padding"
     );
 
@@ -105,14 +106,14 @@ where
         //very important ;=)
         rest = _rest;
 
-        extern_base64::encode_config_buf(this, config.clone(), &mut buff);
+        extern_base64::encode_config_buf(this, config, &mut buff);
         //FIXME add a write_str method to EncodedWordWriter
         for ch in buff.chars() {
             //SAFE: base64 consist of only ascii chars
             out.write_char(SoftAsciiChar::from_unchecked(ch))
         }
 
-        if rest.len() == 0 {
+        if rest.is_empty() {
             break;
         } else {
             out.start_next_encoded_word();

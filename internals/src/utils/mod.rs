@@ -3,6 +3,8 @@
 //! Or with other words, thinks which
 //! (currently) have no other place to
 //! be placed in.
+#![allow(clippy::transmute_ptr_to_ptr)]
+
 use std::any::TypeId;
 use std::cell::RefCell;
 use std::fmt::{self, Debug};
@@ -106,8 +108,8 @@ pub fn uneraser_mut<GOT: 'static, EXP: 'static>(inp: &mut GOT) -> Option<&mut EX
 /// - on the first byte of a multi-byte utf-8 char
 ///
 pub fn is_utf8_continuation_byte(b: u8) -> bool {
-    // all additional bytes (and only them) in utf8 start with 0b10xxxxxx so while
-    (b & 0b11000000) == 0b10000000
+    // all additional bytes (and only them) in utf8 start with 0b10xx_xxxx so while
+    (b & 0b1100_0000) == 0b1000_0000
 }
 
 /// Faster insertion of byte slices into a byte vector.
@@ -127,7 +129,7 @@ pub fn vec_insert_bytes(target: &mut Vec<u8>, idx: usize, source: &[u8]) {
     let source_ptr = source.as_ptr();
     let insertion_point = unsafe {
         // SAFE: we panic if idx > target.len(), through idx == target.len() is fine
-        target.as_mut_ptr().offset(idx as isize)
+        target.as_mut_ptr().add(idx)
     };
     let moved_data_len = old_len - idx;
 
@@ -146,7 +148,7 @@ pub fn vec_insert_bytes(target: &mut Vec<u8>, idx: usize, source: &[u8]) {
         //         - 0 <= 0  [Q.E.D]
         copy(
             /*src*/ insertion_point,
-            /*dest*/ insertion_point.offset(insertion_len as isize),
+            /*dest*/ insertion_point.add(insertion_len),
             /*count*/ moved_data_len,
         );
 

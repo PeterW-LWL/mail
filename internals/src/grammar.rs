@@ -162,7 +162,7 @@ pub fn is_especial(ch: char) -> bool {
 //TODO add rfc
 /// Check if a string is an token (based on RFC ...).
 pub fn is_token(s: &str) -> bool {
-    0 < s.len() && s.chars().all(is_token_char)
+    !s.is_empty() && s.chars().all(is_token_char)
 }
 
 //
@@ -231,9 +231,9 @@ pub mod encoded_word {
 
     impl EncodedWordContext {
         /// Returns a (context dependent) validator to check if a char can be represented without encoding.
-        fn char_validator(&self) -> fn(char) -> bool {
+        fn char_validator(self) -> fn(char) -> bool {
             use self::EncodedWordContext::*;
-            match *self {
+            match self {
                 Phrase => valid_char_in_ec_in_phrase,
                 Text => is_encoded_word_char,
                 Comment => valid_char_in_ec_in_comment,
@@ -281,12 +281,8 @@ pub mod encoded_word {
                 assert_eq!(rest.len(), 0, "[BUG] used nom::eof!() but rest.len() > 0");
                 Ok(result)
             }
-            nom::IResult::Incomplete(..) => {
-                return Err((EncodingErrorKind::Malformed, mail_type).into());
-            }
-            nom::IResult::Error(..) => {
-                return Err((EncodingErrorKind::Malformed, mail_type).into());
-            }
+            nom::IResult::Incomplete(..) => Err((EncodingErrorKind::Malformed, mail_type).into()),
+            nom::IResult::Error(..) => Err((EncodingErrorKind::Malformed, mail_type).into()),
         }
     }
 
@@ -338,11 +334,7 @@ pub fn is_quoted_string(qstr: &str, tp: MailType) -> bool {
                 }
             }
             '"' => {
-                if iter.next().is_none() {
-                    return true;
-                } else {
-                    return false;
-                }
+                return iter.next().is_none();
             }
             ch => {
                 if !is_qtext(ch, tp) {
@@ -354,7 +346,7 @@ pub fn is_quoted_string(qstr: &str, tp: MailType) -> bool {
     }
 
     // The only true return if we have a '"' followed by iter.next().is_none()
-    return false;
+    false
 }
 
 #[cfg(test)]

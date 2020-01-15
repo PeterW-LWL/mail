@@ -30,14 +30,14 @@ pub enum MailType {
 impl MailType {
     /// Returns true if the self is equal to `Internationalized`
     #[inline]
-    pub fn is_internationalized(&self) -> bool {
-        *self == MailType::Internationalized
+    pub fn is_internationalized(self) -> bool {
+        self == MailType::Internationalized
     }
 
     /// Returns true if self is either `Internationalized` or `Mime8BitEnabled`
-    pub fn supports_8bit_bodies(&self) -> bool {
+    pub fn supports_8bit_bodies(self) -> bool {
         use self::MailType::*;
-        match *self {
+        match self {
             Ascii => false,
             Mime8BitEnabled => true,
             Internationalized => true,

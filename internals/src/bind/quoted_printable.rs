@@ -33,7 +33,7 @@ pub fn encoded_word_decode<R: AsRef<[u8]>>(input: R) -> Result<Vec<u8>, Encoding
 // making it compatilble with all context, but not nessesary
 // the best solution...
 /// Simple wrapper around ecoded_word_encode for utf8 strings only
-pub fn encoded_word_encode_utf8<'a, O>(word: &str, writer: &mut O)
+pub fn encoded_word_encode_utf8<O>(word: &str, writer: &mut O)
 where
     O: EncodedWordWriter,
 {
@@ -95,6 +95,7 @@ where
 ///   might be encoded with completely different bytes, but when the RFC speaks of
 ///   '\r','\n' it normally means the bytes 10/13 independent of the character set,
 ///   or if they appear in a image, zip-archiev etc. )
+#[allow(clippy::needless_range_loop)]
 pub fn encoded_word_encode<'a, I, O>(input: I, out: &mut O)
 where
     I: Iterator<Item = &'a [u8]>,
@@ -172,7 +173,7 @@ mod test {
     #[test]
     fn to_hex() {
         let data = &[
-            ('0', 0b11110000),
+            ('0', 0b1111_0000),
             ('0', 0b0),
             ('7', 0b0111),
             ('7', 0b10111),

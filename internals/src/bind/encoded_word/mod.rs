@@ -14,9 +14,9 @@ pub enum EncodedWordEncoding {
 impl EncodedWordEncoding {
     /// returns the acronym for the given encoding
     /// used in a encoded word
-    pub fn acronym(&self) -> &'static SoftAsciiStr {
+    pub fn acronym(self) -> &'static SoftAsciiStr {
         use self::EncodedWordEncoding::*;
-        match *self {
+        match self {
             Base64 => SoftAsciiStr::from_unchecked("B"),
             QuotedPrintable => SoftAsciiStr::from_unchecked("Q"),
         }
@@ -31,14 +31,14 @@ impl EncodedWordEncoding {
     /// As both algorithm need to know about code point boundaries
     /// only encoding utf8 is supported for now
     ///
-    pub fn encode<R, O>(&self, input: R, out: &mut O)
+    pub fn encode<R, O>(self, input: R, out: &mut O)
     where
         R: AsRef<str>,
         O: EncodedWordWriter,
     {
         use self::EncodedWordEncoding::*;
         let input: &str = input.as_ref();
-        match *self {
+        match self {
             Base64 => base64::encoded_word_encode(input, out),
             QuotedPrintable => quoted_printable::encoded_word_encode_utf8(input, out),
         }
