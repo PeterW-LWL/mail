@@ -9,7 +9,7 @@ use chrono;
 use futures::Future;
 
 /// Type alias for an boxed future which is Send + 'static.
-pub type SendBoxFuture<I, E> = Box<Future<Item = I, Error = E> + Send + 'static>;
+pub type SendBoxFuture<I, E> = Box<dyn Future<Item = I, Error = E> + Send + 'static>;
 
 /// Returns the current data time.
 pub fn now() -> chrono::DateTime<chrono::Utc> {

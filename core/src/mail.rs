@@ -578,7 +578,7 @@ fn recursive_auto_gen_headers<C: Context>(mail: &mut Mail, boundary_count: &mut 
             headers.insert(ContentId::body(data.content_id().clone()));
         }
         &mut MailBody::MultipleBodies { ref mut bodies, .. } => {
-            let mut headers: &mut HeaderMap = headers;
+            let headers: &mut HeaderMap = headers;
             let content_type: &mut Header<ContentType> = headers
                 .get_single_mut(ContentType)
                 .expect("[BUG] mail was already validated")
