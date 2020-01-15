@@ -39,7 +39,7 @@ impl EncodableInHeader for PhraseList {
         Ok(())
     }
 
-    fn boxed_clone(&self) -> Box<EncodableInHeader> {
+    fn boxed_clone(&self) -> Box<dyn EncodableInHeader> {
         Box::new(self.clone())
     }
 }

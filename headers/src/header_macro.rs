@@ -124,7 +124,7 @@ macro_rules! def_headers {
                 }
             }
             fn can_be_trait_object<EN: EncodableInHeader>( v: Option<&EN> ) {
-                let _ = v.map( |en| en as &EncodableInHeader );
+                let _ = v.map( |en| en as &dyn EncodableInHeader );
             }
             $(
                 can_be_trait_object::<$scope::$component>( None );

@@ -162,7 +162,7 @@ impl EncodableInHeader for MessageId {
         Ok(())
     }
 
-    fn boxed_clone(&self) -> Box<EncodableInHeader> {
+    fn boxed_clone(&self) -> Box<dyn EncodableInHeader> {
         Box::new(self.clone())
     }
 }
@@ -181,7 +181,7 @@ impl EncodableInHeader for MessageIdList {
         Ok(())
     }
 
-    fn boxed_clone(&self) -> Box<EncodableInHeader> {
+    fn boxed_clone(&self) -> Box<dyn EncodableInHeader> {
         Box::new(self.clone())
     }
 }

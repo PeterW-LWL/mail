@@ -179,7 +179,7 @@ impl EncodableInHeader for DispositionParameters {
         }
     }
 
-    fn boxed_clone(&self) -> Box<EncodableInHeader> {
+    fn boxed_clone(&self) -> Box<dyn EncodableInHeader> {
         Box::new(self.clone())
     }
 }
@@ -199,7 +199,7 @@ impl EncodableInHeader for Disposition {
         Ok(())
     }
 
-    fn boxed_clone(&self) -> Box<EncodableInHeader> {
+    fn boxed_clone(&self) -> Box<dyn EncodableInHeader> {
         Box::new(self.clone())
     }
 }
@@ -250,9 +250,9 @@ mod test {
     } => ascii => [
         Text concat!( "attachment",
             "; filename=random.png",
-            "; creation-date=\"Tue,  6 Aug 2013 07:11:01 +0000\"",
-            "; modification-date=\"Tue,  6 Aug 2013 07:11:02 +0000\"",
-            "; read-date=\"Tue,  6 Aug 2013 07:11:03 +0000\"",
+            "; creation-date=\"Tue, 06 Aug 2013 07:11:01 +0000\"",
+            "; modification-date=\"Tue, 06 Aug 2013 07:11:02 +0000\"",
+            "; read-date=\"Tue, 06 Aug 2013 07:11:03 +0000\"",
             "; size=4096" ),
     ]}
 

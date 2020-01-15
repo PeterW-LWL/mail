@@ -85,14 +85,14 @@ impl HeaderName {
                 });
             }
             match ch {
-                'a'...'z' => {
+                'a'..='z' => {
                     if begin_of_word {
                         return Err(InvalidHeaderName {
                             invalid_name: name.to_owned().into(),
                         });
                     }
                 }
-                'A'...'Z' => {
+                'A'..='Z' => {
                     if begin_of_word {
                         begin_of_word = false;
                     } else {
@@ -101,7 +101,7 @@ impl HeaderName {
                         });
                     }
                 }
-                '0'...'9' => {
+                '0'..='9' => {
                     begin_of_word = false;
                 }
                 ch => {

@@ -35,7 +35,7 @@ impl EncodableInHeader for OptMailboxList {
         encode_list(self.0.iter(), handle)
     }
 
-    fn boxed_clone(&self) -> Box<EncodableInHeader> {
+    fn boxed_clone(&self) -> Box<dyn EncodableInHeader> {
         Box::new(self.clone())
     }
 }
@@ -205,7 +205,7 @@ impl EncodableInHeader for MailboxList {
         encode_list(self.0.iter(), handle)
     }
 
-    fn boxed_clone(&self) -> Box<EncodableInHeader> {
+    fn boxed_clone(&self) -> Box<dyn EncodableInHeader> {
         Box::new(self.clone())
     }
 }

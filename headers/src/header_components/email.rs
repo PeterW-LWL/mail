@@ -93,7 +93,7 @@ impl EncodableInHeader for Email {
         Ok(())
     }
 
-    fn boxed_clone(&self) -> Box<EncodableInHeader> {
+    fn boxed_clone(&self) -> Box<dyn EncodableInHeader> {
         Box::new(self.clone())
     }
 }
@@ -131,7 +131,7 @@ impl EncodableInHeader for LocalPart {
         Ok(())
     }
 
-    fn boxed_clone(&self) -> Box<EncodableInHeader> {
+    fn boxed_clone(&self) -> Box<dyn EncodableInHeader> {
         Box::new(self.clone())
     }
 }
@@ -258,7 +258,7 @@ impl EncodableInHeader for Domain {
         Ok(())
     }
 
-    fn boxed_clone(&self) -> Box<EncodableInHeader> {
+    fn boxed_clone(&self) -> Box<dyn EncodableInHeader> {
         Box::new(self.clone())
     }
 }

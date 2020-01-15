@@ -115,7 +115,7 @@ impl ChainTail {
         }
     }
 
-    fn as_fail(&self) -> Option<&Fail> {
+    fn as_fail(&self) -> Option<&dyn Fail> {
         match *self {
             ChainTail::Backtrace(_) => None,
             ChainTail::Error(ref error) => Some(error.as_fail()),
@@ -199,7 +199,7 @@ impl ComponentCreationError {
 }
 
 impl Fail for ComponentCreationError {
-    fn cause(&self) -> Option<&Fail> {
+    fn cause(&self) -> Option<&dyn Fail> {
         self.backtrace.as_fail()
     }
     fn backtrace(&self) -> Option<&Backtrace> {

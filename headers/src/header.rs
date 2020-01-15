@@ -245,13 +245,13 @@ pub trait HeaderObjTraitBoxExt: Sized {
         H: HeaderKind;
 }
 
-impl HeaderObjTraitBoxExt for Box<HeaderObjTrait> {
+impl HeaderObjTraitBoxExt for Box<dyn HeaderObjTrait> {
     fn downcast<H>(self) -> Result<Box<Header<H>>, Self>
     where
         H: HeaderKind,
     {
         if HeaderObjTrait::is::<H>(&*self) {
-            let ptr: *mut (HeaderObj) = Box::into_raw(self);
+            let ptr: *mut HeaderObj = Box::into_raw(self);
             Ok(unsafe { Box::from_raw(ptr as *mut Header<H>) })
         } else {
             Err(self)
