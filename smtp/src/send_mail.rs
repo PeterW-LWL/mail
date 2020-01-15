@@ -91,7 +91,7 @@ fn collect_res<S, E>(stream: S) -> impl Future<Item = Vec<Result<S::Item, S::Err
 where
     S: Stream,
 {
-    stream.then(|res| Ok(res)).collect()
+    stream.then(Ok).collect()
 }
 
 /// Turns a `MailRequest` into a future resolving to a `MailEnvelop`.

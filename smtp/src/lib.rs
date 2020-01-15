@@ -56,8 +56,8 @@
 //! let results = fut.wait();
 //! # }
 //! ```
-//!
-//!
+#![allow(clippy::let_and_return)]
+
 extern crate futures;
 extern crate mail_core as mail;
 #[cfg_attr(test, macro_use)]

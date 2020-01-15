@@ -76,7 +76,7 @@ where
     where
         T: IntoIterator<Item = I>,
     {
-        let all = all.into_iter().map(|fut| AltFuse::Future(fut)).collect();
+        let all = all.into_iter().map(AltFuse::Future).collect();
 
         ResolveAll { all }
     }
