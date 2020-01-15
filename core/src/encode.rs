@@ -53,6 +53,7 @@ fn _encode_mail(mail: &Mail, top: bool, encoder: &mut EncodingBuffer) -> Result<
 /// if the body is not yet resolved use `Body::poll_body` or `IntoFuture`
 /// on `Mail` to prevent this from happening
 ///
+#[allow(clippy::nonminimal_bool)]
 fn encode_headers(mail: &Mail, top: bool, encoder: &mut EncodingBuffer) -> Result<(), MailError> {
     use super::MailBody::*;
 
@@ -85,10 +86,7 @@ fn encode_headers(mail: &Mail, top: bool, encoder: &mut EncodingBuffer) -> Resul
             let header = ContentType::body(data.media_type().clone());
             encode_header(&mut handle, header.name(), &header)?;
         }
-        MultipleBodies {
-            hidden_text: _,
-            bodies: _,
-        } => {}
+        MultipleBodies { .. } => {}
     }
     Ok(())
 }
@@ -137,7 +135,7 @@ fn encode_mail_part(mail: &Mail, encoder: &mut EncodingBuffer) -> Result<(), Mai
             ref hidden_text,
             ref bodies,
         } => {
-            if hidden_text.len() > 0 {
+            if !hidden_text.is_empty() {
                 //TODO find out if there is any source using the hidden text
                 // (e.g. for some form of validation, prove of senders validity etc.)
                 // if not drop the "hidden_text" field
@@ -176,7 +174,7 @@ fn encode_mail_part(mail: &Mail, encoder: &mut EncodingBuffer) -> Result<(), Mai
                 _encode_mail(mail, false, encoder)?;
             }
 
-            if bodies.len() > 0 {
+            if !bodies.is_empty() {
                 encoder.write_header_line(|handle| {
                     handle.write_char(minus)?;
                     handle.write_char(minus)?;

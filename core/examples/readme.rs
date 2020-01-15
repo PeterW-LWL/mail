@@ -37,7 +37,7 @@ fn print_some_mail() -> Result<(), MailError> {
     // We don't added any think which needs loading but we could have
     // and all of it would have been loaded concurrent and async.
     let encoded = mail
-        .into_encodable_mail(ctx.clone())
+        .into_encodable_mail(ctx)
         .wait()?
         .encode_into_bytes(MailType::Ascii)?;
 

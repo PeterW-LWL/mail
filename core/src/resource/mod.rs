@@ -180,10 +180,10 @@ impl Resource {
 
     /// Return the content id, if there is any.
     pub fn content_id(&self) -> Option<&ContentId> {
-        match self {
-            &Resource::Source(..) => None,
-            &Resource::Data(ref data) => Some(data.content_id()),
-            &Resource::EncData(ref enc_data) => Some(enc_data.content_id()),
+        match *self {
+            Resource::Source(..) => None,
+            Resource::Data(ref data) => Some(data.content_id()),
+            Resource::EncData(ref enc_data) => Some(enc_data.content_id()),
         }
     }
 }

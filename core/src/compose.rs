@@ -173,13 +173,11 @@ impl MailParts {
             mail.wrap_with_related(related)
         };
 
-        let mail = if attachments.is_empty() {
+        if attachments.is_empty() {
             mail
         } else {
             mail.wrap_with_mixed(attachments)
-        };
-
-        mail
+        }
     }
 }
 

@@ -296,9 +296,9 @@ impl Mail {
         } else {
             validate_singlepart_headermap(self.headers())?;
         }
-        match self.body() {
-            &MailBody::SingleBody { .. } => {}
-            &MailBody::MultipleBodies { ref bodies, .. } => {
+        match *self.body() {
+            MailBody::SingleBody { .. } => {}
+            MailBody::MultipleBodies { ref bodies, .. } => {
                 for body in bodies {
                     body.generally_validate_mail()?;
                 }
@@ -396,6 +396,7 @@ pub struct MailFuture<C: Context> {
     inner: InnerMailFuture<C>,
 }
 
+#[allow(clippy::large_enum_variant)]
 enum InnerMailFuture<C: Context> {
     New {
         mail: Mail,
@@ -545,8 +546,8 @@ fn auto_gen_headers<C: Context>(mail: &mut Mail, encoded_resources: Vec<EncData>
 ///
 /// Panics if the resource is not transfer encoded
 pub(crate) fn assume_encoded(resource: &Resource) -> &EncData {
-    match resource {
-        &Resource::EncData(ref ed) => ed,
+    match *resource {
+        Resource::EncData(ref ed) => ed,
         _ => panic!("[BUG] auto gen/encode should only be called on all resources are loaded"),
     }
 }
@@ -566,8 +567,8 @@ fn recursive_auto_gen_headers<C: Context>(mail: &mut Mail, boundary_count: &mut 
         ref mut headers,
         ref mut body,
     } = mail;
-    match body {
-        &mut MailBody::SingleBody { ref mut body } => {
+    match *body {
+        MailBody::SingleBody { ref mut body } => {
             let data = assume_encoded(body);
 
             if let Some(Ok(disposition)) = headers.get_single_mut(ContentDisposition) {
@@ -577,7 +578,7 @@ fn recursive_auto_gen_headers<C: Context>(mail: &mut Mail, boundary_count: &mut 
 
             headers.insert(ContentId::body(data.content_id().clone()));
         }
-        &mut MailBody::MultipleBodies { ref mut bodies, .. } => {
+        MailBody::MultipleBodies { ref mut bodies, .. } => {
             let headers: &mut HeaderMap = headers;
             let content_type: &mut Header<ContentType> = headers
                 .get_single_mut(ContentType)
@@ -703,7 +704,7 @@ mod test {
 
             let mut body_count = 0;
             mail.visit_mail_bodies(&mut |body: &Resource| {
-                if let &Resource::Data(ref body) = body {
+                if let Resource::Data(ref body) = *body {
                     assert_eq!(
                         ["r1", "r2", "r3"][body_count].as_bytes(),
                         body.buffer().as_ref()
@@ -852,7 +853,7 @@ mod test {
             mail.insert_headers(headers! {
                 _From: ["random@this.is.no.mail"],
                 Subject: "hoho",
-                Date: provided_date.clone()
+                Date: provided_date
             }?);
 
             let enc_mail = assert_ok!(mail.into_encodable_mail(ctx).wait());

@@ -74,8 +74,8 @@ mod test {
         #[test]
         fn boundary_is_not_quoted() {
             let out = create_structured_random_boundary(0);
-            assert!(!out.starts_with("\""));
-            assert!(!out.ends_with("\""));
+            assert!(!out.starts_with('\"'));
+            assert!(!out.ends_with('\"'));
         }
 
         #[test]

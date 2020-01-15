@@ -68,12 +68,12 @@ pub type Context = CompositeContext<FsResourceLoader, CpuPool, HashedIdGen>;
 /// also should only use domain you actually own).
 pub fn new(domain: Domain, unique_part: SoftAsciiString) -> Result<Context, ContextSetupError> {
     let resource_loader =
-        FsResourceLoader::with_cwd_root().map_err(|err| ContextSetupError::ReadingEnv(err))?;
+        FsResourceLoader::with_cwd_root().map_err(ContextSetupError::ReadingEnv)?;
 
     let cpu_pool = Builder::new().create();
 
-    let id_gen = HashedIdGen::new(domain, unique_part)
-        .map_err(|err| ContextSetupError::PunyCodingDomain(err))?;
+    let id_gen =
+        HashedIdGen::new(domain, unique_part).map_err(ContextSetupError::PunyCodingDomain)?;
 
     Ok(CompositeContext::new(resource_loader, cpu_pool, id_gen))
 }

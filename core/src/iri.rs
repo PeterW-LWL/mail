@@ -191,7 +191,7 @@ impl<'de> Deserialize<'de> for IRI {
             where
                 E: de::Error,
             {
-                let iri = s.parse().map_err(|err| E::custom(err))?;
+                let iri = s.parse().map_err(E::custom)?;
 
                 Ok(iri)
             }

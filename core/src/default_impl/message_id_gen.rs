@@ -96,7 +96,7 @@ impl MailIdGenComponent for HashedIdGen {
     }
 
     fn generate_content_id(&self) -> ContentId {
-        self.generate_message_id().into()
+        self.generate_message_id()
     }
 }
 

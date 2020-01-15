@@ -25,7 +25,7 @@ pub enum MaybeEncData {
 }
 
 impl MaybeEncData {
-    pub fn to_resource(self) -> Resource {
+    pub fn into_resource(self) -> Resource {
         match self {
             MaybeEncData::Data(data) => Resource::Data(data),
             MaybeEncData::EncData(enc_data) => Resource::EncData(enc_data),

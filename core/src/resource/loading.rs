@@ -70,7 +70,7 @@ impl ContainedResourcesAccess for Vec<Resource> {
     }
 }
 
-impl ContainedResourcesAccess for HashMap<String, Resource> {
+impl<S: std::hash::BuildHasher> ContainedResourcesAccess for HashMap<String, Resource, S> {
     type Key = str;
 
     fn visit_resources(&self, visitor: &mut impl FnMut(&Self::Key, &Resource)) {
@@ -136,7 +136,7 @@ where
         let mut futs = Vec::new();
 
         container.visit_resources(&mut |key, resource| {
-            if let &Resource::Source(ref source) = resource {
+            if let Resource::Source(ref source) = *resource {
                 let fut = ctx.load_resource(source);
                 futs.push(fut);
                 keys.push(key.to_owned());
@@ -175,13 +175,13 @@ where
         let InnerFuture {
             mut container,
             keys,
-            futs: _,
+            ..
         } = self.inner.take().unwrap();
 
         for (key, new_resource) in keys.into_iter().zip(loaded.into_iter()) {
             container.access_resource_mut(key.borrow(), |resource_ref| {
                 if let Some(resource_ref) = resource_ref {
-                    mem::replace(resource_ref, new_resource.to_resource());
+                    mem::replace(resource_ref, new_resource.into_resource());
                 }
             })
         }
