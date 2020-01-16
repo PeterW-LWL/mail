@@ -67,7 +67,7 @@ pub trait TemplateEngine: Sized {
 /// This could for example be implemented in a wild card impl for the template engine for
 /// any data `D` which implements `Serialize`.
 pub trait TemplateEngineCanHandleData<D>: TemplateEngine {
-    fn render<'r, 'a>(
+    fn render<'r>(
         &'r self,
         id: &'r Self::Id,
         data: &'r D,

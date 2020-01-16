@@ -100,7 +100,7 @@ impl<'de> Deserialize<'de> for CwdBaseDir {
     {
         use serde::de::Error;
         let path_buf = PathBuf::deserialize(deserializer)?;
-        Self::from_path(path_buf).map_err(|err| D::Error::custom(err))
+        Self::from_path(path_buf).map_err(D::Error::custom)
     }
 }
 
@@ -110,7 +110,7 @@ impl Serialize for CwdBaseDir {
         S: Serializer,
     {
         use serde::ser::Error;
-        let path = self.to_base_path().map_err(|err| S::Error::custom(err))?;
+        let path = self.to_base_path().map_err(S::Error::custom)?;
 
         path.serialize(serializer)
     }

@@ -312,7 +312,7 @@ mod test {
     use toml;
 
     fn test_source_iri(resource: &Resource, iri: &str) {
-        if let &Resource::Source(ref source) = resource {
+        if let Resource::Source(ref source) = *resource {
             assert_eq!(source.iri.as_str(), iri);
         } else {
             panic!(

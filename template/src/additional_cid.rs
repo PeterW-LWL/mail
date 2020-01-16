@@ -39,7 +39,7 @@ impl<'a> AdditionalCIds<'a> {
                 );
             }
         }
-        return None;
+        None
     }
 }
 

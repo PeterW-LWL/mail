@@ -135,7 +135,7 @@ impl PathRebaseable for Resource {
         &mut self,
         base_dir: impl AsRef<Path>,
     ) -> Result<(), UnsupportedPathError> {
-        if let &mut Resource::Source(ref mut source) = self {
+        if let Resource::Source(ref mut source) = *self {
             source.iri.rebase_to_include_base_dir(base_dir)?;
         }
         Ok(())
@@ -145,7 +145,7 @@ impl PathRebaseable for Resource {
         &mut self,
         base_dir: impl AsRef<Path>,
     ) -> Result<(), UnsupportedPathError> {
-        if let &mut Resource::Source(ref mut source) = self {
+        if let Resource::Source(ref mut source) = *self {
             source.iri.rebase_to_exclude_base_dir(base_dir)?;
         }
         Ok(())
