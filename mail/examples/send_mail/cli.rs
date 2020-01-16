@@ -92,9 +92,9 @@ impl<'a> ClDialog<'a> {
         let mut buf = String::new();
         while self.stdin.read_line(&mut buf)? != 0 {
             if !buf.ends_with("\r\n") {
-                if buf.ends_with("\r") {
+                if buf.ends_with('\r') {
                     buf.push('\n')
-                } else if buf.ends_with("\n") {
+                } else if buf.ends_with('\n') {
                     let n_idx = buf.len() - 1;
                     buf.insert(n_idx, '\r');
                 } else {

@@ -44,7 +44,7 @@ fn main() {
     // on a existing tokio runtime.
     tokio::run(future::lazy(move || {
         send_mail_batch(mail_requests, connection_config, ctx)
-            .then(|res| Ok(res))
+            .then(Ok)
             .for_each(|res| {
                 match res {
                     Ok(_) => println!("[mail send]"),
@@ -75,7 +75,7 @@ fn create_mail_requests(
 ) -> Result<Vec<MailRequest>, MailError> {
     use mail::headers::*;
 
-    let requests = mails
+    mails
         .into_iter()
         .map(|simple_mail| {
             let cli::SimpleMail {
@@ -93,9 +93,7 @@ fn create_mail_requests(
 
             Ok(MailRequest::from(mail))
         })
-        .collect::<Result<Vec<_>, _>>();
-
-    requests
+        .collect::<Result<Vec<_>, _>>()
 }
 
 fn read_data() -> Result<(cli::MsaInfo, Vec<cli::SimpleMail>), io::Error> {
